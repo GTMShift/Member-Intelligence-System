@@ -1,12 +1,37 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { MemberProfileCard } from './components/MemberProfileCard';
 import { MemberSearchPanel } from './components/MemberSearchPanel';
 import { useAuth } from './context/AuthContext';
+import { CompanyDetailPage } from './pages/CompanyDetailPage';
 import type { UserRole } from './types/api';
 
+interface DashboardLocationState {
+  selectedMemberId?: string;
+}
+
 function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<DashboardPage />} />
+        <Route path="/companies/:id" element={<CompanyPageLayout />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+function DashboardPage() {
   const { role, setRole } = useAuth();
+  const location = useLocation();
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const state = location.state as DashboardLocationState | null;
+    if (state?.selectedMemberId) {
+      setSelectedMemberId(state.selectedMemberId);
+    }
+  }, [location.state]);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -48,6 +73,30 @@ function App() {
             </div>
           )}
         </section>
+      </main>
+    </div>
+  );
+}
+
+function CompanyPageLayout() {
+  const { role, setRole } = useAuth();
+
+  return (
+    <div className="flex min-h-screen flex-col">
+      <header className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-[90rem] items-center justify-between px-4 py-4 sm:px-6">
+          <div>
+            <h1 className="text-lg font-semibold text-slate-900">
+              SolutionExec Member Intelligence Platform
+            </h1>
+            <p className="text-sm text-slate-500">Company details</p>
+          </div>
+          <RoleToggle role={role} onChange={setRole} />
+        </div>
+      </header>
+
+      <main className="mx-auto w-full max-w-[90rem] flex-1 bg-slate-50 lg:min-h-[calc(100vh-4.5rem)]">
+        <CompanyDetailPage />
       </main>
     </div>
   );

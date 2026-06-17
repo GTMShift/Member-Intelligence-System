@@ -1,7 +1,7 @@
 import type { Interaction } from '../types/api';
 import { formatTimestamp } from '../utils/format';
 
-const TYPE_LABELS: Record<Interaction['type'], string> = {
+const TYPE_LABELS: Record<Interaction['interaction_type'], string> = {
   meeting: 'Meeting',
   call: 'Call',
   email: 'Email',
@@ -33,7 +33,7 @@ export function InteractionTimeline({ interactions }: InteractionTimelineProps) 
         >
           <div className="flex min-w-[5.5rem] flex-col items-start">
             <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
-              {TYPE_LABELS[interaction.type]}
+              {TYPE_LABELS[interaction.interaction_type]}
             </span>
             <time
               dateTime={interaction.occurred_at}

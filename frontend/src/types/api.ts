@@ -18,19 +18,11 @@ export type MemberDataCategory =
 export type InteractionType = 'meeting' | 'call' | 'email' | 'event' | 'note';
 
 export interface MemberProfile {
-  current_company: string | null;
-  current_role: string | null;
+  job_title: string | null;
   current_job_start_date: string | null;
   seniority_level: string | null;
-  company_linkedin_url: string | null;
-  company_domain: string | null;
-  company_size: string | null;
-  company_industry: string | null;
-  company_sub_industry: string | null;
-  company_overview: string | null;
-  company_type: string | null;
-  company_revenue: string | null;
-  company_tags: string | null;
+  company_id: string | null;
+  company_name: string | null;
   country: string | null;
   state_region: string | null;
   city: string | null;
@@ -57,7 +49,7 @@ export interface MemberDataEntry {
 
 export interface Interaction {
   id: string;
-  type: InteractionType;
+  interaction_type: InteractionType;
   summary: string;
   occurred_at: string;
   logged_by: string;
@@ -69,8 +61,9 @@ export interface MemberSearchResult {
   first_name: string;
   last_name: string;
   email: string;
-  current_company: string | null;
-  current_role: string | null;
+  company_id: string | null;
+  company_name: string | null;
+  job_title: string | null;
   city: string | null;
   state_region: string | null;
   icp: IcpStatus;
@@ -96,6 +89,22 @@ export interface MemberDetail {
   profile: MemberProfile;
   member_data: MemberDataEntry[];
   interactions: Interaction[];
+}
+
+export interface CompanyDetail {
+  id: string;
+  name: string;
+  linkedin_url: string | null;
+  domain: string | null;
+  size: string | null;
+  industry: string | null;
+  sub_industry: string | null;
+  overview: string | null;
+  company_type: string | null;
+  revenue: string | null;
+  tags: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface MemberSearchParams {

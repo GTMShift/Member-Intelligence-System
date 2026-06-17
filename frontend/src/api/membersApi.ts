@@ -1,3 +1,4 @@
+import { getCompanyById } from './mockCompanies';
 import { MOCK_MEMBERS } from './mockMembers';
 import type {
   FilterOptions,
@@ -16,8 +17,9 @@ function toSearchResult(member: MemberDetail): MemberSearchResult {
     first_name: member.first_name,
     last_name: member.last_name,
     email: member.email,
-    current_company: member.profile.current_company,
-    current_role: member.profile.current_role,
+    company_id: member.profile.company_id,
+    company_name: member.profile.company_name,
+    job_title: member.profile.job_title,
     city: member.profile.city,
     state_region: member.profile.state_region,
     icp: member.profile.icp,
@@ -34,8 +36,8 @@ function matchesQuery(member: MemberDetail, q: string): boolean {
     member.last_name,
     `${member.first_name} ${member.last_name}`,
     member.email,
-    member.profile.current_company,
-    member.profile.current_role,
+    member.profile.company_name,
+    member.profile.job_title,
   ]
     .filter(Boolean)
     .join(' ')
@@ -50,7 +52,12 @@ function filterMembers(params: MemberSearchParams): MemberDetail[] {
     if (params.icp && member.profile.icp !== params.icp) return false;
     if (params.city && member.profile.city !== params.city) return false;
     if (params.state && member.profile.state_region !== params.state) return false;
-    if (params.industry && member.profile.company_industry !== params.industry) return false;
+    if (params.industry) {
+      const company = member.profile.company_id
+        ? getCompanyById(member.profile.company_id)
+        : undefined;
+      if (company?.industry !== params.industry) return false;
+    }
     if (params.seniority && member.profile.seniority_level !== params.seniority) return false;
     if (params.source && member.profile.signup_source !== params.source) return false;
     return true;
@@ -113,7 +120,10 @@ export function getFilterOptions(): FilterOptions {
   for (const member of MOCK_MEMBERS) {
     if (member.profile.city) cities.add(member.profile.city);
     if (member.profile.state_region) states.add(member.profile.state_region);
-    if (member.profile.company_industry) industries.add(member.profile.company_industry);
+    if (member.profile.company_id) {
+      const company = getCompanyById(member.profile.company_id);
+      if (company?.industry) industries.add(company.industry);
+    }
     if (member.profile.seniority_level) seniorityLevels.add(member.profile.seniority_level);
     if (member.profile.signup_source) signupSources.add(member.profile.signup_source);
   }

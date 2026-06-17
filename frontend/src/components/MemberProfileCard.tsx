@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { getMember } from '../api/membersApi';
 import { useAuth } from '../context/AuthContext';
 import type { MemberDataEntry, MemberDetail } from '../types/api';
@@ -265,22 +266,9 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
   ];
 
   const roleFields: ProfileField[] = [
-    { label: 'Current company', value: profile.current_company },
-    { label: 'Current role', value: profile.current_role },
+    { label: 'Job title', value: profile.job_title },
     { label: 'Job start date', value: profile.current_job_start_date },
     { label: 'Seniority level', value: profile.seniority_level },
-  ];
-
-  const companyFields: ProfileField[] = [
-    { label: 'Company LinkedIn', value: profile.company_linkedin_url },
-    { label: 'Company domain', value: profile.company_domain },
-    { label: 'Company size', value: profile.company_size },
-    { label: 'Industry', value: profile.company_industry },
-    { label: 'Sub industry', value: profile.company_sub_industry },
-    { label: 'Company overview', value: profile.company_overview },
-    { label: 'Company type', value: profile.company_type },
-    { label: 'Revenue', value: profile.company_revenue },
-    { label: 'Company tags', value: profile.company_tags },
   ];
 
   const locationFields: ProfileField[] = [
@@ -310,8 +298,23 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
           {fullName(member.first_name, member.last_name)}
         </h2>
         <p className="mt-1 text-sm text-slate-600">
-          {profile.current_role ?? '—'}
-          {profile.current_company ? ` · ${profile.current_company}` : ''}
+          {profile.job_title ?? '—'}
+          {profile.company_name ? (
+            <>
+              {' · '}
+              {profile.company_id ? (
+                <Link
+                  to={`/companies/${profile.company_id}`}
+                  state={{ fromMemberId: memberId }}
+                  className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                >
+                  {profile.company_name}
+                </Link>
+              ) : (
+                profile.company_name
+              )}
+            </>
+          ) : null}
         </p>
         <p className="mt-2 text-xs text-slate-400">
           Last updated {formatTimestamp(member.last_updated)}
@@ -340,12 +343,24 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
               </h4>
               <FieldGrid fields={roleFields} />
             </div>
-            <div>
-              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Company
-              </h4>
-              <FieldGrid fields={companyFields} />
-            </div>
+            {profile.company_name && (
+              <div>
+                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Company
+                </h4>
+                {profile.company_id ? (
+                  <Link
+                    to={`/companies/${profile.company_id}`}
+                    state={{ fromMemberId: memberId }}
+                    className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                  >
+                    {profile.company_name}
+                  </Link>
+                ) : (
+                  <p className="text-sm text-slate-900">{profile.company_name}</p>
+                )}
+              </div>
+            )}
             <div>
               <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Location

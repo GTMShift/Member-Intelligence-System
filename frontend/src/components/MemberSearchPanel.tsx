@@ -216,8 +216,8 @@ export function MemberSearchPanel({
                         {fullName(member.first_name, member.last_name)}
                       </p>
                       <p className="mt-0.5 truncate text-sm text-slate-600">
-                        {member.current_role ?? '—'}
-                        {member.current_company ? ` · ${member.current_company}` : ''}
+                        {member.job_title ?? '—'}
+                        {member.company_name ? ` · ${member.company_name}` : ''}
                       </p>
                       <p className="mt-0.5 truncate text-xs text-slate-500">
                         {member.city ?? '—'}
