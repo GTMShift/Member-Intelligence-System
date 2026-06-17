@@ -2,16 +2,15 @@
 -- GTMShift Member Intelligence Platform
 -- Migration 002: Add Companies Table
 -- ============================================================
--- Moves company data out of member_profile into its own table.
--- Avoids duplicate company data when multiple members share
--- the same employer (e.g. multiple Salesforce members).
 -- Run AFTER 001_initial_schema.sql.
+-- Company columns were never added to member_profile in 001
+-- so this migration only creates the companies table and
+-- adds the foreign key to member_profile.
 -- ============================================================
 
 
 -- ============================================================
 -- COMPANIES TABLE
--- One row per company. Members reference this via foreign key.
 -- ============================================================
 CREATE TABLE companies (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -22,7 +21,7 @@ CREATE TABLE companies (
     industry        TEXT,
     sub_industry    TEXT,
     overview        TEXT,
-    type            TEXT,
+    company_type    TEXT,
     revenue         TEXT,
     tags            TEXT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -33,22 +32,10 @@ CREATE TABLE companies (
 
 
 -- ============================================================
--- UPDATE MEMBER_PROFILE
--- Add company_id foreign key, drop old inline company columns
+-- ADD FOREIGN KEY TO MEMBER_PROFILE
 -- ============================================================
 ALTER TABLE member_profile
     ADD COLUMN company_id UUID REFERENCES companies(id) ON DELETE SET NULL;
-
-ALTER TABLE member_profile
-    DROP COLUMN company_linkedin_url,
-    DROP COLUMN company_domain,
-    DROP COLUMN company_size,
-    DROP COLUMN company_industry,
-    DROP COLUMN company_sub_industry,
-    DROP COLUMN company_overview,
-    DROP COLUMN company_type,
-    DROP COLUMN company_revenue,
-    DROP COLUMN company_tags;
 
 
 -- ============================================================

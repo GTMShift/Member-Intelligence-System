@@ -61,8 +61,8 @@ Response:
     "first_name": "string",
     "last_name": "string",
     "linkedin_url": "string",
-    "current_role": "string",
-    "current_company": "string",
+    "job_title": "string",
+    "company_name": "string",
     "photo_url": "string"
   }
 }
@@ -123,7 +123,7 @@ Response:
   "created_at": "timestamp",
   "last_updated": "timestamp",
   "profile": {
-    "current_role": "string",
+    "job_title": "string",
     "current_job_start_date": "string",
     "seniority_level": "string",
     "company_id": "uuid",
@@ -155,7 +155,7 @@ Response:
   "interactions": [
     {
       "id": "uuid",
-      "type": "meeting | call | email | event | note",
+      "interaction_type": "meeting | call | email | event | note",
       "summary": "string",
       "occurred_at": "timestamp",
       "logged_by": "string",
@@ -179,7 +179,7 @@ Request body:
   "linkedin_url": "string",
   "phone": "string",
   "company_id": "uuid",
-  "current_role": "string",
+  "job_title": "string",
   "signup_source": "Website | Luma | Substack | Manual",
   "event_feedback": "string"
 }
@@ -242,7 +242,7 @@ Request body (all fields optional):
 ```json
 {
   "company_id": "uuid",
-  "current_role": "string",
+  "job_title": "string",
   "current_job_start_date": "string",
   "seniority_level": "string",
   "country": "string",
@@ -318,7 +318,7 @@ Response:
       "email": "string",
       "company_id": "uuid",
       "company_name": "string",
-      "current_role": "string",
+      "job_title": "string",
       "city": "string",
       "state_region": "string",
       "icp": "YES | NO | null",
@@ -346,7 +346,7 @@ Response:
   "industry": "string",
   "sub_industry": "string",
   "overview": "string",
-  "type": "string",
+  "company_type": "string",
   "revenue": "string",
   "tags": "string",
   "created_at": "timestamp",
@@ -391,7 +391,7 @@ Request body:
   "industry": "string",
   "sub_industry": "string",
   "overview": "string",
-  "type": "string",
+  "company_type": "string",
   "revenue": "string",
   "tags": "string"
 }
@@ -427,7 +427,7 @@ Request body (all fields optional):
   "industry": "string",
   "sub_industry": "string",
   "overview": "string",
-  "type": "string",
+  "company_type": "string",
   "revenue": "string",
   "tags": "string"
 }
@@ -534,7 +534,7 @@ Get the full interaction timeline for a member. Admin only.
 
 Query params:
 ```
-type   string    meeting | call | email | event | note
+interaction_type   string    meeting | call | email | event | note
 ```
 
 Response:
@@ -544,7 +544,7 @@ Response:
   "interactions": [
     {
       "id": "uuid",
-      "type": "string",
+      "interaction_type": "string",
       "summary": "string",
       "occurred_at": "timestamp",
       "logged_by": "string",
@@ -562,7 +562,7 @@ Log a new interaction. Admin only.
 Request body:
 ```json
 {
-  "type": "meeting | call | email | event | note",
+  "interaction_type": "meeting | call | email | event | note",
   "summary": "string",
   "occurred_at": "timestamp",
   "logged_by": "string",
@@ -573,7 +573,7 @@ Request body:
 Example for logging event attendance:
 ```json
 {
-  "type": "event",
+  "interaction_type": "event",
   "summary": "Attended Sept Wine Dinner",
   "occurred_at": "2026-09-12T18:00:00Z",
   "logged_by": "Meghan",
@@ -586,7 +586,7 @@ Response:
 {
   "id": "uuid",
   "member_id": "uuid",
-  "type": "string",
+  "interaction_type": "string",
   "occurred_at": "timestamp"
 }
 ```
@@ -605,8 +605,8 @@ Response:
 ```json
 {
   "member_id": "uuid",
-  "enriched_fields": ["current_company", "seniority_level", "city"],
-  "skipped_fields": ["current_role"],
+  "enriched_fields": ["company_id", "seniority_level", "city"],
+  "skipped_fields": ["job_title"],
   "skip_reason": "Manual entry takes priority over Apollo for existing fields",
   "updated_at": "timestamp"
 }

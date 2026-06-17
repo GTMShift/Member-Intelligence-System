@@ -37,22 +37,10 @@ CREATE TABLE member_profile (
     id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     member_id               UUID NOT NULL REFERENCES members(id) ON DELETE CASCADE,
 
-    -- Current role
-    current_company         TEXT,
-    current_role            TEXT,
+    -- Current role (renamed from current_role to avoid reserved word conflict)
+    job_title               TEXT,
     current_job_start_date  TEXT,
     seniority_level         TEXT,
-
-    -- Company details (from Apollo enrichment)
-    company_linkedin_url    TEXT,
-    company_domain          TEXT,
-    company_size            TEXT,
-    company_industry        TEXT,
-    company_sub_industry    TEXT,
-    company_overview        TEXT,
-    company_type            TEXT,
-    company_revenue         TEXT,
-    company_tags            TEXT,
 
     -- Location
     country                 TEXT,
@@ -90,19 +78,11 @@ CREATE TABLE member_data (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     member_id   UUID NOT NULL REFERENCES members(id) ON DELETE CASCADE,
     tier        TEXT NOT NULL CHECK (tier IN ('user_editable', 'admin_only')),
-    category    TEXT NOT NULL, -- e.g. 'challenge', 'interest', 'note', 'event_feedback'
+    category    TEXT NOT NULL,
     data        JSONB NOT NULL,
-    logged_by   TEXT,          -- team member name or 'self' if member submitted
+    logged_by   TEXT,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
--- Example rows this table will store:
--- { tier: 'user_editable', category: 'event_feedback',
---   data: { "question": "What is one thing you want to get out of this event?",
---            "answer": "How to keep my team relevant in a world of gen demos" } }
---
--- { tier: 'admin_only', category: 'note',
---   data: { "text": "Strong ICP fit, intro'd by Chris at Sept dinner" } }
 
 
 -- ============================================================
@@ -112,21 +92,19 @@ CREATE TABLE member_data (
 CREATE TABLE interactions (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     member_id       UUID NOT NULL REFERENCES members(id) ON DELETE CASCADE,
-    type            TEXT NOT NULL CHECK (type IN ('meeting', 'call', 'email', 'event', 'note')),
+    interaction_type TEXT NOT NULL CHECK (interaction_type IN ('meeting', 'call', 'email', 'event', 'note')),
     summary         TEXT,
     occurred_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     logged_by       TEXT,
-    metadata        JSONB        -- e.g. event name, calendar link, email subject
+    metadata        JSONB
 );
 
 
 -- ============================================================
 -- INDEXES
--- Speeds up the searches the admin dashboard will run constantly
 -- ============================================================
 CREATE INDEX idx_members_email        ON members(email);
 CREATE INDEX idx_members_linkedin     ON members(linkedin_url);
-CREATE INDEX idx_profile_company      ON member_profile(current_company);
 CREATE INDEX idx_profile_icp          ON member_profile(icp);
 CREATE INDEX idx_profile_city         ON member_profile(city);
 CREATE INDEX idx_profile_state        ON member_profile(state_region);
