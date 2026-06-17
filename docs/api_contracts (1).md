@@ -108,6 +108,9 @@ Response:
 ### GET /members/:id
 Get one full member profile. Admin gets all three tiers. Member gets their own public + user_editable only.
 
+Company info is not returned inline — only company_id and company_name are returned.
+To view full company details, call GET /companies/:id.
+
 Response:
 ```json
 {
@@ -120,19 +123,11 @@ Response:
   "created_at": "timestamp",
   "last_updated": "timestamp",
   "profile": {
-    "current_company": "string",
     "current_role": "string",
     "current_job_start_date": "string",
     "seniority_level": "string",
-    "company_linkedin_url": "string",
-    "company_domain": "string",
-    "company_size": "string",
-    "company_industry": "string",
-    "company_sub_industry": "string",
-    "company_overview": "string",
-    "company_type": "string",
-    "company_revenue": "string",
-    "company_tags": "string",
+    "company_id": "uuid",
+    "company_name": "string",
     "country": "string",
     "state_region": "string",
     "city": "string",
@@ -183,7 +178,7 @@ Request body:
   "email": "string",
   "linkedin_url": "string",
   "phone": "string",
-  "current_company": "string",
+  "company_id": "uuid",
   "current_role": "string",
   "signup_source": "Website | Luma | Substack | Manual",
   "event_feedback": "string"
@@ -246,19 +241,10 @@ This is separate from core identity to keep changes auditable.
 Request body (all fields optional):
 ```json
 {
-  "current_company": "string",
+  "company_id": "uuid",
   "current_role": "string",
   "current_job_start_date": "string",
   "seniority_level": "string",
-  "company_linkedin_url": "string",
-  "company_domain": "string",
-  "company_size": "string",
-  "company_industry": "string",
-  "company_sub_industry": "string",
-  "company_overview": "string",
-  "company_type": "string",
-  "company_revenue": "string",
-  "company_tags": "string",
   "country": "string",
   "state_region": "string",
   "city": "string",
@@ -330,7 +316,8 @@ Response:
       "first_name": "string",
       "last_name": "string",
       "email": "string",
-      "current_company": "string",
+      "company_id": "uuid",
+      "company_name": "string",
       "current_role": "string",
       "city": "string",
       "state_region": "string",
@@ -338,6 +325,119 @@ Response:
       "last_updated": "timestamp"
     }
   ]
+}
+```
+
+---
+
+## Companies
+
+### GET /companies/:id
+Get full details for a company. Called when a user clicks a company name in the admin dashboard.
+
+Response:
+```json
+{
+  "id": "uuid",
+  "name": "string",
+  "linkedin_url": "string",
+  "domain": "string",
+  "size": "string",
+  "industry": "string",
+  "sub_industry": "string",
+  "overview": "string",
+  "type": "string",
+  "revenue": "string",
+  "tags": "string",
+  "created_at": "timestamp",
+  "updated_at": "timestamp"
+}
+```
+
+---
+
+### GET /companies
+Get all companies. Admin only.
+
+Response:
+```json
+{
+  "total": 120,
+  "companies": [
+    {
+      "id": "uuid",
+      "name": "string",
+      "domain": "string",
+      "industry": "string",
+      "size": "string"
+    }
+  ]
+}
+```
+
+---
+
+### POST /companies
+Create a new company record. Admin only.
+Check for existing company by domain before creating to avoid duplicates.
+
+Request body:
+```json
+{
+  "name": "string",
+  "linkedin_url": "string",
+  "domain": "string",
+  "size": "string",
+  "industry": "string",
+  "sub_industry": "string",
+  "overview": "string",
+  "type": "string",
+  "revenue": "string",
+  "tags": "string"
+}
+```
+
+Response:
+```json
+{
+  "id": "uuid",
+  "name": "string",
+  "created_at": "timestamp"
+}
+```
+
+Errors:
+```
+409 — company with this domain already exists
+400 — missing required fields
+```
+
+---
+
+### PATCH /companies/:id
+Update a company record. Admin only.
+
+Request body (all fields optional):
+```json
+{
+  "name": "string",
+  "linkedin_url": "string",
+  "domain": "string",
+  "size": "string",
+  "industry": "string",
+  "sub_industry": "string",
+  "overview": "string",
+  "type": "string",
+  "revenue": "string",
+  "tags": "string"
+}
+```
+
+Response:
+```json
+{
+  "id": "uuid",
+  "updated_at": "timestamp"
 }
 ```
 
