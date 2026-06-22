@@ -126,3 +126,26 @@ export interface FilterOptions {
   seniorityLevels: string[];
   signupSources: string[];
 }
+
+export type DedupMatchedOn = 'email' | 'linkedin_url' | 'phone';
+
+export interface DedupCheckResponse {
+  duplicate_found: boolean;
+  existing_member_id: string;
+  matched_on: DedupMatchedOn;
+}
+
+/** Incoming signup fields passed to POST /members/dedup/check alongside the check result. */
+export interface DedupIncomingMember {
+  first_name: string;
+  last_name: string;
+  email: string;
+  linkedin_url: string;
+  phone: string | null;
+}
+
+export interface PendingDuplicateFlag {
+  id: string;
+  check: DedupCheckResponse;
+  incoming: DedupIncomingMember;
+}

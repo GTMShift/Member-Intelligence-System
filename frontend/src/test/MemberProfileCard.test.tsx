@@ -23,6 +23,10 @@ function mockAuthAs(role: 'admin' | 'member') {
     role,
     setRole: vi.fn(),
     isAdmin: role === 'admin',
+    session: null,
+    user: null,
+    loading: false,
+    signOut: vi.fn().mockResolvedValue(undefined),
   });
 }
 

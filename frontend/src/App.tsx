@@ -2,8 +2,11 @@ import { useEffect, useState } from 'react';
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { MemberProfileCard } from './components/MemberProfileCard';
 import { MemberSearchPanel } from './components/MemberSearchPanel';
+import { DuplicateFlagAlerts } from './components/DuplicateFlagAlerts';
+import { ProtectedRoute } from './components/ProtectedRoute';
 import { useAuth } from './context/AuthContext';
 import { CompanyDetailPage } from './pages/CompanyDetailPage';
+import { LoginPage } from './pages/LoginPage';
 import type { UserRole } from './types/api';
 
 interface DashboardLocationState {
@@ -14,15 +17,30 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<DashboardPage />} />
-        <Route path="/companies/:id" element={<CompanyPageLayout />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/companies/:id"
+          element={
+            <ProtectedRoute>
+              <CompanyPageLayout />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </BrowserRouter>
   );
 }
 
 function DashboardPage() {
-  const { role, setRole } = useAuth();
+  const { role, setRole, isAdmin } = useAuth();
   const location = useLocation();
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
 
@@ -32,6 +50,10 @@ function DashboardPage() {
       setSelectedMemberId(state.selectedMemberId);
     }
   }, [location.state]);
+
+  const handleViewExistingMember = (memberId: string) => {
+    setSelectedMemberId(memberId);
+  };
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -46,6 +68,10 @@ function DashboardPage() {
           <RoleToggle role={role} onChange={setRole} />
         </div>
       </header>
+
+      {isAdmin && (
+        <DuplicateFlagAlerts onViewExistingMember={handleViewExistingMember} />
+      )}
 
       <main className="mx-auto flex w-full max-w-[90rem] flex-1 flex-col lg:flex-row">
         <aside className="w-full border-b border-slate-200 bg-slate-50 lg:w-[22rem] lg:shrink-0 lg:border-b-0 lg:border-r xl:w-[26rem]">
