@@ -7,7 +7,7 @@ All IDs are UUIDs.
 
 ---
 
-## Notes on data cleaning (Jonah's work)
+## Notes on data cleaning
 - LinkedIn URLs are cleaned — no appended data (e.g. `,True` removed)
 - Phone numbers are in E.164 format (e.g. `+15551234567`)
 - Duplicate members are being merged — dedup logic still in progress
@@ -132,12 +132,6 @@ Response:
     "state_region": "string",
     "city": "string",
     "work_email_enriched": "string",
-    "prev_company_1": "string",
-    "prev_role_1": "string",
-    "prev_company_2": "string",
-    "prev_role_2": "string",
-    "prev_company_3": "string",
-    "prev_role_3": "string",
     "icp": "YES | NO | null",
     "signup_source": "string",
     "updated_at": "timestamp"
@@ -160,6 +154,16 @@ Response:
       "occurred_at": "timestamp",
       "logged_by": "string",
       "metadata": {}
+    }
+  ],
+  "employment_history": [
+    {
+      "id": "uuid",
+      "company": "string",
+      "role": "string",
+      "start_date": "date",
+      "end_date": "date",
+      "source": "Apollo | Manual | Import"
     }
   ]
 }
@@ -249,12 +253,6 @@ Request body (all fields optional):
   "state_region": "string",
   "city": "string",
   "work_email_enriched": "string",
-  "prev_company_1": "string",
-  "prev_role_1": "string",
-  "prev_company_2": "string",
-  "prev_role_2": "string",
-  "prev_company_3": "string",
-  "prev_role_3": "string",
   "icp": "YES | NO",
   "signup_source": "string"
 }
@@ -443,7 +441,147 @@ Response:
 
 ---
 
-## Member Data (JSONB entries)
+## Employment History
+
+### GET /members/:id/employment
+Get full employment history for a member. Admin and member (own profile only).
+
+Response:
+```json
+{
+  "member_id": "uuid",
+  "employment_history": [
+    {
+      "id": "uuid",
+      "company": "string",
+      "role": "string",
+      "start_date": "date",
+      "end_date": "date",
+      "source": "Apollo | Manual | Import"
+    }
+  ]
+}
+```
+
+---
+
+### POST /members/:id/employment
+Add a new employment history entry. Admin only.
+
+Request body:
+```json
+{
+  "company": "string",
+  "role": "string",
+  "start_date": "date",
+  "end_date": "date",
+  "source": "Apollo | Manual | Import"
+}
+```
+
+Response:
+```json
+{
+  "id": "uuid",
+  "member_id": "uuid",
+  "company": "string",
+  "created_at": "timestamp"
+}
+```
+
+---
+
+## Events
+
+### GET /events
+Get all events. Admin only.
+
+Response:
+```json
+{
+  "total": 10,
+  "events": [
+    {
+      "id": "uuid",
+      "luma_event_id": "string",
+      "event_name": "string",
+      "event_date": "timestamp",
+      "event_type": "string",
+      "capacity": 50,
+      "location": "string"
+    }
+  ]
+}
+```
+
+---
+
+### POST /events
+Create a new event. Admin only.
+
+Request body:
+```json
+{
+  "luma_event_id": "string",
+  "event_name": "string",
+  "event_date": "timestamp",
+  "event_type": "string",
+  "capacity": 50,
+  "location": "string"
+}
+```
+
+Response:
+```json
+{
+  "id": "uuid",
+  "event_name": "string",
+  "created_at": "timestamp"
+}
+```
+
+Errors:
+```
+409 — event with this luma_event_id already exists
+400 — missing required fields
+```
+
+---
+
+### POST /events/:id/signups
+Register a member for an event.
+
+Request body:
+```json
+{
+  "member_id": "uuid",
+  "rsvp_status": "registered | attended | no_show | canceled",
+  "signup_date": "timestamp",
+  "event_goal": "string",
+  "approval_status": "string"
+}
+```
+
+Response:
+```json
+{
+  "id": "uuid",
+  "member_id": "uuid",
+  "event_id": "uuid",
+  "rsvp_status": "string",
+  "created_at": "timestamp"
+}
+```
+
+Errors:
+```
+409 — member already signed up for this event
+400 — missing required fields
+```
+
+---
+
+## Enrichment
 
 ### GET /members/:id/data
 Get all member_data entries for a member.
@@ -504,7 +642,7 @@ Example for admin adding a note:
   "tier": "admin_only",
   "category": "note",
   "data": { "text": "Strong ICP fit, intro'd by Chris at Sept dinner" },
-  "logged_by": "James Kaikis"
+  "logged_by": "admin"
 }
 ```
 
@@ -576,7 +714,7 @@ Example for logging event attendance:
   "interaction_type": "event",
   "summary": "Attended Sept Wine Dinner",
   "occurred_at": "2026-09-12T18:00:00Z",
-  "logged_by": "Meghan",
+  "logged_by": "admin",
   "metadata": { "event_name": "Sept Wine Dinner", "location": "Chicago" }
 }
 ```
@@ -597,7 +735,7 @@ Response:
 
 ### POST /members/:id/enrich
 Trigger Apollo enrichment for a single member. Admin only.
-Pulls company, role, seniority, location, and previous roles where available.
+Pulls company, role, seniority, location, and employment history where available.
 
 No request body needed.
 
@@ -606,21 +744,27 @@ Response:
 {
   "member_id": "uuid",
   "enriched_fields": ["company_id", "seniority_level", "city"],
-  "skipped_fields": ["job_title"],
-  "skip_reason": "Manual entry takes priority over Apollo for existing fields",
+  "conflict_fields": ["job_title"],
+  "conflict_detail": {
+    "job_title": { "manual": "VP of Sales", "apollo": "Vice President, Sales" }
+  },
+  "skipped_fields": [],
   "updated_at": "timestamp"
 }
 ```
 
 Notes:
-- Fields that already have a manually entered value are NOT overwritten by Apollo
-- Only empty fields get filled in by enrichment
-- This rule must be confirmed before build (open question #2 from PRD)
+- Manual entry always wins — Apollo never overwrites an existing manually entered value
+- If Apollo data conflicts with a manual entry, it is flagged in conflict_fields with a side-by-side comparison for admin review
+- Only empty fields get filled in automatically
+- Final decision on conflicts rests with the admin team
 
 ---
 
 ## Deduplication
-> Status: logic still being finalized by Jonah. Do not build this endpoint until dedup rules are locked.
+> Status: logic still being finalized by the team. Do not build this endpoint until dedup rules are locked.
+> Approach: keep all historical data with timestamps. No merge UI for now.
+> Member-facing confirmation flow for email/phone changes is future state.
 
 ### POST /members/dedup/check
 Check if a member being created already exists.
@@ -646,9 +790,21 @@ Response:
 
 ---
 
-## Open questions that affect these contracts
+## Open Questions — Resolved
 
-1. Which field wins when Apollo and manual entry conflict? (currently defaulting to manual wins — confirm before building enrichment endpoint)
-2. Can members see their own ICP status? (currently admin-only — confirm before building GET /members/:id role logic)
-3. Dedup merge endpoint — hold until Jonah finishes dedup logic
-4. Calendar sync endpoint — hold until calendar platform is confirmed
+1. Which field wins when Apollo and manual entry conflict?
+   RESOLVED: Manual entry always wins. Conflicting Apollo data is flagged
+   for admin review with a side-by-side comparison. Admin team makes the final call.
+
+2. Can members see their own ICP status?
+   RESOLVED: No. ICP is admin-only. Members never see it.
+
+3. Dedup merge logic?
+   RESOLVED: Keep all historical data with timestamps. No merge UI for now.
+   Member-facing confirmation flow for email/phone is future state.
+   Endpoint still on hold until dedup rules are fully finalized.
+
+4. Calendar platform for interaction sync?
+   RESOLVED: Google Calendar + Granola via Atlas mac mini with local model.
+   Transcripts push from Granola into Supabase via a script on Atlas.
+   Too complex for current phase — flagged for future build. Endpoint on hold.
