@@ -61,7 +61,7 @@ Response:
     "first_name": "string",
     "last_name": "string",
     "linkedin_url": "string",
-    "job_title": "string",
+    "current_role": "string",
     "company_name": "string",
     "photo_url": "string"
   }
@@ -111,6 +111,8 @@ Get one full member profile. Admin gets all three tiers. Member gets their own p
 Company info is not returned inline — only company_id and company_name are returned.
 To view full company details, call GET /companies/:id.
 
+Current job title is not stored on member_profile — it comes from employment_history where is_current = true.
+
 Response:
 ```json
 {
@@ -123,7 +125,6 @@ Response:
   "created_at": "timestamp",
   "last_updated": "timestamp",
   "profile": {
-    "job_title": "string",
     "current_job_start_date": "string",
     "seniority_level": "string",
     "company_id": "uuid",
@@ -163,6 +164,7 @@ Response:
       "role": "string",
       "start_date": "date",
       "end_date": "date",
+      "is_current": true,
       "source": "Apollo | Manual | Import"
     }
   ]
@@ -183,7 +185,7 @@ Request body:
   "linkedin_url": "string",
   "phone": "string",
   "company_id": "uuid",
-  "job_title": "string",
+  "current_role": "string",
   "signup_source": "Website | Luma | Substack | Manual",
   "event_feedback": "string"
 }
@@ -192,6 +194,7 @@ Request body:
 Notes:
 - `email` and `linkedin_url` are unique — if either already exists, return a 409 conflict
 - `event_feedback` maps to a `member_data` row with `tier = 'user_editable'` and `category = 'event_feedback'`
+- `current_role` creates an entry in `employment_history` with `is_current = true`
 - Phone must be in E.164 format (e.g. `+15551234567`)
 
 Response:
@@ -246,7 +249,6 @@ Request body (all fields optional):
 ```json
 {
   "company_id": "uuid",
-  "job_title": "string",
   "current_job_start_date": "string",
   "seniority_level": "string",
   "country": "string",
@@ -316,7 +318,7 @@ Response:
       "email": "string",
       "company_id": "uuid",
       "company_name": "string",
-      "job_title": "string",
+      "current_role": "string",
       "city": "string",
       "state_region": "string",
       "icp": "YES | NO | null",
@@ -325,6 +327,8 @@ Response:
   ]
 }
 ```
+
+Note: `current_role` in search results is derived from `employment_history` where `is_current = true`.
 
 ---
 
@@ -445,6 +449,7 @@ Response:
 
 ### GET /members/:id/employment
 Get full employment history for a member. Admin and member (own profile only).
+Current role is the entry where is_current = true.
 
 Response:
 ```json
@@ -457,6 +462,7 @@ Response:
       "role": "string",
       "start_date": "date",
       "end_date": "date",
+      "is_current": true,
       "source": "Apollo | Manual | Import"
     }
   ]
@@ -467,6 +473,8 @@ Response:
 
 ### POST /members/:id/employment
 Add a new employment history entry. Admin only.
+When adding a current role, set is_current = true.
+The previous current role will automatically be set to is_current = false.
 
 Request body:
 ```json
@@ -475,6 +483,7 @@ Request body:
   "role": "string",
   "start_date": "date",
   "end_date": "date",
+  "is_current": true,
   "source": "Apollo | Manual | Import"
 }
 ```
@@ -744,9 +753,9 @@ Response:
 {
   "member_id": "uuid",
   "enriched_fields": ["company_id", "seniority_level", "city"],
-  "conflict_fields": ["job_title"],
+  "conflict_fields": ["role"],
   "conflict_detail": {
-    "job_title": { "manual": "VP of Sales", "apollo": "Vice President, Sales" }
+    "role": { "manual": "VP of Sales", "apollo": "Vice President, Sales" }
   },
   "skipped_fields": [],
   "updated_at": "timestamp"

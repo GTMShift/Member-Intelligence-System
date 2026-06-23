@@ -11,6 +11,10 @@ import type {
 
 const SEARCH_DELAY_MS = 150;
 
+function getCurrentRole(member: MemberDetail): string | null {
+  return member.employment_history.find((entry) => entry.is_current)?.role ?? null;
+}
+
 function toSearchResult(member: MemberDetail): MemberSearchResult {
   return {
     id: member.id,
@@ -19,7 +23,7 @@ function toSearchResult(member: MemberDetail): MemberSearchResult {
     email: member.email,
     company_id: member.profile.company_id,
     company_name: member.profile.company_name,
-    job_title: member.profile.job_title,
+    current_role: getCurrentRole(member),
     city: member.profile.city,
     state_region: member.profile.state_region,
     icp: member.profile.icp,
@@ -37,7 +41,7 @@ function matchesQuery(member: MemberDetail, q: string): boolean {
     `${member.first_name} ${member.last_name}`,
     member.email,
     member.profile.company_name,
-    member.profile.job_title,
+    getCurrentRole(member),
   ]
     .filter(Boolean)
     .join(' ')

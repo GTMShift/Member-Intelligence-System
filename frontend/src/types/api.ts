@@ -17,8 +17,19 @@ export type MemberDataCategory =
 
 export type InteractionType = 'meeting' | 'call' | 'email' | 'event' | 'note';
 
+export type EmploymentSource = 'Apollo' | 'Manual' | 'Import';
+
+export interface EmploymentHistoryEntry {
+  id: string;
+  company: string;
+  role: string;
+  start_date: string | null;
+  end_date: string | null;
+  is_current: boolean;
+  source: EmploymentSource;
+}
+
 export interface MemberProfile {
-  job_title: string | null;
   current_job_start_date: string | null;
   seniority_level: string | null;
   company_id: string | null;
@@ -63,7 +74,8 @@ export interface MemberSearchResult {
   email: string;
   company_id: string | null;
   company_name: string | null;
-  job_title: string | null;
+  /** Derived from employment_history where is_current = true */
+  current_role: string | null;
   city: string | null;
   state_region: string | null;
   icp: IcpStatus;
@@ -89,6 +101,7 @@ export interface MemberDetail {
   profile: MemberProfile;
   member_data: MemberDataEntry[];
   interactions: Interaction[];
+  employment_history: EmploymentHistoryEntry[];
 }
 
 export interface CompanyDetail {
@@ -142,6 +155,7 @@ export interface DedupIncomingMember {
   email: string;
   linkedin_url: string;
   phone: string | null;
+  current_role: string | null;
 }
 
 export interface PendingDuplicateFlag {

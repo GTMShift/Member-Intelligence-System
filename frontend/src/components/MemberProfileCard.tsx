@@ -257,6 +257,8 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
   const { profile } = member;
   const userEditableEntries = member.member_data.filter((e) => e.tier === 'user_editable');
   const adminOnlyEntries = member.member_data.filter((e) => e.tier === 'admin_only');
+  const currentRole =
+    member.employment_history.find((entry) => entry.is_current)?.role ?? null;
 
   const identityFields: ProfileField[] = [
     { label: 'Email', value: member.email },
@@ -266,7 +268,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
   ];
 
   const roleFields: ProfileField[] = [
-    { label: 'Job title', value: profile.job_title },
+    { label: 'Job title', value: currentRole },
     { label: 'Job start date', value: profile.current_job_start_date },
     { label: 'Seniority level', value: profile.seniority_level },
   ];
@@ -298,7 +300,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
           {fullName(member.first_name, member.last_name)}
         </h2>
         <p className="mt-1 text-sm text-slate-600">
-          {profile.job_title ?? '—'}
+          {currentRole ?? '—'}
           {profile.company_name ? (
             <>
               {' · '}

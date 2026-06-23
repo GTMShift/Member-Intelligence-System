@@ -14,6 +14,7 @@ export const MOCK_DUPLICATE_FLAGS: PendingDuplicateFlag[] = [
       email: 'emily.n@greenfield.co',
       linkedin_url: 'https://www.linkedin.com/in/emilynakamura-new',
       phone: '+12125550999',
+      current_role: 'Director of Business Development',
     },
   },
   {
@@ -29,6 +30,7 @@ export const MOCK_DUPLICATE_FLAGS: PendingDuplicateFlag[] = [
       email: 'm.rivera.personal@gmail.com',
       linkedin_url: 'https://www.linkedin.com/in/marcusrivera',
       phone: '+14155550999',
+      current_role: 'Chief Revenue Officer',
     },
   },
 ];
