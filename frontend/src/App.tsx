@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { MemberProfileCard } from './components/MemberProfileCard';
 import { MemberSearchPanel } from './components/MemberSearchPanel';
 import { DuplicateFlagAlerts } from './components/DuplicateFlagAlerts';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { useAuth } from './context/AuthContext';
+import { supabase } from './lib/supabaseClient';
 import { CompanyDetailPage } from './pages/CompanyDetailPage';
 import { LoginPage } from './pages/LoginPage';
 import type { UserRole } from './types/api';
@@ -65,7 +66,7 @@ function DashboardPage() {
             </h1>
             <p className="text-sm text-slate-500">Admin dashboard</p>
           </div>
-          <RoleToggle role={role} onChange={setRole} />
+          <HeaderActions role={role} onRoleChange={setRole} />
         </div>
       </header>
 
@@ -117,13 +118,45 @@ function CompanyPageLayout() {
             </h1>
             <p className="text-sm text-slate-500">Company details</p>
           </div>
-          <RoleToggle role={role} onChange={setRole} />
+          <HeaderActions role={role} onRoleChange={setRole} />
         </div>
       </header>
 
       <main className="mx-auto w-full max-w-[90rem] flex-1 bg-slate-50 lg:min-h-[calc(100vh-4.5rem)]">
         <CompanyDetailPage />
       </main>
+    </div>
+  );
+}
+
+function HeaderActions({
+  role,
+  onRoleChange,
+}: {
+  role: UserRole;
+  onRoleChange: (role: UserRole) => void;
+}) {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    navigate('/login');
+  };
+
+  return (
+    <div className="flex items-center gap-4">
+      <RoleToggle role={role} onChange={onRoleChange} />
+      {user?.email && (
+        <span className="text-sm text-slate-600">{user.email}</span>
+      )}
+      <button
+        type="button"
+        onClick={handleSignOut}
+        className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+      >
+        Sign out
+      </button>
     </div>
   );
 }
