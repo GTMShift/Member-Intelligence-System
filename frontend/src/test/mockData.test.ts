@@ -2,11 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { MOCK_MEMBERS } from '../api/mockMembers';
 
 describe('mock data consistency', () => {
-  it('all mock members have job_title on profile, not current_role', () => {
+  it('all mock members have a current role in employment_history, not job_title on profile', () => {
     for (const member of MOCK_MEMBERS) {
-      expect(member.profile).toHaveProperty('job_title');
-      expect(member.profile.job_title).toBeTruthy();
-      expect(member.profile).not.toHaveProperty('current_role');
+      expect(member.profile).not.toHaveProperty('job_title');
+
+      const currentEmployment = member.employment_history.filter(
+        (entry) => entry.is_current === true,
+      );
+      expect(currentEmployment.length).toBeGreaterThanOrEqual(1);
+
+      for (const entry of currentEmployment) {
+        expect(entry).toHaveProperty('role');
+        expect(entry.role).toBeTruthy();
+      }
     }
   });
 

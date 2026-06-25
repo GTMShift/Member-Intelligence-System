@@ -1,13 +1,23 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import type { UserRole } from '../types/api';
 
-export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { session, loading } = useAuth();
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  requiredRole?: UserRole;
+}
+
+export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
+  const { session, role, loading } = useAuth();
 
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <p className="text-sm text-slate-500">Loading…</p>
+        <div
+          className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600"
+          role="status"
+          aria-label="Loading"
+        />
       </div>
     );
   }
@@ -16,5 +26,17 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
-  return children;
+  if (requiredRole === 'admin') {
+    if (role !== 'admin') {
+      return <Navigate to="/unauthorized" replace />;
+    }
+  }
+
+  if (requiredRole === 'member') {
+    if (role !== 'admin' && role !== 'member') {
+      return <Navigate to="/unauthorized" replace />;
+    }
+  }
+
+  return <>{children}</>;
 }

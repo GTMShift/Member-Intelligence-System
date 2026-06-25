@@ -2,7 +2,15 @@ import { supabase } from '../lib/supabaseClient';
 
 export function LoginPage() {
   const handleGoogleSignIn = async () => {
-    await supabase.auth.signInWithOAuth({ provider: 'google' });
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/redirect`,
+        queryParams: {
+          prompt: 'select_account',
+        },
+      },
+    });
   };
 
   return (
