@@ -12,6 +12,15 @@ class MemberCreate(BaseModel):
     record_source: str | None = None  # 'Framer' | 'Luma' | 'Substack' | 'Manual'
 
 
+class MemberUpdate(BaseModel):
+    first_name: str | None = None
+    last_name: str | None = None
+    email: str | None = None
+    linkedin_url: str | None = None
+    phone: str | None = None
+    record_source: str | None = None
+
+
 class MemberResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
