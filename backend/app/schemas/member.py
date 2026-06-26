@@ -1,18 +1,24 @@
-from pydantic import BaseModel
-from typing import Optional
+from __future__ import annotations
+
+from pydantic import BaseModel, ConfigDict
 
 
-class MemberBase(BaseModel):
-    name: str
+class MemberCreate(BaseModel):
+    first_name: str
+    last_name: str
     email: str
+    linkedin_url: str
+    phone: str | None = None
+    record_source: str | None = None  # 'Framer' | 'Luma' | 'Substack' | 'Manual'
 
 
-class MemberCreate(MemberBase):
-    pass
+class MemberResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
 
-
-class MemberResponse(MemberBase):
     id: str
-
-    class Config:
-        from_attributes = True
+    first_name: str
+    last_name: str
+    email: str
+    linkedin_url: str
+    phone: str | None = None
+    record_source: str | None = None
