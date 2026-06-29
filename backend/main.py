@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import members
+from app.api import members, enrichment
 
 app = FastAPI(title="Member Intelligence System API")
 
@@ -13,6 +13,7 @@ app.add_middleware(
 )
 
 app.include_router(members.router)
+app.include_router(enrichment.router)
 
 
 @app.get("/")

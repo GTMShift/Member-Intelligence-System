@@ -6,6 +6,7 @@ class Settings(BaseSettings):
 
     supabase_url: str
     supabase_key: str
+    apollo_api_key: str
 
 
 settings = Settings()

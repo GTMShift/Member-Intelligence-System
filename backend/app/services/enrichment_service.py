@@ -72,8 +72,12 @@ def enrich_member(
         skipped["company_id"] = "apollo organization missing domain"
 
     # ------------------------------------------------------------------
-    # employment_history — one row per job
+    # employment_history — delete previous Apollo rows then re-insert.
+    # This makes re-enrichment idempotent: running it twice gives the
+    # same result as running it once.
     # ------------------------------------------------------------------
+    supabase.table("employment_history").delete().eq("member_id", member_id).eq("source", "Apollo").execute()
+
     current_job = None
     for job in person.employment_history:
         row = {
@@ -113,6 +117,33 @@ def enrich_member(
         fields_updated=updated,
         fields_skipped=skipped,
     )
+
+
+def persist_run(run: EnrichmentRunCreate) -> dict:
+    result = supabase.table("enrichment_runs").insert(run.model_dump()).execute()
+    return result.data[0]
+
+
+def get_runs_for_member(member_id: str) -> list[dict]:
+    result = (
+        supabase.table("enrichment_runs")
+        .select("*")
+        .eq("member_id", member_id)
+        .order("ran_at", desc=True)
+        .execute()
+    )
+    return result.data
+
+
+def get_run_by_id(run_id: str) -> dict | None:
+    result = (
+        supabase.table("enrichment_runs")
+        .select("*")
+        .eq("id", run_id)
+        .single()
+        .execute()
+    )
+    return result.data
 
 
 def _upsert_company(org: ApolloOrganization) -> str:
