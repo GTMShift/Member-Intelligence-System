@@ -24,7 +24,7 @@ function toSearchResult(member: MemberDetail): MemberSearchResult {
     company_id: member.profile.company_id,
     company_name: member.profile.company_name,
     current_role: getCurrentRole(member),
-    city: member.profile.city,
+    metro_area_name: member.profile.metro_area_name,
     state_region: member.profile.state_region,
     icp: member.profile.icp,
     last_updated: member.last_updated,
@@ -54,7 +54,9 @@ function filterMembers(params: MemberSearchParams): MemberDetail[] {
   return MOCK_MEMBERS.filter((member) => {
     if (params.q && !matchesQuery(member, params.q)) return false;
     if (params.icp && member.profile.icp !== params.icp) return false;
-    if (params.city && member.profile.city !== params.city) return false;
+    if (params.metro_area_name && member.profile.metro_area_name !== params.metro_area_name) {
+      return false;
+    }
     if (params.state && member.profile.state_region !== params.state) return false;
     if (params.industry) {
       const company = member.profile.company_id
@@ -115,14 +117,12 @@ export async function getMember(id: string, role: UserRole): Promise<MemberDetai
 }
 
 export function getFilterOptions(): FilterOptions {
-  const cities = new Set<string>();
   const states = new Set<string>();
   const industries = new Set<string>();
   const seniorityLevels = new Set<string>();
   const signupSources = new Set<string>();
 
   for (const member of MOCK_MEMBERS) {
-    if (member.profile.city) cities.add(member.profile.city);
     if (member.profile.state_region) states.add(member.profile.state_region);
     if (member.profile.company_id) {
       const company = getCompanyById(member.profile.company_id);
@@ -135,7 +135,6 @@ export function getFilterOptions(): FilterOptions {
   const sort = (values: Set<string>) => [...values].sort((a, b) => a.localeCompare(b));
 
   return {
-    cities: sort(cities),
     states: sort(states),
     industries: sort(industries),
     seniorityLevels: sort(seniorityLevels),

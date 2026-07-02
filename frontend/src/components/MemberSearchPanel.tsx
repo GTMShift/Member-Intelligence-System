@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getFilterOptions, searchMembers } from '../api/membersApi';
+import { MOCK_METRO_AREAS } from '../api/mockMetroAreas';
 import type { MemberSearchParams, MemberSearchResult } from '../types/api';
 import { formatTimestamp, fullName } from '../utils/format';
 
@@ -48,7 +49,7 @@ export function MemberSearchPanel({
   const activeFilterCount = useMemo(() => {
     return [
       filters.icp,
-      filters.city,
+      filters.metro_area_name,
       filters.state,
       filters.industry,
       filters.seniority,
@@ -137,10 +138,10 @@ export function MemberSearchPanel({
             ]}
           />
           <FilterSelect
-            label="City"
-            value={filters.city ?? ''}
-            onChange={(v) => updateFilter('city', v)}
-            options={filterOptions.cities.map((c) => ({ value: c, label: c }))}
+            label="Metro Area"
+            value={filters.metro_area_name ?? ''}
+            onChange={(v) => updateFilter('metro_area_name', v)}
+            options={MOCK_METRO_AREAS.map((m) => ({ value: m.name, label: m.name }))}
           />
           <FilterSelect
             label="State"
@@ -220,7 +221,7 @@ export function MemberSearchPanel({
                         {member.company_name ? ` · ${member.company_name}` : ''}
                       </p>
                       <p className="mt-0.5 truncate text-xs text-slate-500">
-                        {member.city ?? '—'}
+                        {member.metro_area_name ?? '—'}
                       </p>
                     </div>
                     <IcpBadge icp={member.icp} />

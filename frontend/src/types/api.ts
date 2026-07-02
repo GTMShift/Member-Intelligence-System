@@ -37,6 +37,7 @@ export interface MemberProfile {
   country: string | null;
   state_region: string | null;
   city: string | null;
+  metro_area_name: string | null;
   work_email_enriched: string | null;
   prev_company_1: string | null;
   prev_role_1: string | null;
@@ -76,7 +77,7 @@ export interface MemberSearchResult {
   company_name: string | null;
   /** Derived from employment_history where is_current = true */
   current_role: string | null;
-  city: string | null;
+  metro_area_name: string | null;
   state_region: string | null;
   icp: IcpStatus;
   last_updated: string;
@@ -123,7 +124,7 @@ export interface CompanyDetail {
 export interface MemberSearchParams {
   q?: string;
   icp?: 'YES' | 'NO';
-  city?: string;
+  metro_area_name?: string;
   state?: string;
   industry?: string;
   seniority?: string;
@@ -133,7 +134,6 @@ export interface MemberSearchParams {
 }
 
 export interface FilterOptions {
-  cities: string[];
   states: string[];
   industries: string[];
   seniorityLevels: string[];
@@ -162,4 +162,12 @@ export interface PendingDuplicateFlag {
   id: string;
   check: DedupCheckResponse;
   incoming: DedupIncomingMember;
+}
+
+export interface MetroArea {
+  id: string;
+  name: string;
+  center_lat: number;
+  center_lng: number;
+  radius_miles: number;
 }

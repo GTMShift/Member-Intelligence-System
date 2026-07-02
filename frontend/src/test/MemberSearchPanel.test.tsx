@@ -32,11 +32,11 @@ describe('MemberSearchPanel', () => {
     expect(screen.getByRole('searchbox', { name: /search members/i })).toBeInTheDocument();
   });
 
-  it('renders filter dropdowns for ICP, city, state, industry, seniority, and signup source', () => {
+  it('renders filter dropdowns for ICP, metro area, state, industry, seniority, and signup source', () => {
     renderPanel();
 
     expect(screen.getByLabelText('ICP')).toBeInTheDocument();
-    expect(screen.getByLabelText('City')).toBeInTheDocument();
+    expect(screen.getByLabelText('Metro Area')).toBeInTheDocument();
     expect(screen.getByLabelText('State')).toBeInTheDocument();
     expect(screen.getByLabelText('Industry')).toBeInTheDocument();
     expect(screen.getByLabelText('Seniority')).toBeInTheDocument();
@@ -115,11 +115,11 @@ describe('MemberSearchPanel', () => {
     await advanceSearchTimers();
 
     fireEvent.change(screen.getByLabelText('ICP'), { target: { value: 'YES' } });
-    fireEvent.change(screen.getByLabelText('City'), { target: { value: 'Chicago' } });
+    fireEvent.change(screen.getByLabelText('Metro Area'), { target: { value: 'Chicago' } });
     await advanceSearchTimers();
 
     const matchingMembers = MOCK_MEMBERS.filter(
-      (m) => m.profile.icp === 'YES' && m.profile.city === 'Chicago',
+      (m) => m.profile.icp === 'YES' && m.profile.metro_area_name === 'Chicago',
     );
     expect(screen.getByText(`${matchingMembers.length} members`)).toBeInTheDocument();
     expect(screen.getByText('Sarah Chen')).toBeInTheDocument();
