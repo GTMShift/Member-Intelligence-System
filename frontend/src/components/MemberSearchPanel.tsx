@@ -11,6 +11,15 @@ interface MemberSearchPanelProps {
 
 const EMPTY_FILTERS: MemberSearchParams = {};
 
+const TEAM_SIZE_OPTIONS = [
+  '1-10',
+  '11-50',
+  '51-200',
+  '201-500',
+  '501-1000',
+  '1000+',
+] as const;
+
 function IcpBadge({ icp }: { icp: MemberSearchResult['icp'] }) {
   if (icp === 'YES') {
     return (
@@ -54,6 +63,8 @@ export function MemberSearchPanel({
       filters.industry,
       filters.seniority,
       filters.source,
+      filters.company_size,
+      filters.tag,
     ].filter(Boolean).length;
   }, [filters]);
 
@@ -166,6 +177,18 @@ export function MemberSearchPanel({
             value={filters.source ?? ''}
             onChange={(v) => updateFilter('source', v)}
             options={filterOptions.signupSources.map((s) => ({ value: s, label: s }))}
+          />
+          <FilterSelect
+            label="Team Size"
+            value={filters.company_size ?? ''}
+            onChange={(v) => updateFilter('company_size', v)}
+            options={TEAM_SIZE_OPTIONS.map((s) => ({ value: s, label: s }))}
+          />
+          <FilterSelect
+            label="Tags"
+            value={filters.tag ?? ''}
+            onChange={(v) => updateFilter('tag', v)}
+            options={filterOptions.companyTags.map((t) => ({ value: t, label: t }))}
           />
         </div>
 

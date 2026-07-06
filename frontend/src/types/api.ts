@@ -38,6 +38,8 @@ export interface MemberProfile {
   state_region: string | null;
   city: string | null;
   metro_area_name: string | null;
+  company_size: string | null;
+  company_tags: string[];
   work_email_enriched: string | null;
   prev_company_1: string | null;
   prev_role_1: string | null;
@@ -129,6 +131,8 @@ export interface MemberSearchParams {
   industry?: string;
   seniority?: string;
   source?: string;
+  company_size?: string;
+  tag?: string;
   page?: number;
   limit?: number;
 }
@@ -138,6 +142,7 @@ export interface FilterOptions {
   industries: string[];
   seniorityLevels: string[];
   signupSources: string[];
+  companyTags: string[];
 }
 
 export type DedupMatchedOn = 'email' | 'linkedin_url' | 'phone';

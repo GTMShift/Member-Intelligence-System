@@ -66,6 +66,8 @@ function filterMembers(params: MemberSearchParams): MemberDetail[] {
     }
     if (params.seniority && member.profile.seniority_level !== params.seniority) return false;
     if (params.source && member.profile.signup_source !== params.source) return false;
+    if (params.company_size && member.profile.company_size !== params.company_size) return false;
+    if (params.tag && !member.profile.company_tags.includes(params.tag)) return false;
     return true;
   });
 }
@@ -121,6 +123,7 @@ export function getFilterOptions(): FilterOptions {
   const industries = new Set<string>();
   const seniorityLevels = new Set<string>();
   const signupSources = new Set<string>();
+  const companyTags = new Set<string>();
 
   for (const member of MOCK_MEMBERS) {
     if (member.profile.state_region) states.add(member.profile.state_region);
@@ -130,6 +133,9 @@ export function getFilterOptions(): FilterOptions {
     }
     if (member.profile.seniority_level) seniorityLevels.add(member.profile.seniority_level);
     if (member.profile.signup_source) signupSources.add(member.profile.signup_source);
+    for (const tag of member.profile.company_tags) {
+      companyTags.add(tag);
+    }
   }
 
   const sort = (values: Set<string>) => [...values].sort((a, b) => a.localeCompare(b));
@@ -139,5 +145,6 @@ export function getFilterOptions(): FilterOptions {
     industries: sort(industries),
     seniorityLevels: sort(seniorityLevels),
     signupSources: sort(signupSources),
+    companyTags: sort(companyTags),
   };
 }
