@@ -8,6 +8,7 @@ import { AuthContext, useAuth } from './context/AuthContext';
 import { CompanyDetailPage } from './pages/CompanyDetailPage';
 import { LoginPage } from './pages/LoginPage';
 import { UnauthorizedPage } from './pages/UnauthorizedPage';
+import { MemberEntryPage } from './pages/MemberEntryPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { MOCK_NOTIFICATIONS } from './api/mockNotifications';
 import type { UserRole } from './types/api';
@@ -52,6 +53,14 @@ function App() {
           element={
             <ProtectedRoute requiredRole="admin">
               <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/add-member"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <MemberEntryPage />
             </ProtectedRoute>
           }
         />
@@ -241,6 +250,15 @@ export function HeaderActions() {
             </span>
           )}
         </Link>
+      )}
+      {role === 'admin' && (
+        <button
+          type="button"
+          onClick={() => navigate('/admin/add-member')}
+          className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700"
+        >
+          + Add member
+        </button>
       )}
       {role === 'admin' && (
         <div className="relative flex rounded-lg border border-slate-200 bg-slate-100 p-0.5">
