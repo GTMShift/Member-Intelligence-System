@@ -291,17 +291,20 @@ Returns < 2 seconds per PRD performance SLA.
 
 Query params:
 ```
-q          string    full-text search (name, company, role, email)
-icp        string    YES | NO
-city       string
-state      string
-country    string
-company    string
-industry   string
-seniority  string
-source     string    Website | Luma | Substack | Manual
-page       integer   default 1
-limit      integer   default 50
+q              string    full-text search (name, company, role, email)
+icp            string    YES | NO
+metro_area     string    filter by metro area name (e.g. "New York City")
+state          string
+country        string
+company        string
+industry       string
+seniority      string
+source         string    Website | Luma | Substack | Manual
+team_size      string    1-10 | 11-50 | 51-200 | 201-500 | 501-1000 | 1000+
+tags           string    filter by company tags
+event_attended string    returns members who attended this event name
+page           integer   default 1
+limit          integer   default 50
 ```
 
 Response:
@@ -318,8 +321,10 @@ Response:
       "email": "string",
       "company_id": "uuid",
       "company_name": "string",
+      "company_size": "string",
+      "company_tags": "string",
       "current_role": "string",
-      "city": "string",
+      "metro_area_name": "string | null",
       "state_region": "string",
       "icp": "YES | NO | null",
       "last_updated": "timestamp"
@@ -329,6 +334,7 @@ Response:
 ```
 
 Note: `current_role` in search results is derived from `employment_history` where `is_current = true`.
+Note: `metro_area_name` replaces exact city filtering — members are grouped by proximity to metro area center coordinates.
 
 ---
 
@@ -794,6 +800,117 @@ Response:
   "duplicate_found": true,
   "existing_member_id": "uuid",
   "matched_on": "email | linkedin_url | phone"
+}
+```
+
+---
+
+## Notifications
+
+### GET /notifications
+Get all notifications. Admin only.
+
+Query params:
+```
+type       string    duplicate_detected | job_change | new_signup | enrichment_complete | enrichment_failed | profile_updated
+is_read    boolean   true | false
+page       integer   default 1
+limit      integer   default 50
+```
+
+Response:
+```json
+{
+  "total": 24,
+  "page": 1,
+  "limit": 50,
+  "notifications": [
+    {
+      "id": "uuid",
+      "type": "string",
+      "title": "string",
+      "body": "string",
+      "member_id": "uuid | null",
+      "member_name": "string | null",
+      "is_read": false,
+      "created_at": "timestamp"
+    }
+  ]
+}
+```
+
+---
+
+### PATCH /notifications/:id/read
+Mark a single notification as read. Admin only.
+
+No request body needed.
+
+Response:
+```json
+{
+  "id": "uuid",
+  "is_read": true
+}
+```
+
+---
+
+### PATCH /notifications/read-all
+Mark all notifications as read. Admin only.
+
+No request body needed.
+
+Response:
+```json
+{
+  "updated": 12
+}
+```
+
+---
+
+## Metro Areas
+
+### GET /metro-areas
+Get all defined metro areas. Admin only.
+
+Response:
+```json
+{
+  "metro_areas": [
+    {
+      "id": "uuid",
+      "name": "New York City",
+      "center_lat": 40.7128,
+      "center_lng": -74.0060,
+      "radius_miles": 60
+    }
+  ]
+}
+```
+
+---
+
+### POST /metro-areas
+Create a new metro area. Admin only.
+
+Request body:
+```json
+{
+  "name": "string",
+  "center_lat": 0.0,
+  "center_lng": 0.0,
+  "radius_miles": 60
+}
+```
+
+Response:
+```json
+{
+  "id": "uuid",
+  "name": "string",
+  "created_at": "timestamp"
 }
 ```
 
