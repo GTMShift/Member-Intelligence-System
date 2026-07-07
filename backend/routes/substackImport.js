@@ -132,18 +132,28 @@ router.post('/import', upload.single('file'), async (req, res) => {
     .in('email', incomingEmails);
   if (touchErr) return res.status(500).json({ error: 'Failed to update seen subscribers', details: touchErr.message });
 
-  // 4. Anyone previously active but missing from this import = unsubscribed
-  const { data: nowMissing, error: missingErr } = await supabase
+  // 4. Anyone previously active but missing from this import = unsubscribed.
+  // Compared in JS rather than a giant inline SQL "NOT IN" list, since that approach
+  // silently failed once the subscriber list grew large enough.
+  const incomingEmailSet = new Set(incomingEmails);
+  const { data: allActive, error: activeErr } = await supabase
     .from('substack_subscribers')
-    .select('id')
-    .eq('status', 'active')
-    .not('email', 'in', `(${incomingEmails.map((e) => `"${e}"`).join(',')})`);
+    .select('id, email')
+    .eq('status', 'active');
+  if (activeErr) return res.status(500).json({ error: 'Failed to fetch active subscribers', details: activeErr.message });
+
+  const missingIds = (allActive || [])
+    .filter((s) => !incomingEmailSet.has(s.email))
+    .map((s) => s.id);
 
   let unsubscribedCount = 0;
-  if (!missingErr && nowMissing?.length > 0) {
-    const ids = nowMissing.map((m) => m.id);
-    await supabase.from('substack_subscribers').update({ status: 'unsubscribed', unsubscribed_at: now }).in('id', ids);
-    unsubscribedCount = ids.length;
+  if (missingIds.length > 0) {
+    const { error: unsubErr } = await supabase
+      .from('substack_subscribers')
+      .update({ status: 'unsubscribed', unsubscribed_at: now })
+      .in('id', missingIds);
+    if (unsubErr) return res.status(500).json({ error: 'Failed to mark unsubscribed', details: unsubErr.message });
+    unsubscribedCount = missingIds.length;
   }
 
   // 5. Match subscribers to existing members by normalized (trimmed, lowercased) email.
