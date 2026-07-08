@@ -241,7 +241,7 @@ router.post('/import', upload.single('file'), async (req, res) => {
   }
 
   // 7. Update the import run with final counts
-  await supabase
+  const { error: updateRunErr } = await supabase
     .from('substack_import_runs')
     .update({
       total_rows: parsedRows.length,
@@ -250,6 +250,9 @@ router.post('/import', upload.single('file'), async (req, res) => {
       unsubscribed_count: unsubscribedCount,
     })
     .eq('id', importRun.id);
+  if (updateRunErr) {
+    return res.status(500).json({ error: 'Failed to update import run counts', details: updateRunErr.message });
+  }
 
   res.json({
     import_run_id: importRun.id,
