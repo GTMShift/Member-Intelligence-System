@@ -165,7 +165,11 @@ function applyRoleFilter(member: MemberDetail, role: UserRole): MemberDetail {
 }
 
 async function fetchAllMemberDetails(): Promise<MemberDetail[]> {
-  const { data, error } = await supabase.from('members').select(MEMBER_SELECT);
+  const { data, error } = await supabase
+    .from('members')
+    .select(MEMBER_SELECT)
+    .order('last_updated', { ascending: false })
+    .order('id', { ascending: false });
   if (error) throw new Error(`Failed to fetch members: ${error.message}`);
   return (data ?? []).map(toMemberDetail);
 }
