@@ -16,6 +16,37 @@ const toDate = (v) => {
   return isNaN(d.getTime()) ? null : d.toISOString();
 };
 
+// For plain `date` columns (not timestamptz). Avoids the timezone-shift risk of
+// toDate(): if the CSV value isn't already ISO-formatted, JS's Date constructor
+// parses it as local time, and converting that to UTC via toISOString() can
+// silently shift the calendar date by a day depending on timezone. This instead
+// reads the date back using local getters (matching however it was parsed),
+// so the stored date always matches what was in the source cell.
+const toDateOnly = (v) => {
+  if (v === undefined || v === null || v === '') return null;
+  const c = String(v).trim();
+  if (c === '') return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(c)) return c; // already unambiguous, use as-is
+  const d = new Date(c);
+  if (isNaN(d.getTime())) return null;
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// TODO: add an auth/admin check here once the project has one — right now this
+// endpoint is open to anyone who can reach your backend, same as your other routes.
+router.get('/import-runs', async (req, res) => {
+  const { data, error } = await supabase
+    .from('substack_import_runs')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(20);
+  if (error) return res.status(500).json({ error: 'Failed to fetch import runs', details: error.message });
+  res.json(data);
+});
+
 // TODO: add an auth/admin check here once the project has one — right now this
 // endpoint is open to anyone who can reach your backend, same as your other routes.
 router.post('/import', upload.single('file'), async (req, res) => {
@@ -44,10 +75,10 @@ router.post('/import', upload.single('file'), async (req, res) => {
       email: row['Email']?.trim().toLowerCase(),
       name: row['Name'] || null,
       subscription_type: row['Type'] || row['Stripe plan'] || null,
-      start_date: toDate(row['Start date']),
-      paid_upgrade_date: toDate(row['Paid upgrade date']),
-      cancel_date: toDate(row['Cancel date']),
-      expiration_date: toDate(row['Expiration date']),
+      start_date: toDateOnly(row['Start date']),
+      paid_upgrade_date: toDateOnly(row['Paid upgrade date']),
+      cancel_date: toDateOnly(row['Cancel date']),
+      expiration_date: toDateOnly(row['Expiration date']),
       country: row['Country'] || null,
       state_province: row['State/Province'] || null,
       raw_csv_row: row,
