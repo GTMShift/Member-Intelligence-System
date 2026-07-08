@@ -1,8 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getFilterOptions, searchMembers } from '../api/membersApi';
 import { MOCK_METRO_AREAS } from '../api/mockMetroAreas';
-import type { MemberSearchParams, MemberSearchResult } from '../types/api';
+import type { FilterOptions, MemberSearchParams, MemberSearchResult } from '../types/api';
 import { formatTimestamp, fullName } from '../utils/format';
+
+const EMPTY_FILTER_OPTIONS: FilterOptions = {
+  states: [],
+  industries: [],
+  seniorityLevels: [],
+  signupSources: [],
+  companyTags: [],
+};
 
 interface MemberSearchPanelProps {
   selectedMemberId: string | null;
@@ -46,14 +54,33 @@ export function MemberSearchPanel({
   selectedMemberId,
   onSelectMember,
 }: MemberSearchPanelProps) {
-  const filterOptions = useMemo(() => getFilterOptions(), []);
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>(EMPTY_FILTER_OPTIONS);
+
+  useEffect(() => {
+    let cancelled = false;
+    getFilterOptions()
+      .then((options) => {
+        if (!cancelled) setFilterOptions(options);
+      })
+      .catch(() => {
+        // Leave filterOptions at the empty defaults if this fails —
+        // filters just won't have any choices, but the page still renders.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<MemberSearchParams>(EMPTY_FILTERS);
   const [results, setResults] = useState<MemberSearchResult[]>([]);
   const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const PAGE_SIZE = 50;
 
   const activeFilterCount = useMemo(() => {
     return [
@@ -76,17 +103,41 @@ export function MemberSearchPanel({
       const response = await searchMembers({
         q: searchQuery || undefined,
         ...searchFilters,
+        page: 1,
+        limit: PAGE_SIZE,
       });
       setResults(response.results);
       setTotal(response.total);
+      setPage(1);
     } catch {
       setError('Search failed. Please try again.');
       setResults([]);
       setTotal(0);
+      setPage(1);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const loadMore = useCallback(async () => {
+    setLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const response = await searchMembers({
+        q: query || undefined,
+        ...filters,
+        page: nextPage,
+        limit: PAGE_SIZE,
+      });
+      setResults((prev) => [...prev, ...response.results]);
+      setTotal(response.total);
+      setPage(nextPage);
+    } catch {
+      setError('Failed to load more members. Please try again.');
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [page, query, filters]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -257,6 +308,19 @@ export function MemberSearchPanel({
             );
           })}
         </ul>
+
+        {!loading && !error && results.length < total && (
+          <div className="flex justify-center py-4">
+            <button
+              type="button"
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              {loadingMore ? 'Loading…' : `Load more (${results.length} of ${total})`}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
