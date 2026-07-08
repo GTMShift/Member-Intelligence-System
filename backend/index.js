@@ -18,3 +18,6 @@ app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
 const eventsRouter = require('./routes/events');
 app.use('/events', eventsRouter);
+
+const substackRouter = require('./routes/substackImport');
+app.use('/substack', substackRouter);
