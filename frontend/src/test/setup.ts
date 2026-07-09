@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom';
+import './testHelpers';
 import { vi } from 'vitest';
 
 vi.mock('../lib/supabaseClient', () => ({

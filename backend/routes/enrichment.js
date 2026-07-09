@@ -2,6 +2,7 @@ const express = require('express');
 const axios = require('axios');
 const router = express.Router({ mergeParams: true });
 const supabase = require('../supabaseClient');
+const { isValidEmploymentSource } = require('../utils/validate');
 
 function bucketEmployeeCount(count) {
   const numericCount = Number(count);
@@ -40,6 +41,10 @@ async function logEnrichmentRun(memberId, status, fieldsUpdated, fieldsSkipped) 
 router.post('/', async (req, res) => {
   const { id } = req.params;
 
+  if (!process.env.FULLENRICH_API_KEY) {
+    return res.status(500).json({ error: 'FULLENRICH_API_KEY is not configured' });
+  }
+
   const { data: member, error: memberError } = await supabase
     .from('members')
     .select('id, email, linkedin_url')
@@ -50,8 +55,8 @@ router.post('/', async (req, res) => {
     return res.status(404).json({ error: 'Member not found' });
   }
 
-  if (!member.email || !member.linkedin_url) {
-    return res.status(422).json({ error: 'Member must have both email and linkedin_url for enrichment' });
+  if (!hasValue(member.email) && !hasValue(member.linkedin_url)) {
+    return res.status(422).json({ error: 'Member must have email or linkedin_url for enrichment' });
   }
 
   const { data: profile } = await supabase
@@ -60,19 +65,25 @@ router.post('/', async (req, res) => {
     .eq('member_id', id)
     .single();
 
+  const enrichPayload = {};
+  if (hasValue(member.email)) {
+    enrichPayload.email = member.email;
+  }
+  if (hasValue(member.linkedin_url)) {
+    enrichPayload.linkedin_url = member.linkedin_url;
+  }
+
   let enrichmentResponse;
 
   try {
     enrichmentResponse = await axios.post(
       'https://api.fullenrich.com/v1/enrich',
-      {
-        linkedin_url: member.linkedin_url,
-        email: member.email,
-      },
+      enrichPayload,
       {
         headers: {
           Authorization: `Bearer ${process.env.FULLENRICH_API_KEY}`,
         },
+        timeout: 15000,
       }
     );
   } catch (error) {
@@ -98,13 +109,13 @@ router.post('/', async (req, res) => {
   const fieldsSkipped = [];
   const profileUpdates = {};
 
-  const profileFieldMappings = [
+  const profileFieldMappings = new Map([
     ['seniority_level', person.seniority],
     ['city', person.city],
     ['state_region', person.state],
     ['country', person.country],
     ['work_email_enriched', person.work_email],
-  ];
+  ]);
 
   for (const [column, value] of profileFieldMappings) {
     if (!hasValue(value)) {
@@ -121,23 +132,56 @@ router.post('/', async (req, res) => {
     fieldsUpdated.push(column);
   }
 
-  let companyId = currentProfile.company_id || null;
   const organization = person.organization || {};
 
   if (organization.domain) {
     const companyPayload = {
       domain: organization.domain,
-      name: organization.name || organization.company_name || organization.domain,
-      linkedin_url: organization.linkedin_url || organization.linkedin || null,
-      size: bucketEmployeeCount(organization.employee_count || organization.headcount),
-      industry: organization.industry || null,
-      sub_industry: organization.sub_industry || organization.industry_group || null,
-      overview: organization.description || organization.summary || null,
-      company_type: organization.type || null,
-      revenue: organization.revenue || null,
-      tags: Array.isArray(organization.tags) ? organization.tags.join(', ') : organization.tags || null,
       updated_at: new Date().toISOString(),
     };
+
+    const companyName = organization.name || organization.company_name;
+    if (hasValue(companyName)) {
+      companyPayload.name = companyName;
+    }
+
+    const linkedinUrl = organization.linkedin_url || organization.linkedin;
+    if (hasValue(linkedinUrl)) {
+      companyPayload.linkedin_url = linkedinUrl;
+    }
+
+    const size = bucketEmployeeCount(organization.employee_count || organization.headcount);
+    if (hasValue(size)) {
+      companyPayload.size = size;
+    }
+
+    if (hasValue(organization.industry)) {
+      companyPayload.industry = organization.industry;
+    }
+
+    const subIndustry = organization.sub_industry || organization.industry_group;
+    if (hasValue(subIndustry)) {
+      companyPayload.sub_industry = subIndustry;
+    }
+
+    const overview = organization.description || organization.summary;
+    if (hasValue(overview)) {
+      companyPayload.overview = overview;
+    }
+
+    if (hasValue(organization.type)) {
+      companyPayload.company_type = organization.type;
+    }
+
+    if (hasValue(organization.revenue)) {
+      companyPayload.revenue = organization.revenue;
+    }
+
+    if (Array.isArray(organization.tags) && organization.tags.length > 0) {
+      companyPayload.tags = organization.tags.join(', ');
+    } else if (hasValue(organization.tags)) {
+      companyPayload.tags = organization.tags;
+    }
 
     const { data: company, error: companyError } = await supabase
       .from('companies')
@@ -148,7 +192,6 @@ router.post('/', async (req, res) => {
     if (companyError) {
       console.error('Company upsert failed:', companyError.message);
     } else if (!hasValue(currentProfile.company_id)) {
-      companyId = company.id;
       profileUpdates.company_id = company.id;
       fieldsUpdated.push('company_id');
     } else {
@@ -159,30 +202,38 @@ router.post('/', async (req, res) => {
   }
 
   if (Object.keys(profileUpdates).length > 0) {
-    const { error: profileUpdateError } = await supabase
+    const { error: profileUpsertError } = await supabase
       .from('member_profile')
-      .update({
-        ...profileUpdates,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('member_id', id);
+      .upsert(
+        {
+          member_id: id,
+          ...profileUpdates,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'member_id' }
+      );
 
-    if (profileUpdateError) {
-      return res.status(500).json({ error: profileUpdateError.message });
+    if (profileUpsertError) {
+      return res.status(500).json({ error: profileUpsertError.message });
     }
   }
 
-  const { error: deleteEmploymentError } = await supabase
-    .from('employment_history')
-    .delete()
-    .eq('member_id', id)
-    .eq('source', 'FullEnrich');
+  const employmentHistory = Array.isArray(person.employment_history) ? person.employment_history : [];
+  const employmentSource = 'FullEnrich';
 
-  if (deleteEmploymentError) {
-    return res.status(500).json({ error: deleteEmploymentError.message });
+  if (!isValidEmploymentSource(employmentSource)) {
+    return res.status(500).json({ error: 'Invalid employment history source configuration' });
   }
 
-  const employmentHistory = Array.isArray(person.employment_history) ? person.employment_history : [];
+  const { data: existingFullEnrichJobs, error: existingJobsError } = await supabase
+    .from('employment_history')
+    .select('id')
+    .eq('member_id', id)
+    .eq('source', employmentSource);
+
+  if (existingJobsError) {
+    return res.status(500).json({ error: existingJobsError.message });
+  }
 
   if (employmentHistory.length > 0) {
     const employmentRows = employmentHistory.map((job) => ({
@@ -192,7 +243,7 @@ router.post('/', async (req, res) => {
       start_date: job.start_date || null,
       end_date: job.end_date || null,
       is_current: Boolean(job.is_current),
-      source: 'FullEnrich',
+      source: employmentSource,
     }));
 
     const { error: insertEmploymentError } = await supabase
@@ -201,6 +252,29 @@ router.post('/', async (req, res) => {
 
     if (insertEmploymentError) {
       return res.status(500).json({ error: insertEmploymentError.message });
+    }
+
+    const existingJobIds = (existingFullEnrichJobs || []).map((job) => job.id);
+
+    if (existingJobIds.length > 0) {
+      const { error: deleteEmploymentError } = await supabase
+        .from('employment_history')
+        .delete()
+        .in('id', existingJobIds);
+
+      if (deleteEmploymentError) {
+        return res.status(500).json({ error: deleteEmploymentError.message });
+      }
+    }
+  } else if ((existingFullEnrichJobs || []).length > 0) {
+    const { error: deleteEmploymentError } = await supabase
+      .from('employment_history')
+      .delete()
+      .eq('member_id', id)
+      .eq('source', employmentSource);
+
+    if (deleteEmploymentError) {
+      return res.status(500).json({ error: deleteEmploymentError.message });
     }
   }
 
@@ -218,11 +292,9 @@ router.post('/', async (req, res) => {
   res.json({
     status: 'success',
     member_id: id,
-    company_id: companyId,
     fields_updated: fieldsUpdated,
     fields_skipped: fieldsSkipped,
     employment_history_count: employmentHistory.length,
-    enrichment_result: enrichmentResponse.data,
   });
 });
 
