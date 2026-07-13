@@ -25,7 +25,8 @@ const MEMBER_SELECT = `
   ),
   employment_history(id, company, role, start_date, end_date, is_current, source),
   member_data(id, tier, category, data, logged_by, created_at),
-  interactions(id, interaction_type, summary, occurred_at, logged_by, metadata)
+  interactions(id, interaction_type, summary, occurred_at, logged_by, metadata),
+  linked_profile:profiles(avatar_url)
 `;
 
 // industry lives on companies, not on MemberProfile's declared shape — tracked
@@ -42,6 +43,7 @@ function firstOrSelf<T>(value: T | T[] | null | undefined): T | null {
 
 function toMemberDetail(row: any): MemberDetail {
   const profileRaw = firstOrSelf(row.profile);
+  const linkedProfile = firstOrSelf(row.linked_profile);
   const company = firstOrSelf(profileRaw?.company);
   const metroArea = firstOrSelf(profileRaw?.metro_area);
   const employment = row.employment_history ?? [];
@@ -71,6 +73,7 @@ function toMemberDetail(row: any): MemberDetail {
       seniority_level: profileRaw?.seniority_level ?? null,
       company_id: profileRaw?.company_id ?? null,
       company_name: company?.name ?? null,
+      avatar_url: linkedProfile?.avatar_url ?? null,
       country: profileRaw?.country ?? null,
       state_region: profileRaw?.state_region ?? null,
       city: profileRaw?.city ?? null,
@@ -168,8 +171,9 @@ async function fetchAllMemberDetails(): Promise<MemberDetail[]> {
   const { data, error } = await supabase
     .from('members')
     .select(MEMBER_SELECT)
-    .order('last_updated', { ascending: false })
-    .order('id', { ascending: false });
+    .order('last_name', { ascending: true })
+    .order('first_name', { ascending: true })
+    .order('id', { ascending: true }); // final tie-breaker for fully stable ordering
   if (error) throw new Error(`Failed to fetch members: ${error.message}`);
   return (data ?? []).map(toMemberDetail);
 }

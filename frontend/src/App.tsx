@@ -10,6 +10,9 @@ import { LoginPage } from './pages/LoginPage';
 import { UnauthorizedPage } from './pages/UnauthorizedPage';
 import { MemberEntryPage } from './pages/MemberEntryPage';
 import { NotificationsPage } from './pages/NotificationsPage';
+import { SubstackImportPage } from './pages/SubstackImportPage';
+import { CompleteProfilePage } from './pages/CompleteProfilePage';
+import { MyProfilePage } from './pages/MyProfilePage';
 import { MOCK_NOTIFICATIONS } from './api/mockNotifications';
 import type { UserRole } from './types/api';
 
@@ -49,6 +52,22 @@ function App() {
         <Route path="/unauthorized" element={<UnauthorizedPage />} />
         <Route path="/redirect" element={<RoleBasedRedirect />} />
         <Route
+          path="/complete-profile"
+          element={
+            <ProtectedRoute requiredRole="member">
+              <CompleteProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/my-profile"
+          element={
+            <ProtectedRoute requiredRole="member">
+              <MyProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/"
           element={
             <ProtectedRoute requiredRole="admin">
@@ -61,6 +80,14 @@ function App() {
           element={
             <ProtectedRoute requiredRole="admin">
               <MemberEntryPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/substack-import"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <SubstackImportPage />
             </ProtectedRoute>
           }
         />
@@ -206,7 +233,7 @@ function MemberDirectoryLayout({
 }
 
 export function HeaderActions() {
-  const { user, signOut, role } = useAuth();
+  const { user, signOut, role, memberId } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -258,6 +285,24 @@ export function HeaderActions() {
           className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700"
         >
           + Add member
+        </button>
+      )}
+      {role === 'admin' && (
+        <button
+          type="button"
+          onClick={() => navigate('/admin/substack-import')}
+          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+        >
+          Import Substack CSV
+        </button>
+      )}
+      {isMemberView && (
+        <button
+          type="button"
+          onClick={() => navigate(memberId ? '/my-profile' : '/complete-profile')}
+          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+        >
+          My Profile
         </button>
       )}
       {role === 'admin' && (

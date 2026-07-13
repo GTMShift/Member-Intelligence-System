@@ -20,7 +20,6 @@ function FieldGrid({ fields }: { fields: ProfileField[] }) {
   if (visible.length === 0) {
     return <p className="text-sm text-slate-500">No data available.</p>;
   }
-
   return (
     <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
       {visible.map((field) => (
@@ -56,7 +55,6 @@ function TierSection({
     violet: 'bg-violet-100 text-violet-800',
     amber: 'bg-amber-100 text-amber-800',
   };
-
   return (
     <section className={`rounded-xl border ${borderColors[tierColor]} bg-white p-5`}>
       <div className="mb-4 flex items-center gap-2">
@@ -83,7 +81,6 @@ function FeedbackPrompts({ entries }: { entries: MemberDataEntry[] }) {
       e.tier === 'user_editable' &&
       ['challenge', 'event_feedback', 'interest', 'mandate'].includes(e.category),
   );
-
   if (feedbackEntries.length === 0) {
     return (
       <p className="text-sm text-slate-500">
@@ -91,13 +88,11 @@ function FeedbackPrompts({ entries }: { entries: MemberDataEntry[] }) {
       </p>
     );
   }
-
   const grouped = feedbackEntries.reduce<Record<string, MemberDataEntry[]>>((acc, entry) => {
     if (!acc[entry.category]) acc[entry.category] = [];
     acc[entry.category].push(entry);
     return acc;
   }, {});
-
   return (
     <div className="space-y-4">
       {Object.entries(grouped).map(([category, items]) => (
@@ -135,7 +130,6 @@ function FeedbackPrompts({ entries }: { entries: MemberDataEntry[] }) {
 
 function FeedbackEntryContent({ entry }: { entry: MemberDataEntry }) {
   const { data, category } = entry;
-
   if (category === 'event_feedback') {
     const question = typeof data.question === 'string' ? data.question : null;
     const answer = typeof data.answer === 'string' ? data.answer : null;
@@ -148,20 +142,17 @@ function FeedbackEntryContent({ entry }: { entry: MemberDataEntry }) {
       </div>
     );
   }
-
   const text = typeof data.text === 'string' ? data.text : JSON.stringify(data);
   return <p className="text-sm text-slate-900">{text}</p>;
 }
 
 function AdminDataEntry({ entry }: { entry: MemberDataEntry }) {
   const { category } = entry;
-
   const categoryLabels: Record<string, string> = {
     note: 'Note',
     transcript: 'Transcript',
     flag: 'Flag',
   };
-
   return (
     <div className="rounded-md border border-amber-100 bg-amber-50/30 p-3">
       <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">
@@ -178,7 +169,6 @@ function AdminDataEntry({ entry }: { entry: MemberDataEntry }) {
 
 function AdminEntryContent({ entry }: { entry: MemberDataEntry }) {
   const { data, category } = entry;
-
   if (category === 'transcript') {
     const source = typeof data.source === 'string' ? data.source : null;
     const text = typeof data.text === 'string' ? data.text : null;
@@ -189,14 +179,32 @@ function AdminEntryContent({ entry }: { entry: MemberDataEntry }) {
       </div>
     );
   }
-
   if (category === 'flag') {
     const reason = typeof data.reason === 'string' ? data.reason : null;
     return <p className="mt-1 text-sm text-slate-900">{reason}</p>;
   }
-
   const text = typeof data.text === 'string' ? data.text : JSON.stringify(data);
   return <p className="mt-1 text-sm text-slate-900">{text}</p>;
+}
+
+function AvatarCircle({
+  avatarUrl,
+  firstName,
+}: {
+  avatarUrl: string | null | undefined;
+  firstName: string;
+}) {
+  return (
+    <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200">
+      {avatarUrl ? (
+        <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center text-xl font-medium text-slate-400">
+          {firstName?.[0]?.toUpperCase() ?? '?'}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
@@ -207,11 +215,9 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
 
   useEffect(() => {
     let cancelled = false;
-
     async function load() {
       setLoading(true);
       setError(null);
-
       try {
         const data = await getMember(memberId, role);
         if (!cancelled) {
@@ -231,7 +237,6 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
         if (!cancelled) setLoading(false);
       }
     }
-
     load();
     return () => {
       cancelled = true;
@@ -266,19 +271,16 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
     { label: 'Phone', value: member.phone },
     { label: 'Work email (enriched)', value: profile.work_email_enriched },
   ];
-
   const roleFields: ProfileField[] = [
     { label: 'Job title', value: currentRole },
     { label: 'Job start date', value: profile.current_job_start_date },
     { label: 'Seniority level', value: profile.seniority_level },
   ];
-
   const locationFields: ProfileField[] = [
     { label: 'Country', value: profile.country },
     { label: 'State/region', value: profile.state_region },
     { label: 'City', value: profile.city },
   ];
-
   const historyFields: ProfileField[] = [
     { label: 'Previous company 1', value: profile.prev_company_1 },
     { label: 'Previous role 1', value: profile.prev_role_1 },
@@ -288,7 +290,6 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
     { label: 'Previous role 3', value: profile.prev_role_3 },
     { label: 'Signup source', value: profile.signup_source },
   ];
-
   const adminProfileFields: ProfileField[] = isAdmin
     ? [{ label: 'ICP', value: profile.icp }]
     : [];
@@ -296,36 +297,40 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
   return (
     <div className="h-full overflow-y-auto">
       <div className="border-b border-slate-200 bg-white px-6 py-5">
-        <h2 className="text-xl font-semibold text-slate-900">
-          {fullName(member.first_name, member.last_name)}
-        </h2>
-        <p className="mt-1 text-sm text-slate-600">
-          {currentRole ?? '—'}
-          {profile.company_name ? (
-            <>
-              {' · '}
-              {profile.company_id ? (
-                <Link
-                  to={`/companies/${profile.company_id}`}
-                  state={{ fromMemberId: memberId }}
-                  className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
-                >
-                  {profile.company_name}
-                </Link>
-              ) : (
-                profile.company_name
+        <div className="flex items-start gap-4">
+          <AvatarCircle avatarUrl={profile.avatar_url} firstName={member.first_name} />
+          <div className="min-w-0 flex-1">
+            <h2 className="text-xl font-semibold text-slate-900">
+              {fullName(member.first_name, member.last_name)}
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              {currentRole ?? '—'}
+              {profile.company_name ? (
+                <>
+                  {' · '}
+                  {profile.company_id ? (
+                    <Link
+                      to={`/companies/${profile.company_id}`}
+                      state={{ fromMemberId: memberId }}
+                      className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                    >
+                      {profile.company_name}
+                    </Link>
+                  ) : (
+                    profile.company_name
+                  )}
+                </>
+              ) : null}
+            </p>
+            <p className="mt-2 text-xs text-slate-400">
+              Last updated {formatTimestamp(member.last_updated)}
+              {profile.updated_at !== member.last_updated && (
+                <> · Profile updated {formatTimestamp(profile.updated_at)}</>
               )}
-            </>
-          ) : null}
-        </p>
-        <p className="mt-2 text-xs text-slate-400">
-          Last updated {formatTimestamp(member.last_updated)}
-          {profile.updated_at !== member.last_updated && (
-            <> · Profile updated {formatTimestamp(profile.updated_at)}</>
-          )}
-        </p>
+            </p>
+          </div>
+        </div>
       </div>
-
       <div className="space-y-5 p-6">
         <TierSection
           title="Public Profile"
@@ -377,7 +382,6 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
             </div>
           </div>
         </TierSection>
-
         <TierSection
           title="Member Feedback"
           description="Tier 2 · User-editable"
@@ -385,7 +389,6 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
         >
           <FeedbackPrompts entries={userEditableEntries} />
         </TierSection>
-
         {isAdmin && (
           <TierSection
             title="Admin Intelligence"
@@ -413,7 +416,6 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
             </div>
           </TierSection>
         )}
-
         {isAdmin && (
           <section className="rounded-xl border border-slate-200 bg-white p-5">
             <h3 className="text-base font-semibold text-slate-900">Interaction Timeline</h3>

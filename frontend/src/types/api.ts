@@ -34,6 +34,7 @@ export interface MemberProfile {
   seniority_level: string | null;
   company_id: string | null;
   company_name: string | null;
+  avatar_url: string | null;
   country: string | null;
   state_region: string | null;
   city: string | null;
