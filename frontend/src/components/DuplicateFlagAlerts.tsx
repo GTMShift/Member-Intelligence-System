@@ -1,6 +1,10 @@
-import { useMemo, useState } from 'react';
-import { MOCK_DUPLICATE_FLAGS } from '../api/mockDuplicateFlags';
-import { MOCK_MEMBERS } from '../api/mockMembers';
+import { useCallback, useEffect, useState } from 'react';
+import { supabase } from '../lib/supabaseClient';
+import { useAuth } from '../context/AuthContext';
+import {
+  dismissDuplicateFlag,
+  fetchPendingDuplicateFlags,
+} from '../api/duplicateFlagsApi';
 import type { DedupMatchedOn, PendingDuplicateFlag } from '../types/api';
 import { fullName } from '../utils/format';
 
@@ -14,23 +18,18 @@ interface DuplicateFlagAlertsProps {
   onViewExistingMember: (memberId: string) => void;
 }
 
-function getExistingMemberName(existingMemberId: string): string {
-  const member = MOCK_MEMBERS.find((m) => m.id === existingMemberId);
-  if (!member) return 'Unknown member';
-  return fullName(member.first_name, member.last_name);
-}
-
 function DuplicateFlagCard({
   flag,
+  existingMemberName,
   onViewExistingMember,
   onDismiss,
 }: {
   flag: PendingDuplicateFlag;
+  existingMemberName: string;
   onViewExistingMember: (memberId: string) => void;
   onDismiss: (flagId: string) => void;
 }) {
   const { check, incoming } = flag;
-  const existingMemberName = getExistingMemberName(check.existing_member_id);
   const incomingName = fullName(incoming.first_name, incoming.last_name);
 
   return (
@@ -47,7 +46,7 @@ function DuplicateFlagCard({
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
-              d="M12 9v2m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"
+              d="M12 9v2m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.420Z"
             />
           </svg>
         </div>
@@ -114,17 +113,46 @@ function DuplicateFlagCard({
 }
 
 export function DuplicateFlagAlerts({ onViewExistingMember }: DuplicateFlagAlertsProps) {
-  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  const { user } = useAuth();
+  const [flags, setFlags] = useState<PendingDuplicateFlag[]>([]);
+  const [existingNames, setExistingNames] = useState<Record<string, string>>({});
 
-  const visibleFlags = useMemo(
-    () => MOCK_DUPLICATE_FLAGS.filter((flag) => !dismissedIds.has(flag.id)),
-    [dismissedIds],
-  );
+  const load = useCallback(async () => {
+    try {
+      const data = await fetchPendingDuplicateFlags();
+      setFlags(data);
 
-  if (visibleFlags.length === 0) return null;
+      const memberIds = [...new Set(data.map((f) => f.check.existing_member_id))];
+      if (memberIds.length > 0) {
+        const { data: members } = await supabase
+          .from('members')
+          .select('id, first_name, last_name')
+          .in('id', memberIds);
+        const names: Record<string, string> = {};
+        for (const m of members ?? []) {
+          names[m.id] = fullName(m.first_name, m.last_name);
+        }
+        setExistingNames(names);
+      }
+    } catch {
+      setFlags([]);
+    }
+  }, []);
 
-  const handleDismiss = (flagId: string) => {
-    setDismissedIds((prev) => new Set(prev).add(flagId));
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  if (flags.length === 0) return null;
+
+  const handleDismiss = async (flagId: string) => {
+    if (!user?.id) return;
+    setFlags((prev) => prev.filter((f) => f.id !== flagId));
+    try {
+      await dismissDuplicateFlag(flagId, user.id);
+    } catch {
+      load();
+    }
   };
 
   return (
@@ -133,10 +161,11 @@ export function DuplicateFlagAlerts({ onViewExistingMember }: DuplicateFlagAlert
       aria-label="Duplicate member alerts"
     >
       <div className="mx-auto max-w-[90rem] space-y-3">
-        {visibleFlags.map((flag) => (
+        {flags.map((flag) => (
           <DuplicateFlagCard
             key={flag.id}
             flag={flag}
+            existingMemberName={existingNames[flag.check.existing_member_id] ?? 'Unknown member'}
             onViewExistingMember={onViewExistingMember}
             onDismiss={handleDismiss}
           />

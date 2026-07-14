@@ -51,6 +51,10 @@ export interface MemberProfile {
   icp: IcpStatus;
   signup_source: string | null;
   updated_at: string;
+  team_size: number | null;
+  bucket: string | null;
+  fit_score: number | null;
+  tag_note: string | null;
 }
 
 export interface MemberDataEntry {
@@ -126,7 +130,6 @@ export interface CompanyDetail {
 
 export interface MemberSearchParams {
   q?: string;
-  icp?: 'YES' | 'NO';
   metro_area_name?: string;
   state?: string;
   industry?: string;
@@ -136,6 +139,8 @@ export interface MemberSearchParams {
   tag?: string;
   page?: number;
   limit?: number;
+  icp?: 'YES' | 'NO' | 'TBD' | 'NONE';
+  team_size?: string;
 }
 
 export interface FilterOptions {
@@ -144,6 +149,7 @@ export interface FilterOptions {
   seniorityLevels: string[];
   signupSources: string[];
   companyTags: string[];
+  teamSizes: string[];
 }
 
 export type DedupMatchedOn = 'email' | 'linkedin_url' | 'phone';
@@ -176,4 +182,23 @@ export interface MetroArea {
   center_lat: number;
   center_lng: number;
   radius_miles: number;
+}
+
+export type NotificationType =
+  | 'duplicate_detected'
+  | 'job_change'
+  | 'new_signup'
+  | 'enrichment_complete'
+  | 'enrichment_failed'
+  | 'profile_updated';
+
+export interface Notification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  member_id: string | null;
+  member_name: string | null;
+  is_read: boolean;
+  created_at: string;
 }

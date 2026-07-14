@@ -13,7 +13,7 @@ import { NotificationsPage } from './pages/NotificationsPage';
 import { SubstackImportPage } from './pages/SubstackImportPage';
 import { CompleteProfilePage } from './pages/CompleteProfilePage';
 import { MyProfilePage } from './pages/MyProfilePage';
-import { MOCK_NOTIFICATIONS } from './api/mockNotifications';
+import { fetchUnreadNotificationCount } from './api/notificationsApi';
 import type { UserRole } from './types/api';
 
 interface DashboardLocationState {
@@ -243,7 +243,12 @@ export function HeaderActions() {
   };
 
   const isMemberView = location.pathname === '/portal';
-  const unreadCount = MOCK_NOTIFICATIONS.filter((n) => !n.is_read).length;
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (role !== 'admin') return;
+    fetchUnreadNotificationCount().then(setUnreadCount);
+  }, [role]);
 
   return (
     <div className="flex items-center gap-4">

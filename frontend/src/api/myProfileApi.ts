@@ -1,5 +1,6 @@
 // src/api/myProfileApi.ts
 import { supabase } from '../lib/supabaseClient';
+import { createNotification } from './notificationsApi';
 
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024; // 5MB
 
@@ -162,6 +163,14 @@ export async function updateMyProfile(
       if (empErr) throw new Error(`Failed to create employment history: ${empErr.message}`);
     }
   }
+
+  await createNotification({
+    type: 'profile_updated',
+    title: 'Profile updated',
+    body: `${input.first_name} ${input.last_name} updated their own profile.`,
+    member_id: memberId,
+    member_name: `${input.first_name} ${input.last_name}`,
+  });
 }
 
 export async function uploadAvatar(profileId: string, file: File): Promise<string> {

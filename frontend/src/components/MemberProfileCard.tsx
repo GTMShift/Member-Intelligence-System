@@ -1,10 +1,57 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getMember } from '../api/membersApi';
+import { updateMemberAsAdmin, type AdminUpdateMemberInput } from '../api/adminUpdateMember';
 import { useAuth } from '../context/AuthContext';
 import type { MemberDataEntry, MemberDetail } from '../types/api';
 import { formatTimestamp, fullName } from '../utils/format';
 import { InteractionTimeline } from './InteractionTimeline';
+
+const BUCKET_OPTIONS = [
+  { value: '', label: 'Select a category' },
+  { value: 'icp_member', label: 'ICP Member' },
+  { value: 'between_roles', label: 'Between Roles' },
+  { value: 'adjacent_remit', label: 'Adjacent Remit' },
+  { value: 'consultant', label: 'Consultant' },
+  { value: 'sponsor', label: 'Sponsor' },
+  { value: 'personal_connection', label: 'Personal Connection' },
+] as const;
+
+const SENIORITY_OPTIONS = [
+  { value: '', label: 'Select seniority' },
+  { value: 'C-Suite', label: 'C-Suite' },
+  { value: 'VP', label: 'VP' },
+  { value: 'Director', label: 'Director' },
+  { value: 'Manager', label: 'Manager' },
+  { value: 'Individual Contributor', label: 'Individual Contributor' },
+] as const;
+
+type EditFormState = {
+  first_name: string;
+  last_name: string;
+  linkedin_url: string;
+  phone: string;
+  job_title: string;
+  current_job_start_date: string;
+  seniority_level: string;
+  company_name: string;
+  country: string;
+  state_region: string;
+  city: string;
+  bucket: string;
+  fit_score: string;
+  tag_note: string;
+};
+
+function normalizeLinkedInUrl(input: string): string {
+  let url = input.trim();
+  if (!url) return url;
+  url = url.replace(/^https?:\/\//i, '');
+  if (!/^www\./i.test(url)) {
+    url = `www.${url}`;
+  }
+  return `https://${url}`;
+}
 
 interface MemberProfileCardProps {
   memberId: string;
@@ -208,40 +255,43 @@ function AvatarCircle({
 }
 
 export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
-  const { role, isAdmin } = useAuth();
+  const { role, isAdmin, user } = useAuth();
   const [member, setMember] = useState<MemberDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState<EditFormState | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const loadMember = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getMember(memberId, role);
+      if (!data) {
+        setError('Member not found.');
+        setMember(null);
+      } else {
+        setMember(data);
+      }
+    } catch {
+      setError('Failed to load member profile.');
+      setMember(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [memberId, role]);
 
   useEffect(() => {
     let cancelled = false;
-    async function load() {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await getMember(memberId, role);
-        if (!cancelled) {
-          if (!data) {
-            setError('Member not found.');
-            setMember(null);
-          } else {
-            setMember(data);
-          }
-        }
-      } catch {
-        if (!cancelled) {
-          setError('Failed to load member profile.');
-          setMember(null);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
+    loadMember().then(() => {
+      if (cancelled) return;
+    });
     return () => {
       cancelled = true;
     };
-  }, [memberId, role]);
+  }, [loadMember]);
 
   if (loading) {
     return (
@@ -264,6 +314,72 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
   const adminOnlyEntries = member.member_data.filter((e) => e.tier === 'admin_only');
   const currentRole =
     member.employment_history.find((entry) => entry.is_current)?.role ?? null;
+
+  const startEditing = () => {
+    setSaveError(null);
+    setEditForm({
+      first_name: member.first_name,
+      last_name: member.last_name,
+      linkedin_url: member.linkedin_url ?? '',
+      phone: member.phone ?? '',
+      job_title: currentRole ?? '',
+      current_job_start_date: profile.current_job_start_date ?? '',
+      seniority_level: profile.seniority_level ?? '',
+      company_name: profile.company_name ?? '',
+      country: profile.country ?? '',
+      state_region: profile.state_region ?? '',
+      city: profile.city ?? '',
+      bucket: profile.bucket ?? '',
+      fit_score: profile.fit_score !== null && profile.fit_score !== undefined ? String(profile.fit_score) : '',
+      tag_note: profile.tag_note ?? '',
+    });
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+    setEditForm(null);
+    setSaveError(null);
+  };
+
+  const handleEditChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
+  ) => {
+    const { name, value } = e.target;
+    setEditForm((prev) => (prev ? { ...prev, [name]: value } : prev));
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editForm || !user?.id) return;
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      const input: AdminUpdateMemberInput = {
+        first_name: editForm.first_name.trim(),
+        last_name: editForm.last_name.trim(),
+        linkedin_url: normalizeLinkedInUrl(editForm.linkedin_url),
+        phone: editForm.phone.trim() || null,
+        job_title: editForm.job_title.trim() || null,
+        current_job_start_date: editForm.current_job_start_date || null,
+        seniority_level: editForm.seniority_level || null,
+        company_name: editForm.company_name.trim() || null,
+        country: editForm.country.trim() || null,
+        state_region: editForm.state_region.trim() || null,
+        city: editForm.city.trim() || null,
+        bucket: editForm.bucket || null,
+        fit_score: editForm.fit_score ? parseInt(editForm.fit_score, 10) : null,
+        tag_note: editForm.tag_note.trim() || null,
+      };
+      await updateMemberAsAdmin(memberId, input, user.id);
+      await loadMember();
+      setIsEditing(false);
+      setEditForm(null);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to save changes');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const identityFields: ProfileField[] = [
     { label: 'Email', value: member.email },
@@ -291,12 +407,21 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
     { label: 'Signup source', value: profile.signup_source },
   ];
   const adminProfileFields: ProfileField[] = isAdmin
-    ? [{ label: 'ICP', value: profile.icp }]
+    ? [
+        { label: 'ICP', value: profile.icp },
+        { label: 'Bucket', value: profile.bucket },
+        {
+          label: 'Fit score',
+          value: profile.fit_score !== null && profile.fit_score !== undefined ? String(profile.fit_score) : null,
+        },
+        { label: 'Tag note', value: profile.tag_note },
+      ]
     : [];
 
   return (
     <div className="h-full overflow-y-auto">
       <div className="border-b border-slate-200 bg-white px-6 py-5">
+        <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-4">
           <AvatarCircle avatarUrl={profile.avatar_url} firstName={member.first_name} />
           <div className="min-w-0 flex-1">
@@ -330,6 +455,44 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
             </p>
           </div>
         </div>
+        {isAdmin && (
+          <div className="flex shrink-0 items-center gap-2">
+            {isEditing ? (
+              <>
+                <button
+                  type="button"
+                  onClick={cancelEditing}
+                  disabled={isSaving}
+                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveEdit}
+                  disabled={isSaving}
+                  className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+                >
+                  {isSaving ? 'Saving…' : 'Save'}
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={startEditing}
+                className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Edit
+              </button>
+            )}
+          </div>
+        )}
+        </div>
+        {saveError && (
+          <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {saveError}
+          </p>
+        )}
       </div>
       <div className="space-y-5 p-6">
         <TierSection
@@ -342,20 +505,117 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
               <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Identity
               </h4>
-              <FieldGrid fields={identityFields} />
+              {isEditing && editForm ? (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-slate-600">First name</label>
+                    <input
+                      type="text"
+                      name="first_name"
+                      value={editForm.first_name}
+                      onChange={handleEditChange}
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-slate-600">Last name</label>
+                    <input
+                      type="text"
+                      name="last_name"
+                      value={editForm.last_name}
+                      onChange={handleEditChange}
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-slate-600">Phone</label>
+                    <input
+                      type="tel"
+                      name="phone"
+                      value={editForm.phone}
+                      onChange={handleEditChange}
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-slate-600">LinkedIn URL</label>
+                    <input
+                      type="text"
+                      name="linkedin_url"
+                      value={editForm.linkedin_url}
+                      onChange={handleEditChange}
+                      placeholder="linkedin.com/in/name"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                    />
+                  </div>
+                  <p className="col-span-2 text-xs text-slate-400">
+                    Email ({member.email}) can't be changed here.
+                  </p>
+                </div>
+              ) : (
+                <FieldGrid fields={identityFields} />
+              )}
             </div>
             <div>
               <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Current role
               </h4>
-              <FieldGrid fields={roleFields} />
+              {isEditing && editForm ? (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-slate-600">Job title</label>
+                    <input
+                      type="text"
+                      name="job_title"
+                      value={editForm.job_title}
+                      onChange={handleEditChange}
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-slate-600">Seniority</label>
+                    <select
+                      name="seniority_level"
+                      value={editForm.seniority_level}
+                      onChange={handleEditChange}
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                    >
+                      {SENIORITY_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-slate-600">Job start date</label>
+                    <input
+                      type="date"
+                      name="current_job_start_date"
+                      value={editForm.current_job_start_date}
+                      onChange={handleEditChange}
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <FieldGrid fields={roleFields} />
+              )}
             </div>
-            {profile.company_name && (
+            {(profile.company_name || isEditing) && (
               <div>
                 <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Company
                 </h4>
-                {profile.company_id ? (
+                {isEditing && editForm ? (
+                  <input
+                    type="text"
+                    name="company_name"
+                    value={editForm.company_name}
+                    onChange={handleEditChange}
+                    className="w-full max-w-sm rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  />
+                ) : profile.company_id ? (
                   <Link
                     to={`/companies/${profile.company_id}`}
                     state={{ fromMemberId: memberId }}
@@ -372,7 +632,42 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
               <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Location
               </h4>
-              <FieldGrid fields={locationFields} />
+              {isEditing && editForm ? (
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-slate-600">City</label>
+                    <input
+                      type="text"
+                      name="city"
+                      value={editForm.city}
+                      onChange={handleEditChange}
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-slate-600">State / Region</label>
+                    <input
+                      type="text"
+                      name="state_region"
+                      value={editForm.state_region}
+                      onChange={handleEditChange}
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-slate-600">Country</label>
+                    <input
+                      type="text"
+                      name="country"
+                      value={editForm.country}
+                      onChange={handleEditChange}
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <FieldGrid fields={locationFields} />
+              )}
             </div>
             <div>
               <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -396,8 +691,51 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
             tierColor="amber"
           >
             <div className="space-y-4">
-              {adminProfileFields.length > 0 && (
-                <FieldGrid fields={adminProfileFields} />
+              {isEditing && editForm ? (
+                <div className="grid grid-cols-2 gap-4 rounded-lg border border-amber-100 bg-amber-50/30 p-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-slate-600">Bucket</label>
+                    <select
+                      name="bucket"
+                      value={editForm.bucket}
+                      onChange={handleEditChange}
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                    >
+                      {BUCKET_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-slate-600">Fit score (0–100)</label>
+                    <input
+                      type="number"
+                      name="fit_score"
+                      min={0}
+                      max={100}
+                      value={editForm.fit_score}
+                      onChange={handleEditChange}
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                    />
+                  </div>
+                  <div className="col-span-2 flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-slate-600">Tag note</label>
+                    <textarea
+                      name="tag_note"
+                      rows={2}
+                      value={editForm.tag_note}
+                      onChange={handleEditChange}
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                    />
+                  </div>
+                  <p className="col-span-2 text-xs text-slate-400">
+                    Note: ICP status ({profile.icp ?? 'not classified'}) is set separately.
+                  </p>
+                </div>
+              ) : (
+                adminProfileFields.length > 0 && <FieldGrid fields={adminProfileFields} />
               )}
               {adminOnlyEntries.length > 0 ? (
                 <div className="space-y-3">

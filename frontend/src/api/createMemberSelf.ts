@@ -1,5 +1,7 @@
 // src/api/createMemberSelf.ts
 import { supabase } from '../lib/supabaseClient';
+import { createNotification } from './notificationsApi';
+import { checkAndFlagDuplicate } from './duplicateFlagsApi';
 
 export interface SelfSignupInput {
   first_name: string;
@@ -100,6 +102,23 @@ export async function createMemberSelf(
   if (linkError) {
     throw new Error(`Failed to link profile to member: ${linkError.message}`);
   }
+
+  await createNotification({
+    type: 'new_signup',
+    title: 'New member signup',
+    body: `${input.first_name} ${input.last_name} signed up and was added to the directory.`,
+    member_id: member.id,
+    member_name: `${input.first_name} ${input.last_name}`,
+  });
+
+  await checkAndFlagDuplicate(member.id, {
+    first_name: input.first_name,
+    last_name: input.last_name,
+    email: input.email,
+    linkedin_url: input.linkedin_url || null,
+    phone: input.phone,
+    current_role: input.job_title,
+  });
 
   return { id: member.id };
 }
