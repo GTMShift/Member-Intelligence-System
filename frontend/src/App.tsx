@@ -3,15 +3,17 @@ import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useNavigate 
 import { MemberProfileCard } from './components/MemberProfileCard';
 import { MemberSearchPanel } from './components/MemberSearchPanel';
 import { DuplicateFlagAlerts } from './components/DuplicateFlagAlerts';
+import { ProfileStalenessBanner } from './components/ProfileStalenessBanner';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AuthContext, useAuth } from './context/AuthContext';
+import { getMember } from './api/membersApi';
 import { CompanyDetailPage } from './pages/CompanyDetailPage';
 import { LoginPage } from './pages/LoginPage';
 import { UnauthorizedPage } from './pages/UnauthorizedPage';
 import { MemberEntryPage } from './pages/MemberEntryPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { MOCK_NOTIFICATIONS } from './api/mockNotifications';
-import type { UserRole } from './types/api';
+import type { MemberDetail, UserRole } from './types/api';
 
 interface DashboardLocationState {
   selectedMemberId?: string;
@@ -134,6 +136,7 @@ function MemberDirectoryLayout({
 }) {
   const location = useLocation();
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const [portalMember, setPortalMember] = useState<MemberDetail | null>(null);
 
   useEffect(() => {
     const state = location.state as DashboardLocationState | null;
@@ -142,8 +145,49 @@ function MemberDirectoryLayout({
     }
   }, [location.state]);
 
+  useEffect(() => {
+    if (!portalView || !selectedMemberId) {
+      setPortalMember(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadPortalMember() {
+      try {
+        const data = await getMember(selectedMemberId!, 'member');
+        if (!cancelled) setPortalMember(data);
+      } catch {
+        if (!cancelled) setPortalMember(null);
+      }
+    }
+
+    loadPortalMember();
+    return () => {
+      cancelled = true;
+    };
+  }, [portalView, selectedMemberId]);
+
   const handleViewExistingMember = (memberId: string) => {
     setSelectedMemberId(memberId);
+  };
+
+  const handleEnrich = async () => {
+    if (!selectedMemberId) return;
+
+    const response = await fetch(
+      `${import.meta.env.VITE_API_URL}/members/${selectedMemberId}/enrich`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ run_type: 'manual' }),
+      },
+    );
+    if (response.ok) {
+      alert('Profile enrichment started — your profile will be updated shortly');
+    } else {
+      alert('Enrichment failed — please try again later');
+    }
   };
 
   const directoryContent = (
@@ -159,7 +203,17 @@ function MemberDirectoryLayout({
 
       <section className="min-h-[24rem] flex-1 bg-slate-50 lg:min-h-[calc(100vh-4.5rem)]">
         {selectedMemberId ? (
-          <MemberProfileCard memberId={selectedMemberId} />
+          <div className="flex h-full flex-col">
+            {portalView && portalMember && (
+              <ProfileStalenessBanner
+                member={portalMember}
+                onEnrichClick={handleEnrich}
+              />
+            )}
+            <div className="min-h-0 flex-1">
+              <MemberProfileCard memberId={selectedMemberId} />
+            </div>
+          </div>
         ) : (
           <div className="flex h-full items-center justify-center p-8">
             <div className="text-center">
