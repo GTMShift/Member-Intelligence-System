@@ -113,6 +113,15 @@ vi.mock('../api/membersApi', async () => {
     return applyRoleFilter(member, role);
   }
 
+  async function getMetroAreas(): Promise<{ id: string; name: string }[]> {
+    return [
+      { id: 'ma-1', name: 'Chicago' },
+      { id: 'ma-2', name: 'San Francisco' },
+      { id: 'ma-3', name: 'New York City' },
+      { id: 'ma-4', name: 'Boston' },
+    ];
+  }
+
   async function getFilterOptions(): Promise<FilterOptions> {
     const states = new Set<string>();
     const industries = new Set<string>();
@@ -147,6 +156,7 @@ vi.mock('../api/membersApi', async () => {
     searchMembers,
     getMember,
     getFilterOptions,
+    getMetroAreas,
   };
 });
 
