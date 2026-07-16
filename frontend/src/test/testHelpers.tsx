@@ -13,8 +13,8 @@ import type {
 } from '../types/api';
 
 vi.mock('../api/membersApi', async () => {
-  const { MOCK_MEMBERS } = await import('../api/mockMembers');
-  const { MOCK_COMPANIES_BY_ID } = await import('../api/mockCompanies');
+  const { MOCK_MEMBERS } = await import('../testFixtures/members');
+  const { MOCK_COMPANIES_BY_ID } = await import('../testFixtures/companies');
 
   function getCurrentRole(member: MemberDetail): string | null {
     return member.employment_history.find((entry) => entry.is_current)?.role ?? null;
