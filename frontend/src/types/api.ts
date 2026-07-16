@@ -203,14 +203,6 @@ export interface MetroArea {
   radius_miles: number;
 }
 
-export type NotificationType =
-  | 'duplicate_detected'
-  | 'job_change'
-  | 'new_signup'
-  | 'enrichment_complete'
-  | 'enrichment_failed'
-  | 'profile_updated';
-
 export interface Notification {
   id: string;
   type: NotificationType;
