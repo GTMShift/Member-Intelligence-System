@@ -1,5 +1,5 @@
 # This workflow does a clean installation of node dependencies, caches them,
-# builds the source code, and runs tests for both the frontend and backend.
+# builds the source code for both the frontend and backend, and runs frontend tests.
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs
 
 name: Node.js CI
