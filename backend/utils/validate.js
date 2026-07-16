@@ -17,5 +17,18 @@ const isValidEmail = (email) => {
   const isValidEnum = (value, allowed) => {
     return allowed.includes(value);
   };
+
+  const EMPLOYMENT_SOURCES = ['Apollo', 'Manual', 'Import', 'FullEnrich'];
+
+  const isValidEmploymentSource = (source) => {
+    return isValidEnum(source, EMPLOYMENT_SOURCES);
+  };
   
-  module.exports = { isValidEmail, isValidDate, isValidLinkedIn, isValidEnum };
+  module.exports = {
+    isValidEmail,
+    isValidDate,
+    isValidLinkedIn,
+    isValidEnum,
+    EMPLOYMENT_SOURCES,
+    isValidEmploymentSource,
+  };

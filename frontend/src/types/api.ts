@@ -19,6 +19,25 @@ export type InteractionType = 'meeting' | 'call' | 'email' | 'event' | 'note';
 
 export type EmploymentSource = 'Apollo' | 'Manual' | 'Import';
 
+export type NotificationType =
+  | 'duplicate_detected'
+  | 'job_change'
+  | 'new_signup'
+  | 'enrichment_complete'
+  | 'enrichment_failed'
+  | 'profile_updated';
+
+export interface Notification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  member_id: string | null;
+  member_name: string | null;
+  is_read: boolean;
+  created_at: string;
+}
+
 export interface EmploymentHistoryEntry {
   id: string;
   company: string;
