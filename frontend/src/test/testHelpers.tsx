@@ -13,8 +13,8 @@ import type {
 } from '../types/api';
 
 vi.mock('../api/membersApi', async () => {
-  const { MOCK_MEMBERS } = await import('../api/mockMembers');
-  const { MOCK_COMPANIES_BY_ID } = await import('../api/mockCompanies');
+  const { MOCK_MEMBERS } = await import('../testFixtures/members');
+  const { MOCK_COMPANIES_BY_ID } = await import('../testFixtures/companies');
 
   function getCurrentRole(member: MemberDetail): string | null {
     return member.employment_history.find((entry) => entry.is_current)?.role ?? null;
@@ -113,6 +113,15 @@ vi.mock('../api/membersApi', async () => {
     return applyRoleFilter(member, role);
   }
 
+  async function getMetroAreas(): Promise<{ id: string; name: string }[]> {
+    return [
+      { id: 'ma-1', name: 'Chicago' },
+      { id: 'ma-2', name: 'San Francisco' },
+      { id: 'ma-3', name: 'New York City' },
+      { id: 'ma-4', name: 'Boston' },
+    ];
+  }
+
   async function getFilterOptions(): Promise<FilterOptions> {
     const states = new Set<string>();
     const industries = new Set<string>();
@@ -139,6 +148,7 @@ vi.mock('../api/membersApi', async () => {
       seniorityLevels: sort(seniorityLevels),
       signupSources: sort(signupSources),
       companyTags: sort(companyTags),
+      teamSizes: [],
     };
   }
 
@@ -146,6 +156,7 @@ vi.mock('../api/membersApi', async () => {
     searchMembers,
     getMember,
     getFilterOptions,
+    getMetroAreas,
   };
 });
 

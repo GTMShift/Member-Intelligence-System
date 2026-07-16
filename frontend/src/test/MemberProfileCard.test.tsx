@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { MemberProfileCard } from '../components/MemberProfileCard';
 import { useAuth } from '../context/AuthContext';
-import { MOCK_MEMBERS } from '../api/mockMembers';
+import { MOCK_MEMBERS } from '../testFixtures/members';
 import { formatTimestamp } from '../utils/format';
 import { renderWithProviders } from './testHelpers';
 
@@ -26,6 +26,9 @@ function mockAuthAs(role: 'admin' | 'member') {
     user: null,
     loading: false,
     signOut: vi.fn().mockResolvedValue(undefined),
+    memberId: null,
+    needsOnboarding: false,
+    refreshMemberId: vi.fn(),
   });
 }
 

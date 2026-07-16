@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createMember, type CreateMemberInput } from '../api/createMember';
+import { createNotification } from '../api/notificationsApi';
+import { checkAndFlagDuplicate } from '../api/duplicateFlagsApi';
 
 const BUCKET_OPTIONS = [
   { value: '', label: 'Select a category' },
@@ -76,7 +78,6 @@ export function MemberEntryPage() {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
 
-    // Clear fit_score if bucket changes to non-ICP
     if (name === 'bucket' && !ICP_SCORE_BUCKETS.includes(value)) {
       setForm((prev) => ({ ...prev, bucket: value, fit_score: '' }));
     }
@@ -107,7 +108,27 @@ export function MemberEntryPage() {
         tag_note: form.tag_note.trim() || null,
       };
 
-      await createMember(input);
+      const created = await createMember(input);
+
+      if (created?.id) {
+        await createNotification({
+          type: 'new_signup',
+          title: 'New member signup',
+          body: `${input.first_name} ${input.last_name} was added to the directory by an admin.`,
+          member_id: created.id,
+          member_name: `${input.first_name} ${input.last_name}`,
+        });
+
+        await checkAndFlagDuplicate(created.id, {
+          first_name: input.first_name,
+          last_name: input.last_name,
+          email: input.email,
+          linkedin_url: input.linkedin_url || null,
+          phone: input.phone,
+          current_role: input.job_title,
+        });
+      }
+
       setSuccess(true);
       setForm(INITIAL_STATE);
     } catch (err) {

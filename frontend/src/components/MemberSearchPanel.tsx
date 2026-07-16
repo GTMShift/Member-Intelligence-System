@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { getFilterOptions, searchMembers } from '../api/membersApi';
-import { MOCK_METRO_AREAS } from '../api/mockMetroAreas';
+import { getFilterOptions, getMetroAreas, searchMembers } from '../api/membersApi';
 import type { FilterOptions, MemberSearchParams, MemberSearchResult } from '../types/api';
 import { formatTimestamp, fullName } from '../utils/format';
 
@@ -10,6 +9,7 @@ const EMPTY_FILTER_OPTIONS: FilterOptions = {
   seniorityLevels: [],
   signupSources: [],
   companyTags: [],
+  teamSizes: [],
 };
 
 interface MemberSearchPanelProps {
@@ -18,15 +18,6 @@ interface MemberSearchPanelProps {
 }
 
 const EMPTY_FILTERS: MemberSearchParams = {};
-
-const TEAM_SIZE_OPTIONS = [
-  '1-10',
-  '11-50',
-  '51-200',
-  '201-500',
-  '501-1000',
-  '1000+',
-] as const;
 
 function IcpBadge({ icp }: { icp: MemberSearchResult['icp'] }) {
   if (icp === 'YES') {
@@ -43,9 +34,16 @@ function IcpBadge({ icp }: { icp: MemberSearchResult['icp'] }) {
       </span>
     );
   }
+  if (icp === 'TBD') {
+    return (
+      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+        TBD
+      </span>
+    );
+  }
   return (
-    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
-      ICP pending
+    <span className="rounded-full bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-400">
+      Not classified
     </span>
   );
 }
@@ -55,6 +53,7 @@ export function MemberSearchPanel({
   onSelectMember,
 }: MemberSearchPanelProps) {
   const [filterOptions, setFilterOptions] = useState<FilterOptions>(EMPTY_FILTER_OPTIONS);
+  const [metroAreas, setMetroAreas] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,6 +64,13 @@ export function MemberSearchPanel({
       .catch(() => {
         // Leave filterOptions at the empty defaults if this fails —
         // filters just won't have any choices, but the page still renders.
+      });
+    getMetroAreas()
+      .then((areas) => {
+        if (!cancelled) setMetroAreas(areas);
+      })
+      .catch(() => {
+        // Same graceful fallback — an empty metro area dropdown, not a crash.
       });
     return () => {
       cancelled = true;
@@ -90,7 +96,7 @@ export function MemberSearchPanel({
       filters.industry,
       filters.seniority,
       filters.source,
-      filters.company_size,
+      filters.team_size,
       filters.tag,
     ].filter(Boolean).length;
   }, [filters]);
@@ -193,17 +199,19 @@ export function MemberSearchPanel({
           <FilterSelect
             label="ICP"
             value={filters.icp ?? ''}
-            onChange={(v) => updateFilter('icp', v as 'YES' | 'NO' | '')}
+            onChange={(v) => updateFilter('icp', v as 'YES' | 'NO' | 'TBD' | 'NONE' | '')}
             options={[
               { value: 'YES', label: 'YES' },
               { value: 'NO', label: 'NO' },
+              { value: 'TBD', label: 'TBD' },
+              { value: 'NONE', label: 'Not classified' },
             ]}
           />
           <FilterSelect
             label="Metro Area"
             value={filters.metro_area_name ?? ''}
             onChange={(v) => updateFilter('metro_area_name', v)}
-            options={MOCK_METRO_AREAS.map((m) => ({ value: m.name, label: m.name }))}
+            options={metroAreas.map((m) => ({ value: m.name, label: m.name }))}
           />
           <FilterSelect
             label="State"
@@ -231,9 +239,9 @@ export function MemberSearchPanel({
           />
           <FilterSelect
             label="Team Size"
-            value={filters.company_size ?? ''}
-            onChange={(v) => updateFilter('company_size', v)}
-            options={TEAM_SIZE_OPTIONS.map((s) => ({ value: s, label: s }))}
+            value={filters.team_size ?? ''}
+            onChange={(v) => updateFilter('team_size', v)}
+            options={filterOptions.teamSizes.map((s) => ({ value: s, label: s }))}
           />
           <FilterSelect
             label="Tags"

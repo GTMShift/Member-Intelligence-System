@@ -19,19 +19,30 @@ const MEMBER_SELECT = `
   id, first_name, last_name, email, linkedin_url, phone, created_at, last_updated,
   profile:member_profile(
     current_job_start_date, seniority_level, company_id, country, state_region, city,
-    work_email_enriched, icp, signup_source, updated_at, metro_area_id,
+    work_email_enriched, icp, signup_source, updated_at, metro_area_id, team_size, tags,
+    bucket, fit_score, tag_note,
     company:companies(name, size, tags, industry),
     metro_area:metro_areas(name)
   ),
   employment_history(id, company, role, start_date, end_date, is_current, source),
   member_data(id, tier, category, data, logged_by, created_at),
-  interactions(id, interaction_type, summary, occurred_at, logged_by, metadata)
+  interactions(id, interaction_type, summary, occurred_at, logged_by, metadata),
+  linked_profile:profiles(avatar_url)
 `;
 
 // industry lives on companies, not on MemberProfile's declared shape — tracked
 // separately here (member id -> industry) so filtering/filter-options can use
 // it without changing the MemberDetail/MemberProfile type contracts.
 const industryByMemberId = new Map<string, string | null>();
+
+const TEAM_SIZE_RANGES = [
+  { value: '1-10', min: 1, max: 10 },
+  { value: '11-50', min: 11, max: 50 },
+  { value: '51-200', min: 51, max: 200 },
+  { value: '201-500', min: 201, max: 500 },
+  { value: '501-1000', min: 501, max: 1000 },
+  { value: '1000+', min: 1001, max: Infinity },
+];
 
 // Supabase returns a to-one relation as an object if a unique constraint is
 // detected, but as an array otherwise — this normalizes either shape.
@@ -42,6 +53,7 @@ function firstOrSelf<T>(value: T | T[] | null | undefined): T | null {
 
 function toMemberDetail(row: any): MemberDetail {
   const profileRaw = firstOrSelf(row.profile);
+  const linkedProfile = firstOrSelf(row.linked_profile);
   const company = firstOrSelf(profileRaw?.company);
   const metroArea = firstOrSelf(profileRaw?.metro_area);
   const employment = row.employment_history ?? [];
@@ -50,10 +62,6 @@ function toMemberDetail(row: any): MemberDetail {
   const prevEntries = [...employment]
     .filter((e: any) => !e.is_current)
     .sort((a: any, b: any) => (b.start_date ?? '').localeCompare(a.start_date ?? ''));
-
-  const companyTags = company?.tags
-    ? company.tags.split(',').map((t: string) => t.trim()).filter(Boolean)
-    : [];
 
   industryByMemberId.set(row.id, company?.industry ?? null);
 
@@ -71,12 +79,17 @@ function toMemberDetail(row: any): MemberDetail {
       seniority_level: profileRaw?.seniority_level ?? null,
       company_id: profileRaw?.company_id ?? null,
       company_name: company?.name ?? null,
+      avatar_url: linkedProfile?.avatar_url ?? null,
       country: profileRaw?.country ?? null,
       state_region: profileRaw?.state_region ?? null,
       city: profileRaw?.city ?? null,
       metro_area_name: metroArea?.name ?? null,
       company_size: company?.size ?? null,
-      company_tags: companyTags,
+      team_size: profileRaw?.team_size ?? null,
+      bucket: profileRaw?.bucket ?? null,
+      fit_score: profileRaw?.fit_score ?? null,
+      tag_note: profileRaw?.tag_note ?? null,
+      company_tags: profileRaw?.tags ?? [],
       work_email_enriched: profileRaw?.work_email_enriched ?? null,
       prev_company_1: prevEntries[0]?.company ?? null,
       prev_role_1: prevEntries[0]?.role ?? null,
@@ -136,7 +149,8 @@ function matchesQuery(member: MemberDetail, q: string): boolean {
 function filterMembers(all: MemberDetail[], params: MemberSearchParams): MemberDetail[] {
   return all.filter((member) => {
     if (params.q && !matchesQuery(member, params.q)) return false;
-    if (params.icp && member.profile.icp !== params.icp) return false;
+    if (params.icp === 'NONE' && member.profile.icp !== null) return false;
+    if (params.icp && params.icp !== 'NONE' && member.profile.icp !== params.icp) return false;
     if (params.metro_area_name && member.profile.metro_area_name !== params.metro_area_name) {
       return false;
     }
@@ -144,7 +158,11 @@ function filterMembers(all: MemberDetail[], params: MemberSearchParams): MemberD
     if (params.industry && industryByMemberId.get(member.id) !== params.industry) return false;
     if (params.seniority && member.profile.seniority_level !== params.seniority) return false;
     if (params.source && member.profile.signup_source !== params.source) return false;
-    if (params.company_size && member.profile.company_size !== params.company_size) return false;
+    if (params.team_size) {
+      const range = TEAM_SIZE_RANGES.find((r) => r.value === params.team_size);
+      const size = member.profile.team_size;
+      if (!range || size === null || size === undefined || size < range.min || size > range.max) return false;
+    }
     if (params.tag && !member.profile.company_tags.includes(params.tag)) return false;
     return true;
   });
@@ -168,8 +186,9 @@ async function fetchAllMemberDetails(): Promise<MemberDetail[]> {
   const { data, error } = await supabase
     .from('members')
     .select(MEMBER_SELECT)
-    .order('last_updated', { ascending: false })
-    .order('id', { ascending: false });
+    .order('last_name', { ascending: true })
+    .order('first_name', { ascending: true })
+    .order('id', { ascending: true }); // final tie-breaker for fully stable ordering
   if (error) throw new Error(`Failed to fetch members: ${error.message}`);
   return (data ?? []).map(toMemberDetail);
 }
@@ -201,6 +220,12 @@ export async function getMember(id: string, role: UserRole): Promise<MemberDetai
   return applyRoleFilter(toMemberDetail(data), role);
 }
 
+export async function getMetroAreas(): Promise<{ id: string; name: string }[]> {
+  const { data, error } = await supabase.from('metro_areas').select('id, name').order('name');
+  if (error) throw new Error(`Failed to fetch metro areas: ${error.message}`);
+  return data ?? [];
+}
+
 export async function getFilterOptions(): Promise<FilterOptions> {
   const all = await fetchAllMemberDetails();
 
@@ -209,6 +234,7 @@ export async function getFilterOptions(): Promise<FilterOptions> {
   const seniorityLevels = new Set<string>();
   const signupSources = new Set<string>();
   const companyTags = new Set<string>();
+  const teamSizes = new Set<string>();
 
   for (const member of all) {
     if (member.profile.state_region) states.add(member.profile.state_region);
@@ -216,6 +242,12 @@ export async function getFilterOptions(): Promise<FilterOptions> {
     if (industry) industries.add(industry);
     if (member.profile.seniority_level) seniorityLevels.add(member.profile.seniority_level);
     if (member.profile.signup_source) signupSources.add(member.profile.signup_source);
+    if (member.profile.team_size !== null && member.profile.team_size !== undefined) {
+      const range = TEAM_SIZE_RANGES.find(
+        (r) => member.profile.team_size! >= r.min && member.profile.team_size! <= r.max,
+      );
+      if (range) teamSizes.add(range.value);
+    }
     for (const tag of member.profile.company_tags) {
       companyTags.add(tag);
     }
@@ -229,5 +261,6 @@ export async function getFilterOptions(): Promise<FilterOptions> {
     seniorityLevels: sort(seniorityLevels),
     signupSources: sort(signupSources),
     companyTags: sort(companyTags),
+    teamSizes: TEAM_SIZE_RANGES.filter((r) => teamSizes.has(r.value)).map((r) => r.value),
   };
 }
