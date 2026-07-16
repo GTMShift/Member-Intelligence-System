@@ -21,7 +21,6 @@ const sarah = MOCK_MEMBERS.find((m) => m.first_name === 'Sarah')!;
 function mockAuthAs(role: 'admin' | 'member') {
   mockUseAuth.mockReturnValue({
     role,
-    setRole: vi.fn(),
     isAdmin: role === 'admin',
     session: null,
     user: null,
