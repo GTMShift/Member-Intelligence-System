@@ -5,19 +5,19 @@ import { createNotification } from '../api/notificationsApi';
 import { checkAndFlagDuplicate } from '../api/duplicateFlagsApi';
 
 const BUCKET_OPTIONS = [
-  { value: '', label: 'Select a category' },
-  { value: 'icp_tier_a', label: 'ICP Tier A' },
-  { value: 'icp_tier_b', label: 'ICP Tier B' },
-  { value: 'icp_tier_c', label: 'ICP Tier C' },
-  { value: 'watchlist', label: 'Watchlist' },
-  { value: 'between_jobs', label: 'Between Jobs' },
-  { value: 'consultant', label: 'Consultant' },
-  { value: 'partner_sponsor', label: 'Partner / Sponsor' },
-  { value: 'icp_no', label: 'ICP No' },
-  { value: 'manual_review', label: 'Manual Review' },
+    { value: '', label: 'Select a category' },
+    { value: 'primary_icp', label: 'Primary ICP' },
+    { value: 'secondary_icp', label: 'Secondary ICP' },
+    { value: 'watchlist', label: 'Watchlist' },
+    { value: 'between_jobs', label: 'Between Jobs' },
+    { value: 'consultant', label: 'Consultant' },
+    { value: 'partner_sponsor', label: 'Partner / Sponsor' },
+    { value: 'icp_no', label: 'ICP No' },
+    { value: 'manual_review', label: 'Manual Review' },
 ];
- 
-const ICP_SCORE_BUCKETS = ['icp_tier_a', 'icp_tier_b', 'icp_tier_c'];
+  
+const ICP_SCORE_BUCKETS = ['primary_icp', 'secondary_icp'];
+
  
 const TEAM_FIELDS = [
   { key: 'oversees_solutions_engineering_consulting', label: 'Solutions Engineering / Consulting' },
@@ -179,7 +179,7 @@ export function MemberEntryPage() {
         fit_score: form.fit_score ? parseInt(form.fit_score, 10) : null,
         tag_note: form.tag_note.trim() || null,
       };
-      
+
       const created = await createMember(input);
 
       if (created?.id) {

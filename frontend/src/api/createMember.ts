@@ -37,7 +37,7 @@ export interface CreateMemberInput {
   event_interest: string | null;
  
   // Section 3 - ICP Classification (member_profile)
-  bucket: 'icp_tier_a' | 'icp_tier_b' | 'icp_tier_c' | 'watchlist' | 'between_jobs' | 'consultant' | 'partner_sponsor' | 'icp_no' | 'manual_review' | null;
+  bucket: 'primary_icp' | 'secondary_icp' | 'watchlist' | 'between_jobs' | 'consultant' | 'partner_sponsor' | 'icp_no' | 'manual_review' | null;
   fit_score: number | null;
   tag_note: string | null;
 }
