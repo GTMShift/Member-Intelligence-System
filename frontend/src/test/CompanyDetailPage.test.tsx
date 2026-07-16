@@ -2,17 +2,23 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { CompanyDetailPage } from '../pages/CompanyDetailPage';
-import { MOCK_COMPANIES } from '../api/mockCompanies';
-import { MOCK_MEMBERS } from '../api/mockMembers';
+import { MOCK_COMPANIES } from '../testFixtures/companies';
+import { MOCK_MEMBERS } from '../testFixtures/members';
 import { renderWithProviders } from './testHelpers';
 
 const mockNavigate = vi.fn();
-
 vi.mock('react-router-dom', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-router-dom')>();
   return {
     ...actual,
     useNavigate: () => mockNavigate,
+  };
+});
+
+vi.mock('../api/companiesApi', async () => {
+  const { MOCK_COMPANIES } = await import('../testFixtures/companies');
+  return {
+    getCompany: async (id: string) => MOCK_COMPANIES.find((c) => c.id === id) ?? null,
   };
 });
 
@@ -44,11 +50,9 @@ describe('CompanyDetailPage', () => {
 
   it('renders company name, domain, industry, size, revenue, company_type, overview, and tags', async () => {
     renderCompanyPage();
-
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: acme.name })).toBeInTheDocument();
     });
-
     expect(screen.getByText(acme.domain!)).toBeInTheDocument();
     expect(screen.getByText(acme.industry!)).toBeInTheDocument();
     expect(screen.getByText(acme.size!)).toBeInTheDocument();
@@ -60,13 +64,10 @@ describe('CompanyDetailPage', () => {
 
   it('back button navigates back to the member profile', async () => {
     renderCompanyPage(sarah.id);
-
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: acme.name })).toBeInTheDocument();
     });
-
     fireEvent.click(screen.getByRole('button', { name: /back to member profile/i }));
-
     expect(mockNavigate).toHaveBeenCalledWith('/', {
       state: { selectedMemberId: sarah.id },
     });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MOCK_MEMBERS } from '../api/mockMembers';
+import { MOCK_MEMBERS } from '../testFixtures/members';
 
 describe('mock data consistency', () => {
   it('all mock members have a current role in employment_history, not job_title on profile', () => {
