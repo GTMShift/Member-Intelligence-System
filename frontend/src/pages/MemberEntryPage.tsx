@@ -419,7 +419,7 @@ export function MemberEntryPage() {
                 name="signup_source"
                 value={form.signup_source}
                 onChange={handleChange}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500focus:outline-none"
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
               >
                 <option value="Manual">Manual</option>
                 <option value="Website">Website</option>

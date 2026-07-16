@@ -27,7 +27,7 @@ interface ImportRun {
 
 // TODO: move to an env var (e.g. VITE_BACKEND_URL) once the project has a
 // pattern for that — hardcoded for now since this only runs against local dev.
-const BACKEND_URL = 'http://localhost:3000';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
 
 export function SubstackImportPage() {
   const navigate = useNavigate();
