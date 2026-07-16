@@ -206,7 +206,7 @@ export function MemberEntryPage() {
  
           {/* Section 1 — Basic Information */}
           <section className="rounded-xl border border-slate-200 bg-white p-6">
-            <h2 className="mb-4 text-sm font-semibold text-slate-900">Basic Information</h2>
+            <h2 className="mb-4 text-sm font-semibold text-slate-900">Profile Information</h2>
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-slate-600">
@@ -251,14 +251,17 @@ export function MemberEntryPage() {
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-slate-600">Phone</label>
+              <label className="text-xs font-medium text-slate-600">Phone <span className="text-red-500">*</span></label>
                 <input
-                  type="tel"
-                  name="phone"
-                  value={form.phone}
-                  onChange={handleChange}
-                  placeholder="+1 312 555 0101"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                    type="tel"
+                    name="phone"
+                    value={form.phone}
+                    onChange={handleChange}
+                    required
+                    placeholder="+12025551234"
+                    pattern="^\+[1-9]\d{1,14}$"
+                    title="Phone number must be in E.164 format e.g. +12025551234"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
                 />
               </div>
               <div className="col-span-2 flex flex-col gap-1.5">
