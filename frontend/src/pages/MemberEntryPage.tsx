@@ -1,8 +1,7 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createMember, type CreateMemberInput, type SocialEntry } from '../api/createMember';
- 
+
 const BUCKET_OPTIONS = [
   { value: '', label: 'Select a category' },
   { value: 'primary_icp', label: 'Primary ICP' },
@@ -14,13 +13,13 @@ const BUCKET_OPTIONS = [
   { value: 'icp_no', label: 'ICP No' },
   { value: 'manual_review', label: 'Manual Review' },
 ];
- 
+
 const ICP_SCORE_BUCKETS = ['primary_icp', 'secondary_icp'];
- 
+
 const SOCIAL_PLATFORMS = ['Twitter/X', 'Instagram', 'TikTok', 'YouTube', 'Facebook'] as const;
- 
+
 const TSHIRT_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'] as const;
- 
+
 const TEAM_FIELDS = [
   { key: 'oversees_solutions_engineering_consulting', label: 'Solutions Engineering / Consulting' },
   { key: 'oversees_customer_success', label: 'Customer Success' },
@@ -33,7 +32,7 @@ const TEAM_FIELDS = [
   { key: 'oversees_professional_services', label: 'Professional Services' },
   { key: 'oversees_implementation_onboarding', label: 'Implementation / Onboarding' },
 ] as const;
- 
+
 const REGION_FIELDS = [
   { key: 'region_north_america', label: 'North America' },
   { key: 'region_regional_usa', label: 'Regional USA' },
@@ -42,21 +41,22 @@ const REGION_FIELDS = [
   { key: 'region_apac', label: 'APAC' },
   { key: 'region_latin_america', label: 'Latin America' },
 ] as const;
- 
+
 type TeamKey = typeof TEAM_FIELDS[number]['key'];
 type RegionKey = typeof REGION_FIELDS[number]['key'];
- 
+
 type FormState = {
-  // Section 1
+  
   first_name: string;
   last_name: string;
   email: string;
   linkedin_url: string;
   phone: string;
-  // Section 2 - Org Details
+  
   team_size: string;
   company_name: string;
   current_role: string;
+  seniority_level: string;
   current_start_date: string;
   management_layers: string;
   event_interest: string;
@@ -76,7 +76,7 @@ type FormState = {
   region_emea: boolean;
   region_apac: boolean;
   region_latin_america: boolean;
-  // Section 3 - Personal Details
+  
   address: string;
   city: string;
   state_region: string;
@@ -84,12 +84,12 @@ type FormState = {
   country: string;
   tshirt_size: string;
   dietary_restrictions: string;
-  // Section 4
+  
   bucket: string;
   fit_score: string;
   tag_note: string;
 };
- 
+
 const INITIAL_STATE: FormState = {
   first_name: '',
   last_name: '',
@@ -99,6 +99,7 @@ const INITIAL_STATE: FormState = {
   team_size: '',
   company_name: '',
   current_role: '',
+  seniority_level: '',
   current_start_date: '',
   management_layers: '',
   event_interest: '',
@@ -129,9 +130,9 @@ const INITIAL_STATE: FormState = {
   fit_score: '',
   tag_note: '',
 };
- 
+
 const EMPTY_SOCIAL: SocialEntry = { platform: 'Twitter/X', username: '', url: '' };
- 
+
 export function MemberEntryPage() {
   const navigate = useNavigate();
   const [form, setForm] = useState<FormState>(INITIAL_STATE);
@@ -139,9 +140,9 @@ export function MemberEntryPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
- 
+
   const showFitScore = ICP_SCORE_BUCKETS.includes(form.bucket);
- 
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
   ) => {
@@ -151,28 +152,28 @@ export function MemberEntryPage() {
       setForm((prev) => ({ ...prev, bucket: value, fit_score: '' }));
     }
   };
- 
+
   const toggleBoolean = (field: TeamKey | RegionKey) => {
     setForm((prev) => ({ ...prev, [field]: !prev[field] }));
   };
- 
+
   const addSocial = () => {
     setSocials((prev) => [...prev, { ...EMPTY_SOCIAL }]);
   };
- 
+
   const removeSocial = (index: number) => {
     setSocials((prev) => prev.filter((_, i) => i !== index));
   };
- 
+
   const updateSocial = (index: number, field: keyof SocialEntry, value: string) => {
     setSocials((prev) => prev.map((s, i) => i === index ? { ...s, [field]: value } : s));
   };
- 
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
- 
+
     try {
       const input: CreateMemberInput = {
         first_name: form.first_name.trim(),
@@ -183,6 +184,7 @@ export function MemberEntryPage() {
         team_size: form.team_size ? parseInt(form.team_size, 10) : null,
         company_name: form.company_name.trim() || null,
         current_role: form.current_role.trim() || null,
+        seniority_level: form.seniority_level || null,
         current_start_date: form.current_start_date || null,
         management_layers: form.management_layers.trim() || null,
         event_interest: form.event_interest.trim() || null,
@@ -214,9 +216,9 @@ export function MemberEntryPage() {
         fit_score: form.fit_score ? parseInt(form.fit_score, 10) : null,
         tag_note: form.tag_note.trim() || null,
       };
- 
+
       const created = await createMember(input);
- 
+
       if (created?.id) {
         setSuccess(true);
         setForm(INITIAL_STATE);
@@ -228,7 +230,7 @@ export function MemberEntryPage() {
       setLoading(false);
     }
   };
- 
+
   return (
     <div className="flex min-h-screen flex-col">
       <header className="border-b border-slate-200 bg-white">
@@ -248,7 +250,7 @@ export function MemberEntryPage() {
           </button>
         </div>
       </header>
- 
+
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 sm:px-6">
         {success && (
           <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3">
@@ -265,15 +267,15 @@ export function MemberEntryPage() {
             </p>
           </div>
         )}
- 
+
         {error && (
           <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
             <p className="text-sm text-red-700">{error}</p>
           </div>
         )}
- 
+
         <form onSubmit={handleSubmit} className="space-y-6">
- 
+
           {/* Section 1 — Profile Information */}
           <section className="rounded-xl border border-slate-200 bg-white p-6">
             <h2 className="mb-4 text-sm font-semibold text-slate-900">Profile Information</h2>
@@ -353,7 +355,7 @@ export function MemberEntryPage() {
               </div>
             </div>
           </section>
- 
+
           {/* Section 2 — Organizational Details */}
           <section className="rounded-xl border border-slate-200 bg-white p-6">
             <h2 className="mb-4 text-sm font-semibold text-slate-900">Organizational Details</h2>
@@ -404,6 +406,30 @@ export function MemberEntryPage() {
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-medium text-slate-600">
+                    Seniority level <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="seniority_level"
+                    value={form.seniority_level}
+                    onChange={handleChange}
+                    required
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  >
+                    <option value="">Select seniority</option>
+                    <option value="Global VP">Global VP</option>
+                    <option value="SVP">SVP</option>
+                    <option value="VP">VP</option>
+                    <option value="Senior Director">Senior Director</option>
+                    <option value="Director">Director</option>
+                    <option value="Senior Manager">Senior Manager</option>
+                    <option value="Manager">Manager</option>
+                    <option value="Team Lead">Team Lead</option>
+                    <option value="Senior Individual Contributor">Senior Individual Contributor</option>
+                    <option value="Individual Contributor">Individual Contributor</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium text-slate-600">
                     Start date <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -441,7 +467,7 @@ export function MemberEntryPage() {
                   />
                 </div>
               </div>
- 
+
               {/* Teams */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-slate-600">
@@ -464,7 +490,7 @@ export function MemberEntryPage() {
                   ))}
                 </div>
               </div>
- 
+
               {/* Regions */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-slate-600">
@@ -489,7 +515,7 @@ export function MemberEntryPage() {
               </div>
             </div>
           </section>
- 
+
           {/* Section 3 — Personal Details */}
           <section className="rounded-xl border border-slate-200 bg-white p-6">
             <h2 className="mb-4 text-sm font-semibold text-slate-900">Personal Details</h2>
@@ -594,7 +620,7 @@ export function MemberEntryPage() {
                   />
                 </div>
               </div>
- 
+
               {/* Social media */}
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-medium text-slate-600">Social media</label>
@@ -642,7 +668,7 @@ export function MemberEntryPage() {
               </div>
             </div>
           </section>
- 
+
           {/* Section 4 — ICP Classification */}
           <section className="rounded-xl border border-slate-200 bg-white p-6">
             <h2 className="mb-1 text-sm font-semibold text-slate-900">ICP Classification</h2>
@@ -694,7 +720,7 @@ export function MemberEntryPage() {
               </div>
             </div>
           </section>
- 
+
           {/* Actions */}
           <div className="flex items-center justify-between pb-8">
             <button
