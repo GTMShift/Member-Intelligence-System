@@ -1,6 +1,12 @@
 
 import { supabase } from '../lib/supabaseClient';
  
+export interface SocialEntry {
+  platform: 'Twitter/X' | 'Instagram' | 'TikTok' | 'YouTube' | 'Facebook';
+  username: string;
+  url?: string;
+}
+ 
 export interface CreateMemberInput {
   // Section 1 - Profile Information (members table)
   first_name: string;
@@ -9,12 +15,23 @@ export interface CreateMemberInput {
   linkedin_url: string;
   phone: string | null;
  
-  // Section 2 - Organizational Details (member_profile)
+  // Section 2 - Personal Details (member_profile + member_socials)
+  address: string | null;
+  city: string | null;
+  state_region: string | null;
+  zip_code: string | null;
+  country: string | null;
+  tshirt_size: 'XS' | 'S' | 'M' | 'L' | 'XL' | 'XXL' | null;
+  dietary_restrictions: string | null;
+  socials: SocialEntry[];
+ 
+  // Section 3 - Organizational Details (member_profile + employment_history + companies)
   team_size: number | null;
   company_name: string | null;
   current_role: string | null;
   current_start_date: string | null;
-  // Teams (booleans)
+  management_layers: string | null;
+  event_interest: string | null;
   oversees_customer_success: boolean;
   oversees_demo_engineering: boolean;
   oversees_enablement: boolean;
@@ -25,18 +42,14 @@ export interface CreateMemberInput {
   oversees_solutions_architecture: boolean;
   oversees_solutions_engineering_consulting: boolean;
   oversees_value_engineering: boolean;
-  // Regions (booleans)
   region_north_america: boolean;
   region_regional_usa: boolean;
   region_global: boolean;
   region_emea: boolean;
   region_apac: boolean;
   region_latin_america: boolean;
-  // Other org fields
-  management_layers: string | null;
-  event_interest: string | null;
  
-  // Section 3 - ICP Classification (member_profile)
+  // Section 4 - ICP Classification (member_profile)
   bucket: 'primary_icp' | 'secondary_icp' | 'watchlist' | 'between_jobs' | 'consultant' | 'partner_sponsor' | 'icp_no' | 'manual_review' | null;
   fit_score: number | null;
   tag_note: string | null;
@@ -73,7 +86,6 @@ export async function createMember(input: CreateMemberInput): Promise<{ id: stri
   if (input.company_name) {
     const companyName = input.company_name.trim();
  
-    // Check if company already exists (exact match, case insensitive)
     const { data: existingCompany } = await supabase
       .from('companies')
       .select('id')
@@ -83,7 +95,6 @@ export async function createMember(input: CreateMemberInput): Promise<{ id: stri
     if (existingCompany) {
       companyId = existingCompany.id;
     } else {
-      // Create new company
       const { data: newCompany, error: companyError } = await supabase
         .from('companies')
         .insert({
@@ -108,9 +119,19 @@ export async function createMember(input: CreateMemberInput): Promise<{ id: stri
     .from('member_profile')
     .insert({
       member_id: member.id,
+      // Personal details
+      address: input.address,
+      city: input.city,
+      state_region: input.state_region,
+      zip_code: input.zip_code,
+      country: input.country,
+      tshirt_size: input.tshirt_size,
+      dietary_restrictions: input.dietary_restrictions,
+      // Org details
       company_id: companyId,
       team_size: input.team_size,
-      // Teams
+      management_layers: input.management_layers,
+      event_interest: input.event_interest,
       oversees_customer_success: input.oversees_customer_success,
       oversees_demo_engineering: input.oversees_demo_engineering,
       oversees_enablement: input.oversees_enablement,
@@ -121,16 +142,12 @@ export async function createMember(input: CreateMemberInput): Promise<{ id: stri
       oversees_solutions_architecture: input.oversees_solutions_architecture,
       oversees_solutions_engineering_consulting: input.oversees_solutions_engineering_consulting,
       oversees_value_engineering: input.oversees_value_engineering,
-      // Regions
       region_north_america: input.region_north_america,
       region_regional_usa: input.region_regional_usa,
       region_global: input.region_global,
       region_emea: input.region_emea,
       region_apac: input.region_apac,
       region_latin_america: input.region_latin_america,
-      // Other org fields
-      management_layers: input.management_layers,
-      event_interest: input.event_interest,
       // ICP classification
       bucket: input.bucket,
       fit_score: input.fit_score,
@@ -147,16 +164,14 @@ export async function createMember(input: CreateMemberInput): Promise<{ id: stri
     throw new Error(profileError.message);
   }
  
-  // Step 4: Insert into employment_history if company and role provided
+  // Step 4: Insert into employment_history if company provided
   if (input.company_name) {
-    // Set existing current roles to false first
     await supabase
       .from('employment_history')
       .update({ is_current: false })
       .eq('member_id', member.id)
       .eq('is_current', true);
  
-    // Insert new current role
     const { error: employmentError } = await supabase
       .from('employment_history')
       .insert({
@@ -173,6 +188,25 @@ export async function createMember(input: CreateMemberInput): Promise<{ id: stri
     if (employmentError) {
       console.error('Error creating employment history:', employmentError);
       throw new Error(employmentError.message);
+    }
+  }
+ 
+  // Step 5: Insert social media entries
+  if (input.socials.length > 0) {
+    const socialRows = input.socials.map((s) => ({
+      member_id: member.id,
+      platform: s.platform,
+      username: s.username.trim(),
+      url: s.url?.trim() || null,
+    }));
+ 
+    const { error: socialsError } = await supabase
+      .from('member_socials')
+      .insert(socialRows);
+ 
+    if (socialsError) {
+      console.error('Error creating member socials:', socialsError);
+      throw new Error(socialsError.message);
     }
   }
  

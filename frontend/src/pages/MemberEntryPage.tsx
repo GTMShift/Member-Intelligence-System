@@ -1,23 +1,25 @@
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createMember, type CreateMemberInput } from '../api/createMember';
-import { createNotification } from '../api/notificationsApi';
-import { checkAndFlagDuplicate } from '../api/duplicateFlagsApi';
-
+import { createMember, type CreateMemberInput, type SocialEntry } from '../api/createMember';
+ 
 const BUCKET_OPTIONS = [
-    { value: '', label: 'Select a category' },
-    { value: 'primary_icp', label: 'Primary ICP' },
-    { value: 'secondary_icp', label: 'Secondary ICP' },
-    { value: 'watchlist', label: 'Watchlist' },
-    { value: 'between_jobs', label: 'Between Jobs' },
-    { value: 'consultant', label: 'Consultant' },
-    { value: 'partner_sponsor', label: 'Partner / Sponsor' },
-    { value: 'icp_no', label: 'ICP No' },
-    { value: 'manual_review', label: 'Manual Review' },
+  { value: '', label: 'Select a category' },
+  { value: 'primary_icp', label: 'Primary ICP' },
+  { value: 'secondary_icp', label: 'Secondary ICP' },
+  { value: 'watchlist', label: 'Watchlist' },
+  { value: 'between_jobs', label: 'Between Jobs' },
+  { value: 'consultant', label: 'Consultant' },
+  { value: 'partner_sponsor', label: 'Partner / Sponsor' },
+  { value: 'icp_no', label: 'ICP No' },
+  { value: 'manual_review', label: 'Manual Review' },
 ];
-  
+ 
 const ICP_SCORE_BUCKETS = ['primary_icp', 'secondary_icp'];
-
+ 
+const SOCIAL_PLATFORMS = ['Twitter/X', 'Instagram', 'TikTok', 'YouTube', 'Facebook'] as const;
+ 
+const TSHIRT_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'] as const;
  
 const TEAM_FIELDS = [
   { key: 'oversees_solutions_engineering_consulting', label: 'Solutions Engineering / Consulting' },
@@ -51,14 +53,13 @@ type FormState = {
   email: string;
   linkedin_url: string;
   phone: string;
-  // Section 2 - Org details
+  // Section 2 - Org Details
   team_size: string;
   company_name: string;
   current_role: string;
   current_start_date: string;
   management_layers: string;
   event_interest: string;
-  // Teams
   oversees_customer_success: boolean;
   oversees_demo_engineering: boolean;
   oversees_enablement: boolean;
@@ -69,14 +70,21 @@ type FormState = {
   oversees_solutions_architecture: boolean;
   oversees_solutions_engineering_consulting: boolean;
   oversees_value_engineering: boolean;
-  // Regions
   region_north_america: boolean;
   region_regional_usa: boolean;
   region_global: boolean;
   region_emea: boolean;
   region_apac: boolean;
   region_latin_america: boolean;
-  // Section 3
+  // Section 3 - Personal Details
+  address: string;
+  city: string;
+  state_region: string;
+  zip_code: string;
+  country: string;
+  tshirt_size: string;
+  dietary_restrictions: string;
+  // Section 4
   bucket: string;
   fit_score: string;
   tag_note: string;
@@ -110,14 +118,24 @@ const INITIAL_STATE: FormState = {
   region_emea: false,
   region_apac: false,
   region_latin_america: false,
+  address: '',
+  city: '',
+  state_region: '',
+  zip_code: '',
+  country: '',
+  tshirt_size: '',
+  dietary_restrictions: '',
   bucket: '',
   fit_score: '',
   tag_note: '',
 };
  
+const EMPTY_SOCIAL: SocialEntry = { platform: 'Twitter/X', username: '', url: '' };
+ 
 export function MemberEntryPage() {
   const navigate = useNavigate();
   const [form, setForm] = useState<FormState>(INITIAL_STATE);
+  const [socials, setSocials] = useState<SocialEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -129,16 +147,25 @@ export function MemberEntryPage() {
   ) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
-
     if (name === 'bucket' && !ICP_SCORE_BUCKETS.includes(value)) {
       setForm((prev) => ({ ...prev, bucket: value, fit_score: '' }));
-    } else {
-      setForm((prev) => ({ ...prev, [name]: value }));
     }
   };
  
   const toggleBoolean = (field: TeamKey | RegionKey) => {
     setForm((prev) => ({ ...prev, [field]: !prev[field] }));
+  };
+ 
+  const addSocial = () => {
+    setSocials((prev) => [...prev, { ...EMPTY_SOCIAL }]);
+  };
+ 
+  const removeSocial = (index: number) => {
+    setSocials((prev) => prev.filter((_, i) => i !== index));
+  };
+ 
+  const updateSocial = (index: number, field: keyof SocialEntry, value: string) => {
+    setSocials((prev) => prev.map((s, i) => i === index ? { ...s, [field]: value } : s));
   };
  
   const handleSubmit = async (e: React.FormEvent) => {
@@ -175,34 +202,26 @@ export function MemberEntryPage() {
         region_emea: form.region_emea,
         region_apac: form.region_apac,
         region_latin_america: form.region_latin_america,
+        address: form.address.trim() || null,
+        city: form.city.trim() || null,
+        state_region: form.state_region.trim() || null,
+        zip_code: form.zip_code.trim() || null,
+        country: form.country.trim() || null,
+        tshirt_size: (form.tshirt_size as CreateMemberInput['tshirt_size']) || null,
+        dietary_restrictions: form.dietary_restrictions.trim() || null,
+        socials: socials.filter((s) => s.username.trim() !== ''),
         bucket: (form.bucket as CreateMemberInput['bucket']) || null,
         fit_score: form.fit_score ? parseInt(form.fit_score, 10) : null,
         tag_note: form.tag_note.trim() || null,
       };
-
+ 
       const created = await createMember(input);
-
+ 
       if (created?.id) {
-        await createNotification({
-          type: 'new_signup',
-          title: 'New member signup',
-          body: `${input.first_name} ${input.last_name} was added to the directory by an admin.`,
-          member_id: created.id,
-          member_name: `${input.first_name} ${input.last_name}`,
-        });
-
-        await checkAndFlagDuplicate(created.id, {
-          first_name: input.first_name,
-          last_name: input.last_name,
-          email: input.email,
-          linkedin_url: input.linkedin_url || null,
-          phone: input.phone,
-          current_role: input.current_role,
-        });
+        setSuccess(true);
+        setForm(INITIAL_STATE);
+        setSocials([]);
       }
-
-      setSuccess(true);
-      setForm(INITIAL_STATE);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
@@ -339,59 +358,73 @@ export function MemberEntryPage() {
           <section className="rounded-xl border border-slate-200 bg-white p-6">
             <h2 className="mb-4 text-sm font-semibold text-slate-900">Organizational Details</h2>
             <div className="space-y-4">
- 
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-medium text-slate-600">Company</label>
+                  <label className="text-xs font-medium text-slate-600">
+                    Company <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     name="company_name"
                     value={form.company_name}
                     onChange={handleChange}
+                    required
                     placeholder="Acme Corp"
                     className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-medium text-slate-600">Team size</label>
+                  <label className="text-xs font-medium text-slate-600">
+                    Team size <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="number"
                     name="team_size"
                     value={form.team_size}
                     onChange={handleChange}
+                    required
                     min={0}
                     placeholder="e.g. 25"
                     className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-medium text-slate-600">Current role / Title</label>
+                  <label className="text-xs font-medium text-slate-600">
+                    Current role / Title <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     name="current_role"
                     value={form.current_role}
                     onChange={handleChange}
+                    required
                     placeholder="Director of Solutions Engineering"
                     className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-medium text-slate-600">Start date</label>
+                  <label className="text-xs font-medium text-slate-600">
+                    Start date <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="date"
                     name="current_start_date"
                     value={form.current_start_date}
                     onChange={handleChange}
+                    required
                     className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-medium text-slate-600">Management layers</label>
+                  <label className="text-xs font-medium text-slate-600">
+                    Management layers <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     name="management_layers"
                     value={form.management_layers}
                     onChange={handleChange}
+                    required
                     placeholder="e.g. 2 layers"
                     className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
                   />
@@ -411,7 +444,9 @@ export function MemberEntryPage() {
  
               {/* Teams */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-slate-600">Teams you oversee</label>
+                <label className="text-xs font-medium text-slate-600">
+                  Teams you oversee <span className="text-red-500">*</span>
+                </label>
                 <div className="flex flex-wrap gap-2">
                   {TEAM_FIELDS.map((team) => (
                     <button
@@ -432,7 +467,9 @@ export function MemberEntryPage() {
  
               {/* Regions */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-slate-600">Regions</label>
+                <label className="text-xs font-medium text-slate-600">
+                  Regions <span className="text-red-500">*</span>
+                </label>
                 <div className="flex flex-wrap gap-2">
                   {REGION_FIELDS.map((region) => (
                     <button
@@ -450,21 +487,176 @@ export function MemberEntryPage() {
                   ))}
                 </div>
               </div>
- 
             </div>
           </section>
  
-          {/* Section 3 — ICP Classification */}
+          {/* Section 3 — Personal Details */}
+          <section className="rounded-xl border border-slate-200 bg-white p-6">
+            <h2 className="mb-4 text-sm font-semibold text-slate-900">Personal Details</h2>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2 flex flex-col gap-1.5">
+                  <label className="text-xs font-medium text-slate-600">
+                    Address <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="address"
+                    value={form.address}
+                    onChange={handleChange}
+                    required
+                    placeholder="123 Main St"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium text-slate-600">
+                    City <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="city"
+                    value={form.city}
+                    onChange={handleChange}
+                    required
+                    placeholder="Chicago"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium text-slate-600">
+                    State / Region <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="state_region"
+                    value={form.state_region}
+                    onChange={handleChange}
+                    required
+                    placeholder="Illinois"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium text-slate-600">
+                    Zip code <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="zip_code"
+                    value={form.zip_code}
+                    onChange={handleChange}
+                    required
+                    placeholder="60601"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium text-slate-600">
+                    Country <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="country"
+                    value={form.country}
+                    onChange={handleChange}
+                    required
+                    placeholder="United States"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium text-slate-600">
+                    T-shirt size <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="tshirt_size"
+                    value={form.tshirt_size}
+                    onChange={handleChange}
+                    required
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  >
+                    <option value="">Select size</option>
+                    {TSHIRT_SIZES.map((size) => (
+                      <option key={size} value={size}>{size}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-span-2 flex flex-col gap-1.5">
+                  <label className="text-xs font-medium text-slate-600">Dietary restrictions</label>
+                  <input
+                    type="text"
+                    name="dietary_restrictions"
+                    value={form.dietary_restrictions}
+                    onChange={handleChange}
+                    placeholder="e.g. Vegetarian, Gluten free"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+ 
+              {/* Social media */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-medium text-slate-600">Social media</label>
+                {socials.map((social, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <select
+                      value={social.platform}
+                      onChange={(e) => updateSocial(index, 'platform', e.target.value)}
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                    >
+                      {SOCIAL_PLATFORMS.map((p) => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      value={social.username}
+                      onChange={(e) => updateSocial(index, 'username', e.target.value)}
+                      placeholder="Username"
+                      className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                    />
+                    <input
+                      type="url"
+                      value={social.url ?? ''}
+                      onChange={(e) => updateSocial(index, 'url', e.target.value)}
+                      placeholder="URL (optional)"
+                      className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeSocial(index)}
+                      className="rounded-md border border-red-200 px-2 py-2 text-xs text-red-500 hover:bg-red-50"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={addSocial}
+                  className="mt-1 self-start rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  + Add social media
+                </button>
+              </div>
+            </div>
+          </section>
+ 
+          {/* Section 4 — ICP Classification */}
           <section className="rounded-xl border border-slate-200 bg-white p-6">
             <h2 className="mb-1 text-sm font-semibold text-slate-900">ICP Classification</h2>
             <p className="mb-4 text-xs text-slate-500">Internal only — members never see this</p>
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-slate-600">Bucket</label>
+                <label className="text-xs font-medium text-slate-600">
+                  Bucket <span className="text-red-500">*</span>
+                </label>
                 <select
                   name="bucket"
                   value={form.bucket}
                   onChange={handleChange}
+                  required
                   className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
                 >
                   {BUCKET_OPTIONS.map((opt) => (
@@ -507,7 +699,7 @@ export function MemberEntryPage() {
           <div className="flex items-center justify-between pb-8">
             <button
               type="button"
-              onClick={() => setForm(INITIAL_STATE)}
+              onClick={() => { setForm(INITIAL_STATE); setSocials([]); }}
               className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
               Clear form
@@ -525,4 +717,3 @@ export function MemberEntryPage() {
     </div>
   );
 }
- 
