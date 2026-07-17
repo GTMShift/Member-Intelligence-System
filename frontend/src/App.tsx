@@ -9,6 +9,7 @@ import { CompanyDetailPage } from './pages/CompanyDetailPage';
 import { LoginPage } from './pages/LoginPage';
 import { UnauthorizedPage } from './pages/UnauthorizedPage';
 import { MemberEntryPage } from './pages/MemberEntryPage';
+import { SpeakerApplicationPage } from './pages/SpeakerApplicationPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { SubstackImportPage } from './pages/SubstackImportPage';
 import { CompleteProfilePage } from './pages/CompleteProfilePage';
@@ -112,6 +113,14 @@ function App() {
           element={
             <ProtectedRoute requiredRole="member">
               <MemberPortalPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/portal/speaker-application"
+          element={
+            <ProtectedRoute requiredRole="member">
+              <SpeakerApplicationPage />
             </ProtectedRoute>
           }
         />
@@ -308,6 +317,15 @@ export function HeaderActions() {
           className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
         >
           My Profile
+        </button>
+      )}
+      {isMemberView && (
+        <button
+          type="button"
+          onClick={() => navigate('/portal/speaker-application')}
+          className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700"
+        >
+        Apply to speak
         </button>
       )}
       {role === 'admin' && (
