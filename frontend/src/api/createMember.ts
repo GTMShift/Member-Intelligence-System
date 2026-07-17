@@ -7,17 +7,18 @@ export interface SocialEntry {
 }
  
 export interface CreateMemberInput {
-  // Section 1 - Profile Information
+  
   first_name: string;
   last_name: string;
   email: string;
   linkedin_url: string;
   phone: string | null;
  
-  // Section 2 - Organizational Details
+  
   team_size: number | null;
   company_name: string | null;
   current_role: string | null;
+  seniority_level: string | null;
   current_start_date: string | null;
   management_layers: string | null;
   event_interest: string | null;
@@ -38,7 +39,7 @@ export interface CreateMemberInput {
   region_apac: boolean;
   region_latin_america: boolean;
  
-  // Section 3 - Personal Details
+  
   address: string | null;
   city: string | null;
   state_region: string | null;
@@ -48,17 +49,17 @@ export interface CreateMemberInput {
   dietary_restrictions: string | null;
   socials: SocialEntry[];
  
-  // Section 4 - ICP Classification
+  
   bucket: 'primary_icp' | 'secondary_icp' | 'watchlist' | 'between_jobs' | 'consultant' | 'partner_sponsor' | 'icp_no' | 'manual_review' | null;
   fit_score: number | null;
   tag_note: string | null;
 }
  
 export async function createMember(input: CreateMemberInput): Promise<{ id: string } | null> {
-  // Get the currently logged in admin's ID for tagged_by
+  
   const { data: { user } } = await supabase.auth.getUser();
  
-  // Call the Postgres function that wraps everything in a transaction
+  
   const { data, error } = await supabase.rpc('create_member_full', {
     p_first_name: input.first_name,
     p_last_name: input.last_name,
@@ -67,6 +68,7 @@ export async function createMember(input: CreateMemberInput): Promise<{ id: stri
     p_phone: input.phone,
     p_company_name: input.company_name,
     p_current_role: input.current_role,
+    p_seniority_level: input.seniority_level,
     p_current_start_date: input.current_start_date,
     p_team_size: input.team_size,
     p_management_layers: input.management_layers,
@@ -99,12 +101,12 @@ export async function createMember(input: CreateMemberInput): Promise<{ id: stri
     p_region_apac: input.region_apac,
     p_region_latin_america: input.region_latin_america,
     p_socials: input.socials.length > 0
-      ? input.socials.map((s) => ({
-        platform: s.platform,
-        username: s.username,
-        url: s.url || null,
-      }))
-    : null,
+    ? input.socials.map((s) => ({
+      platform: s.platform,
+      username: s.username,
+      url: s.url || null,
+    }))
+  : null,
 });
  
   if (error) {
@@ -114,3 +116,4 @@ export async function createMember(input: CreateMemberInput): Promise<{ id: stri
  
   return { id: data as string };
 }
+ 
