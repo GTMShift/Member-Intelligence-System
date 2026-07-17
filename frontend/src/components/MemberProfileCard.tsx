@@ -2,26 +2,43 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getMember } from '../api/membersApi';
 import { updateMemberAsAdmin, type AdminUpdateMemberInput } from '../api/adminUpdateMember';
+import { calculateFitScore, suggestIcpBucket, type IcpBucketSuggestion } from '../api/icpScoring';
 import { useAuth } from '../context/AuthContext';
 import type { MemberDataEntry, MemberDetail } from '../types/api';
 import { formatTimestamp, fullName } from '../utils/format';
 import { InteractionTimeline } from './InteractionTimeline';
 
+// NOTE: aligned to the icp_bucket enum from migration 021 / Meghan's taxonomy.
+// If these values drift from the DB enum, the bucket <select> will silently
+// fail to persist on save (Postgres will reject the enum value).
 const BUCKET_OPTIONS = [
   { value: '', label: 'Select a category' },
-  { value: 'icp_member', label: 'ICP Member' },
-  { value: 'between_roles', label: 'Between Roles' },
-  { value: 'adjacent_remit', label: 'Adjacent Remit' },
+  { value: 'primary_icp', label: 'Primary ICP' },
+  { value: 'secondary_icp', label: 'Secondary ICP' },
+  { value: 'watchlist', label: 'Watchlist' },
+  { value: 'between_jobs', label: 'Between Jobs' },
   { value: 'consultant', label: 'Consultant' },
-  { value: 'sponsor', label: 'Sponsor' },
-  { value: 'personal_connection', label: 'Personal Connection' },
+  { value: 'partner_sponsor', label: 'Partner / Sponsor' },
+  { value: 'icp_no', label: 'Not ICP' },
+  { value: 'manual_review', label: 'Manual Review' },
 ] as const;
 
+const BUCKET_LABELS: Record<string, string> = Object.fromEntries(
+  BUCKET_OPTIONS.filter((o) => o.value).map((o) => [o.value, o.label]),
+);
+
+// NOTE: aligned to the seniority tiers used by calculate_fit_score's scoring
+// table (Global VP/SVP=50, VP=45, Senior Director=35, Director=30). If the
+// member_profile.seniority_level column still stores the old labels
+// (C-Suite / Manager / Individual Contributor), this dropdown and the
+// scoring function will disagree — reconcile before shipping.
 const SENIORITY_OPTIONS = [
   { value: '', label: 'Select seniority' },
-  { value: 'C-Suite', label: 'C-Suite' },
+  { value: 'Global VP/SVP', label: 'Global VP / SVP' },
   { value: 'VP', label: 'VP' },
+  { value: 'Senior Director', label: 'Senior Director' },
   { value: 'Director', label: 'Director' },
+  { value: 'Senior Manager', label: 'Senior Manager' },
   { value: 'Manager', label: 'Manager' },
   { value: 'Individual Contributor', label: 'Individual Contributor' },
 ] as const;
@@ -129,11 +146,7 @@ function FeedbackPrompts({ entries }: { entries: MemberDataEntry[] }) {
       ['challenge', 'event_feedback', 'interest', 'mandate'].includes(e.category),
   );
   if (feedbackEntries.length === 0) {
-    return (
-      <p className="text-sm text-slate-500">
-        No member-submitted feedback yet.
-      </p>
-    );
+    return <p className="text-sm text-slate-500">No member-submitted feedback yet.</p>;
   }
   const grouped = feedbackEntries.reduce<Record<string, MemberDataEntry[]>>((acc, entry) => {
     if (!acc[entry.category]) acc[entry.category] = [];
@@ -143,24 +156,15 @@ function FeedbackPrompts({ entries }: { entries: MemberDataEntry[] }) {
   return (
     <div className="space-y-4">
       {Object.entries(grouped).map(([category, items]) => (
-        <div
-          key={category}
-          className="rounded-lg border-2 border-violet-200 bg-violet-50/50 p-4"
-        >
+        <div key={category} className="rounded-lg border-2 border-violet-200 bg-violet-50/50 p-4">
           <h4 className="text-sm font-semibold text-violet-900">
             {FEEDBACK_PROMPT_LABELS[category] ?? category}
           </h4>
           <ul className="mt-3 space-y-3">
             {items
-              .sort(
-                (a, b) =>
-                  new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-              )
+              .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
               .map((entry) => (
-                <li
-                  key={entry.id}
-                  className="rounded-md border border-violet-100 bg-white p-3"
-                >
+                <li key={entry.id} className="rounded-md border border-violet-100 bg-white p-3">
                   <FeedbackEntryContent entry={entry} />
                   <p className="mt-2 text-xs text-slate-400">
                     Submitted {formatTimestamp(entry.created_at)}
@@ -182,9 +186,7 @@ function FeedbackEntryContent({ entry }: { entry: MemberDataEntry }) {
     const answer = typeof data.answer === 'string' ? data.answer : null;
     return (
       <div>
-        {question && (
-          <p className="text-xs font-medium text-slate-500">{question}</p>
-        )}
+        {question && <p className="text-xs font-medium text-slate-500">{question}</p>}
         {answer && <p className="mt-1 text-sm text-slate-900">{answer}</p>}
       </div>
     );
@@ -254,6 +256,129 @@ function AvatarCircle({
   );
 }
 
+// --- New: ICP Scoring Assistant -------------------------------------------------
+
+function IcpScoringAssistant({
+  memberId,
+  currentBucket,
+  currentFitScore,
+  onApplied,
+}: {
+  memberId: string;
+  currentBucket: string | null | undefined;
+  currentFitScore: number | null | undefined;
+  onApplied: () => Promise<void>;
+}) {
+  const { user } = useAuth();
+  const [isRunning, setIsRunning] = useState(false);
+  const [isApplying, setIsApplying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [suggestion, setSuggestion] = useState<IcpBucketSuggestion | null>(null);
+
+  const runScoring = async () => {
+    setIsRunning(true);
+    setError(null);
+    try {
+      const [score, bucketSuggestion] = await Promise.all([
+        calculateFitScore(memberId),
+        suggestIcpBucket(memberId),
+      ]);
+      setSuggestion({ ...bucketSuggestion, score });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to run ICP scoring.');
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
+  const dismiss = () => {
+    setSuggestion(null);
+    setError(null);
+  };
+
+  const approve = async () => {
+    if (!suggestion || !user?.id) return;
+    setIsApplying(true);
+    setError(null);
+    try {
+      const input: Partial<AdminUpdateMemberInput> = {
+        bucket: suggestion.bucket,
+        fit_score: suggestion.score,
+      };
+      await updateMemberAsAdmin(memberId, input as AdminUpdateMemberInput, user.id);
+      await onApplied();
+      setSuggestion(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to apply suggestion.');
+    } finally {
+      setIsApplying(false);
+    }
+  };
+
+  return (
+    <div className="rounded-lg border border-amber-200 bg-amber-50/40 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+            ICP Scoring Assistant
+          </h4>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Current: {currentBucket ? (BUCKET_LABELS[currentBucket] ?? currentBucket) : 'Not classified'}
+            {currentFitScore !== null && currentFitScore !== undefined ? ` · Score ${currentFitScore}` : ''}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={runScoring}
+          disabled={isRunning}
+          className="shrink-0 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+        >
+          {isRunning ? 'Running…' : 'Run scoring'}
+        </button>
+      </div>
+
+      {error && (
+        <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </p>
+      )}
+
+      {suggestion && (
+        <div className="mt-3 rounded-md border border-amber-200 bg-white p-3">
+          <p className="text-sm text-slate-900">
+            Suggested bucket:{' '}
+            <span className="font-semibold">{BUCKET_LABELS[suggestion.bucket] ?? suggestion.bucket}</span>
+            {' · '}Score: <span className="font-semibold">{suggestion.score}</span>
+          </p>
+          {suggestion.reason && (
+            <p className="mt-1 text-xs text-slate-500">{suggestion.reason}</p>
+          )}
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={approve}
+              disabled={isApplying}
+              className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+            >
+              {isApplying ? 'Applying…' : 'Approve & apply'}
+            </button>
+            <button
+              type="button"
+              onClick={dismiss}
+              disabled={isApplying}
+              className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------------------
+
 export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
   const { role, isAdmin, user } = useAuth();
   const [member, setMember] = useState<MemberDetail | null>(null);
@@ -312,8 +437,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
   const { profile } = member;
   const userEditableEntries = member.member_data.filter((e) => e.tier === 'user_editable');
   const adminOnlyEntries = member.member_data.filter((e) => e.tier === 'admin_only');
-  const currentRole =
-    member.employment_history.find((entry) => entry.is_current)?.role ?? null;
+  const currentRole = member.employment_history.find((entry) => entry.is_current)?.role ?? null;
 
   const startEditing = () => {
     setSaveError(null);
@@ -330,7 +454,8 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
       state_region: profile.state_region ?? '',
       city: profile.city ?? '',
       bucket: profile.bucket ?? '',
-      fit_score: profile.fit_score !== null && profile.fit_score !== undefined ? String(profile.fit_score) : '',
+      fit_score:
+        profile.fit_score !== null && profile.fit_score !== undefined ? String(profile.fit_score) : '',
       tag_note: profile.tag_note ?? '',
     });
     setIsEditing(true);
@@ -409,10 +534,11 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
   const adminProfileFields: ProfileField[] = isAdmin
     ? [
         { label: 'ICP', value: profile.icp },
-        { label: 'Bucket', value: profile.bucket },
+        { label: 'Bucket', value: profile.bucket ? (BUCKET_LABELS[profile.bucket] ?? profile.bucket) : null },
         {
           label: 'Fit score',
-          value: profile.fit_score !== null && profile.fit_score !== undefined ? String(profile.fit_score) : null,
+          value:
+            profile.fit_score !== null && profile.fit_score !== undefined ? String(profile.fit_score) : null,
         },
         { label: 'Tag note', value: profile.tag_note },
       ]
@@ -422,71 +548,71 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
     <div className="h-full overflow-y-auto">
       <div className="border-b border-slate-200 bg-white px-6 py-5">
         <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <AvatarCircle avatarUrl={profile.avatar_url} firstName={member.first_name} />
-          <div className="min-w-0 flex-1">
-            <h2 className="text-xl font-semibold text-slate-900">
-              {fullName(member.first_name, member.last_name)}
-            </h2>
-            <p className="mt-1 text-sm text-slate-600">
-              {currentRole ?? '—'}
-              {profile.company_name ? (
+          <div className="flex items-start gap-4">
+            <AvatarCircle avatarUrl={profile.avatar_url} firstName={member.first_name} />
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xl font-semibold text-slate-900">
+                {fullName(member.first_name, member.last_name)}
+              </h2>
+              <p className="mt-1 text-sm text-slate-600">
+                {currentRole ?? '—'}
+                {profile.company_name ? (
+                  <>
+                    {' · '}
+                    {profile.company_id ? (
+                      <Link
+                        to={`/companies/${profile.company_id}`}
+                        state={{ fromMemberId: memberId }}
+                        className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        {profile.company_name}
+                      </Link>
+                    ) : (
+                      profile.company_name
+                    )}
+                  </>
+                ) : null}
+              </p>
+              <p className="mt-2 text-xs text-slate-400">
+                Last updated {formatTimestamp(member.last_updated)}
+                {profile.updated_at !== member.last_updated && (
+                  <> · Profile updated {formatTimestamp(profile.updated_at)}</>
+                )}
+              </p>
+            </div>
+          </div>
+          {isAdmin && (
+            <div className="flex shrink-0 items-center gap-2">
+              {isEditing ? (
                 <>
-                  {' · '}
-                  {profile.company_id ? (
-                    <Link
-                      to={`/companies/${profile.company_id}`}
-                      state={{ fromMemberId: memberId }}
-                      className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
-                    >
-                      {profile.company_name}
-                    </Link>
-                  ) : (
-                    profile.company_name
-                  )}
+                  <button
+                    type="button"
+                    onClick={cancelEditing}
+                    disabled={isSaving}
+                    className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveEdit}
+                    disabled={isSaving}
+                    className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+                  >
+                    {isSaving ? 'Saving…' : 'Save'}
+                  </button>
                 </>
-              ) : null}
-            </p>
-            <p className="mt-2 text-xs text-slate-400">
-              Last updated {formatTimestamp(member.last_updated)}
-              {profile.updated_at !== member.last_updated && (
-                <> · Profile updated {formatTimestamp(profile.updated_at)}</>
+              ) : (
+                <button
+                  type="button"
+                  onClick={startEditing}
+                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Edit
+                </button>
               )}
-            </p>
-          </div>
-        </div>
-        {isAdmin && (
-          <div className="flex shrink-0 items-center gap-2">
-            {isEditing ? (
-              <>
-                <button
-                  type="button"
-                  onClick={cancelEditing}
-                  disabled={isSaving}
-                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveEdit}
-                  disabled={isSaving}
-                  className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
-                >
-                  {isSaving ? 'Saving…' : 'Save'}
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                onClick={startEditing}
-                className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              >
-                Edit
-              </button>
-            )}
-          </div>
-        )}
+            </div>
+          )}
         </div>
         {saveError && (
           <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -495,16 +621,10 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
         )}
       </div>
       <div className="space-y-5 p-6">
-        <TierSection
-          title="Public Profile"
-          description="Tier 1 · Visible to all"
-          tierColor="blue"
-        >
+        <TierSection title="Public Profile" description="Tier 1 · Visible to all" tierColor="blue">
           <div className="space-y-5">
             <div>
-              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Identity
-              </h4>
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Identity</h4>
               {isEditing && editForm ? (
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-1.5">
@@ -629,9 +749,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
               </div>
             )}
             <div>
-              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Location
-              </h4>
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Location</h4>
               {isEditing && editForm ? (
                 <div className="grid grid-cols-3 gap-4">
                   <div className="flex flex-col gap-1.5">
@@ -677,20 +795,20 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
             </div>
           </div>
         </TierSection>
-        <TierSection
-          title="Member Feedback"
-          description="Tier 2 · User-editable"
-          tierColor="violet"
-        >
+        <TierSection title="Member Feedback" description="Tier 2 · User-editable" tierColor="violet">
           <FeedbackPrompts entries={userEditableEntries} />
         </TierSection>
         {isAdmin && (
-          <TierSection
-            title="Admin Intelligence"
-            description="Tier 3 · Admin only"
-            tierColor="amber"
-          >
+          <TierSection title="Admin Intelligence" description="Tier 3 · Admin only" tierColor="amber">
             <div className="space-y-4">
+              {!isEditing && (
+                <IcpScoringAssistant
+                  memberId={memberId}
+                  currentBucket={profile.bucket}
+                  currentFitScore={profile.fit_score}
+                  onApplied={loadMember}
+                />
+              )}
               {isEditing && editForm ? (
                 <div className="grid grid-cols-2 gap-4 rounded-lg border border-amber-100 bg-amber-50/30 p-4">
                   <div className="flex flex-col gap-1.5">
@@ -740,10 +858,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
               {adminOnlyEntries.length > 0 ? (
                 <div className="space-y-3">
                   {adminOnlyEntries
-                    .sort(
-                      (a, b) =>
-                        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-                    )
+                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                     .map((entry) => (
                       <AdminDataEntry key={entry.id} entry={entry} />
                     ))}
