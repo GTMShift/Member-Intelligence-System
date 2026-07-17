@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getMember } from '../api/membersApi';
 import { useAuth } from '../context/AuthContext';
-import type { MemberDataEntry, MemberDetail } from '../types/api';
+import type { EnrichmentResult, MemberDataEntry, MemberDetail } from '../types/api';
 import { formatTimestamp, fullName } from '../utils/format';
+import { EnrichmentReviewPanel } from './EnrichmentReviewPanel';
 import { InteractionTimeline } from './InteractionTimeline';
 
 interface MemberProfileCardProps {
@@ -200,15 +201,21 @@ function AdminEntryContent({ entry }: { entry: MemberDataEntry }) {
 }
 
 export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
-  const { role, isAdmin } = useAuth();
+  const { role, isAdmin, user } = useAuth();
   const [member, setMember] = useState<MemberDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [enriching, setEnriching] = useState(false);
+  const [enrichError, setEnrichError] = useState<string | null>(null);
+  const [enrichmentResult, setEnrichmentResult] = useState<EnrichmentResult | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
+      setEnrichError(null);
+      setEnriching(false);
+      setEnrichmentResult(null);
       setLoading(true);
       setError(null);
 
@@ -238,6 +245,81 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
     };
   }, [memberId, role]);
 
+  const reloadMember = async () => {
+    try {
+      const data = await getMember(memberId, role);
+      setMember(data);
+    } catch {
+      setError('Failed to reload member profile.');
+    }
+  };
+
+  const handleEnrich = async () => {
+    setEnriching(true);
+    setEnrichError(null);
+
+    try {
+      const startResponse = await fetch(
+        `http://localhost:3000/members/${memberId}/enrich`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ run_type: 'manual' }),
+        },
+      );
+
+      if (!startResponse.ok) {
+        throw new Error('Failed to start enrichment');
+      }
+
+      const startData = await startResponse.json();
+      const enrichmentId = startData.enrichment_id as string | undefined;
+
+      if (!enrichmentId) {
+        throw new Error('No enrichment_id returned');
+      }
+
+      const pollIntervalMs = 5_000;
+      const maxAttempts = 36;
+      let finishedResult: EnrichmentResult | null = null;
+
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+
+        const statusResponse = await fetch(
+          `http://localhost:3000/enrich/status/${enrichmentId}`,
+        );
+
+        if (!statusResponse.ok) {
+          throw new Error('Failed to fetch enrichment status');
+        }
+
+        const pollingResponse = await statusResponse.json();
+
+        if (pollingResponse.status === 'FINISHED') {
+          const contact = pollingResponse.datas?.[0]?.contact ?? null;
+          finishedResult = {
+            enrichment_id: enrichmentId,
+            status: pollingResponse.status,
+            contact,
+          };
+          break;
+        }
+      }
+
+      if (!finishedResult) {
+        setEnrichError('Enrichment is taking longer than expected — check back later');
+        return;
+      }
+
+      setEnrichmentResult(finishedResult);
+    } catch {
+      setEnrichError('Enrichment failed — please try again later');
+    } finally {
+      setEnriching(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -259,6 +341,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
   const adminOnlyEntries = member.member_data.filter((e) => e.tier === 'admin_only');
   const currentRole =
     member.employment_history.find((entry) => entry.is_current)?.role ?? null;
+  const canEnrich = isAdmin || user?.email === member.email;
 
   const identityFields: ProfileField[] = [
     { label: 'Email', value: member.email },
@@ -318,12 +401,27 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
             </>
           ) : null}
         </p>
-        <p className="mt-2 text-xs text-slate-400">
-          Last updated {formatTimestamp(member.last_updated)}
-          {profile.updated_at !== member.last_updated && (
-            <> · Profile updated {formatTimestamp(profile.updated_at)}</>
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <p className="text-xs text-slate-400">
+            Last updated {formatTimestamp(member.last_updated)}
+            {profile.updated_at !== member.last_updated && (
+              <> · Profile updated {formatTimestamp(profile.updated_at)}</>
+            )}
+          </p>
+          {canEnrich && (
+            <button
+              type="button"
+              onClick={handleEnrich}
+              disabled={enriching}
+              className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {enriching ? 'Enriching…' : 'Enrich profile'}
+            </button>
           )}
-        </p>
+        </div>
+        {enrichError && (
+          <p className="mt-2 text-xs text-red-600">{enrichError}</p>
+        )}
       </div>
 
       <div className="space-y-5 p-6">
@@ -424,6 +522,23 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
           </section>
         )}
       </div>
+
+      {enrichmentResult && (
+        <EnrichmentReviewPanel
+          memberId={memberId}
+          existingMember={member}
+          enrichedData={enrichmentResult}
+          onClose={() => {
+            setEnrichmentResult(null);
+            setEnriching(false);
+          }}
+          onApplied={async () => {
+            setEnrichmentResult(null);
+            setEnriching(false);
+            await reloadMember();
+          }}
+        />
+      )}
     </div>
   );
 }

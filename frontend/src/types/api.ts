@@ -176,3 +176,23 @@ export interface MetroArea {
   center_lng: number;
   radius_miles: number;
 }
+
+export interface EnrichmentResult {
+  enrichment_id: string;
+  status: string;
+  contact: {
+    most_probable_email?: string;
+    most_probable_email_status?: string;
+    profile?: {
+      location?: string;
+      position?: {
+        title?: string;
+        company?: {
+          name?: string;
+          website?: string;
+        };
+        start_at?: { month?: number; year?: number };
+      };
+    };
+  } | null;
+}
