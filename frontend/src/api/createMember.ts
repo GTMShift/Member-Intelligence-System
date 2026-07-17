@@ -1,84 +1,116 @@
 import { supabase } from '../lib/supabaseClient';
  
+export interface SocialEntry {
+  platform: 'Twitter/X' | 'Instagram' | 'TikTok' | 'YouTube' | 'Facebook';
+  username: string;
+  url?: string;
+}
+ 
 export interface CreateMemberInput {
-  // Core identity
+  // Section 1 - Profile Information
   first_name: string;
   last_name: string;
   email: string;
   linkedin_url: string;
   phone: string | null;
  
-  // Profile
-  job_title: string | null;
-  current_job_start_date: string | null;
-  seniority_level: string | null;
+  // Section 2 - Organizational Details
+  team_size: number | null;
   company_name: string | null;
-  country: string | null;
-  state_region: string | null;
-  city: string | null;
-  signup_source: 'Website' | 'Luma' | 'Substack' | 'Manual';
+  current_role: string | null;
+  current_start_date: string | null;
+  management_layers: string | null;
+  event_interest: string | null;
+  oversees_customer_success: boolean;
+  oversees_demo_engineering: boolean;
+  oversees_enablement: boolean;
+  oversees_forward_deployed_engineering: boolean;
+  oversees_implementation_onboarding: boolean;
+  oversees_partnerships_channel_se: boolean;
+  oversees_professional_services: boolean;
+  oversees_solutions_architecture: boolean;
+  oversees_solutions_engineering_consulting: boolean;
+  oversees_value_engineering: boolean;
+  region_north_america: boolean;
+  region_regional_usa: boolean;
+  region_global: boolean;
+  region_emea: boolean;
+  region_apac: boolean;
+  region_latin_america: boolean;
  
-  // ICP classification
-  bucket: 'icp_member' | 'between_roles' | 'adjacent_remit' | 'consultant' | 'sponsor' | 'personal_connection' | null;
+  // Section 3 - Personal Details
+  address: string | null;
+  city: string | null;
+  state_region: string | null;
+  zip_code: string | null;
+  country: string | null;
+  tshirt_size: 'XS' | 'S' | 'M' | 'L' | 'XL' | 'XXL' | null;
+  dietary_restrictions: string | null;
+  socials: SocialEntry[];
+ 
+  // Section 4 - ICP Classification
+  bucket: 'primary_icp' | 'secondary_icp' | 'watchlist' | 'between_jobs' | 'consultant' | 'partner_sponsor' | 'icp_no' | 'manual_review' | null;
   fit_score: number | null;
   tag_note: string | null;
 }
  
 export async function createMember(input: CreateMemberInput): Promise<{ id: string } | null> {
-  // Step 1: Insert into members table
-  const { data: member, error: memberError } = await supabase
-    .from('members')
-    .insert({
-      first_name: input.first_name,
-      last_name: input.last_name,
-      email: input.email,
-      linkedin_url: input.linkedin_url,
-      phone: input.phone,
-    })
-    .select('id')
-    .single();
+  // Get the currently logged in admin's ID for tagged_by
+  const { data: { user } } = await supabase.auth.getUser();
  
-  if (memberError || !member) {
-    console.error('Error creating member:', memberError);
-    throw new Error(memberError?.message ?? 'Failed to create member');
+  // Call the Postgres function that wraps everything in a transaction
+  const { data, error } = await supabase.rpc('create_member_full', {
+    p_first_name: input.first_name,
+    p_last_name: input.last_name,
+    p_email: input.email,
+    p_linkedin_url: input.linkedin_url,
+    p_phone: input.phone,
+    p_company_name: input.company_name,
+    p_current_role: input.current_role,
+    p_current_start_date: input.current_start_date,
+    p_team_size: input.team_size,
+    p_management_layers: input.management_layers,
+    p_event_interest: input.event_interest,
+    p_address: input.address,
+    p_city: input.city,
+    p_state_region: input.state_region,
+    p_zip_code: input.zip_code,
+    p_country: input.country,
+    p_tshirt_size: input.tshirt_size,
+    p_dietary_restrictions: input.dietary_restrictions,
+    p_bucket: input.bucket,
+    p_fit_score: input.fit_score,
+    p_tag_note: input.tag_note,
+    p_tagged_by: user?.id ?? null,
+    p_oversees_customer_success: input.oversees_customer_success,
+    p_oversees_demo_engineering: input.oversees_demo_engineering,
+    p_oversees_enablement: input.oversees_enablement,
+    p_oversees_forward_deployed_engineering: input.oversees_forward_deployed_engineering,
+    p_oversees_implementation_onboarding: input.oversees_implementation_onboarding,
+    p_oversees_partnerships_channel_se: input.oversees_partnerships_channel_se,
+    p_oversees_professional_services: input.oversees_professional_services,
+    p_oversees_solutions_architecture: input.oversees_solutions_architecture,
+    p_oversees_solutions_engineering_consulting: input.oversees_solutions_engineering_consulting,
+    p_oversees_value_engineering: input.oversees_value_engineering,
+    p_region_north_america: input.region_north_america,
+    p_region_regional_usa: input.region_regional_usa,
+    p_region_global: input.region_global,
+    p_region_emea: input.region_emea,
+    p_region_apac: input.region_apac,
+    p_region_latin_america: input.region_latin_america,
+    p_socials: input.socials.length > 0
+      ? input.socials.map((s) => ({
+        platform: s.platform,
+        username: s.username,
+        url: s.url || null,
+      }))
+    : null,
+});
+ 
+  if (error) {
+    console.error('Error creating member:', error);
+    throw new Error(error.message);
   }
  
-  // Step 2: Insert into member_profile table
-  const { error: profileError } = await supabase
-    .from('member_profile')
-    .insert({
-      member_id: member.id,
-      job_title: input.job_title,
-      current_job_start_date: input.current_job_start_date,
-      seniority_level: input.seniority_level,
-      country: input.country,
-      state_region: input.state_region,
-      city: input.city,
-      signup_source: input.signup_source,
-    });
- 
-  if (profileError) {
-    console.error('Error creating member profile:', profileError);
-    throw new Error(profileError.message);
-  }
- 
-  // Step 3: Insert into member_tags if a bucket was selected
-  if (input.bucket) {
-    const { error: tagError } = await supabase
-      .from('member_tags')
-      .insert({
-        member_id: member.id,
-        bucket: input.bucket,
-        fit_score: input.fit_score,
-        tagged_manually: true,
-        tag_note: input.tag_note,
-      });
- 
-    if (tagError) {
-      console.error('Error creating member tag:', tagError);
-      throw new Error(tagError.message);
-    }
-  }
- 
-  return { id: member.id };
+  return { id: data as string };
 }
