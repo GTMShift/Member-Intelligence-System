@@ -95,7 +95,7 @@ export function CompleteProfilePage() {
 
       await createMemberSelf(input, user.id);
       await refreshMemberId();
-      navigate('/portal');
+      navigate('/portal', { state: { justCreated: true } });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {

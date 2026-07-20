@@ -35,16 +35,19 @@ export interface UpdateMyProfileInput {
 }
 
 async function findOrCreateCompany(companyName: string | null): Promise<string | null> {
-  const name = companyName?.trim();
-  if (!name) return null;
-
-  const { data: existing, error: findErr } = await supabase
-    .from('companies')
-    .select('id')
-    .ilike('name', name)
-    .maybeSingle();
-  if (findErr) throw new Error(`Company lookup failed: ${findErr.message}`);
-  if (existing) return existing.id;
+    const name = companyName?.trim();
+    if (!name) return null;
+  
+    // Uses .limit(1) + array check instead of .maybeSingle(), since .maybeSingle()
+    // throws an error (not just returns null) if more than one company happens to
+    // share a similar name — which would otherwise surface as a confusing failure.
+    const { data: matches, error: findErr } = await supabase
+      .from('companies')
+      .select('id')
+      .ilike('name', name)
+      .limit(1);
+    if (findErr) throw new Error(`Company lookup failed: ${findErr.message}`);
+    if (matches && matches.length > 0) return matches[0].id;
 
   const { data: created, error: createErr } = await supabase
     .from('companies')

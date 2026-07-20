@@ -18,6 +18,7 @@ import type { UserRole } from './types/api';
 
 interface DashboardLocationState {
   selectedMemberId?: string;
+  justCreated?: boolean;
 }
 
 function PortalRoleOverride({ children }: { children: ReactNode }) {
@@ -150,6 +151,35 @@ function MemberPortalPage() {
   return <MemberDirectoryLayout subtitle="Member portal" portalView />;
 }
 
+function WelcomeToast() {
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setVisible(false), 5000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!visible) return null;
+
+  return (
+    <div className="fixed left-1/2 top-4 z-50 w-[90%] max-w-md -translate-x-1/2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 shadow-lg">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-medium text-green-800">
+          Welcome! Your profile has been created.
+        </p>
+        <button
+          type="button"
+          onClick={() => setVisible(false)}
+          className="shrink-0 text-green-700 hover:text-green-900"
+          aria-label="Dismiss"
+        >
+          ×
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function MemberDirectoryLayout({
   subtitle,
   showDuplicateAlerts = false,
@@ -160,14 +190,22 @@ function MemberDirectoryLayout({
   portalView?: boolean;
 }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const [showWelcome, setShowWelcome] = useState(false);
 
   useEffect(() => {
     const state = location.state as DashboardLocationState | null;
     if (state?.selectedMemberId) {
       setSelectedMemberId(state.selectedMemberId);
     }
-  }, [location.state]);
+    if (state?.justCreated) {
+      setShowWelcome(true);
+      // Clear the flag from history state so refreshing the page (or coming
+      // back later) doesn't keep re-showing the welcome banner.
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, location.pathname, navigate]);
 
   const handleViewExistingMember = (memberId: string) => {
     setSelectedMemberId(memberId);
@@ -205,6 +243,7 @@ function MemberDirectoryLayout({
 
   return (
     <div className="flex min-h-screen flex-col">
+      {showWelcome && <WelcomeToast />}
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-[90rem] items-center justify-between px-4 py-4 sm:px-6">
           <div>
