@@ -221,13 +221,4 @@ export interface EnrichmentResult {
       };
     };
   } | null;
-export interface Notification {
-  id: string;
-  type: NotificationType;
-  title: string;
-  body: string;
-  member_id: string | null;
-  member_name: string | null;
-  is_read: boolean;
-  created_at: string;
 }

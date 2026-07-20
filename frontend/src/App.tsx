@@ -17,7 +17,7 @@ import { SubstackImportPage } from './pages/SubstackImportPage';
 import { CompleteProfilePage } from './pages/CompleteProfilePage';
 import { MyProfilePage } from './pages/MyProfilePage';
 import { fetchUnreadNotificationCount } from './api/notificationsApi';
-import type { UserRole } from './types/api';
+import type { MemberDetail, UserRole } from './types/api';
 
 interface DashboardLocationState {
   selectedMemberId?: string;
