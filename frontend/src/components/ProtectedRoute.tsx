@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import type { UserRole } from '../types/api';
 
@@ -8,7 +8,8 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
-  const { session, role, loading } = useAuth();
+  const { session, role, loading, needsOnboarding } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -35,6 +36,12 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
   if (requiredRole === 'member') {
     if (role !== 'admin' && role !== 'member') {
       return <Navigate to="/unauthorized" replace />;
+    }
+    // A member-role user with no linked member record yet needs to complete
+    // their profile before seeing the portal — but skip this check when
+    // they're already on that page, or we'd redirect to it in an infinite loop.
+    if (role === 'member' && needsOnboarding && location.pathname !== '/complete-profile') {
+      return <Navigate to="/complete-profile" replace />;
     }
   }
 

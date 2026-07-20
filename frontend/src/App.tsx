@@ -11,9 +11,13 @@ import { CompanyDetailPage } from './pages/CompanyDetailPage';
 import { LoginPage } from './pages/LoginPage';
 import { UnauthorizedPage } from './pages/UnauthorizedPage';
 import { MemberEntryPage } from './pages/MemberEntryPage';
+import { SpeakerApplicationPage } from './pages/SpeakerApplicationPage';
 import { NotificationsPage } from './pages/NotificationsPage';
-import { MOCK_NOTIFICATIONS } from './api/mockNotifications';
-import type { MemberDetail, UserRole } from './types/api';
+import { SubstackImportPage } from './pages/SubstackImportPage';
+import { CompleteProfilePage } from './pages/CompleteProfilePage';
+import { MyProfilePage } from './pages/MyProfilePage';
+import { fetchUnreadNotificationCount } from './api/notificationsApi';
+import type { UserRole } from './types/api';
 
 interface DashboardLocationState {
   selectedMemberId?: string;
@@ -51,6 +55,22 @@ function App() {
         <Route path="/unauthorized" element={<UnauthorizedPage />} />
         <Route path="/redirect" element={<RoleBasedRedirect />} />
         <Route
+          path="/complete-profile"
+          element={
+            <ProtectedRoute requiredRole="member">
+              <CompleteProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/my-profile"
+          element={
+            <ProtectedRoute requiredRole="member">
+              <MyProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/"
           element={
             <ProtectedRoute requiredRole="admin">
@@ -63,6 +83,14 @@ function App() {
           element={
             <ProtectedRoute requiredRole="admin">
               <MemberEntryPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/substack-import"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <SubstackImportPage />
             </ProtectedRoute>
           }
         />
@@ -87,6 +115,14 @@ function App() {
           element={
             <ProtectedRoute requiredRole="member">
               <MemberPortalPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/portal/speaker-application"
+          element={
+            <ProtectedRoute requiredRole="member">
+              <SpeakerApplicationPage />
             </ProtectedRoute>
           }
         />
@@ -260,7 +296,7 @@ function MemberDirectoryLayout({
 }
 
 export function HeaderActions() {
-  const { user, signOut, role } = useAuth();
+  const { user, signOut, role, memberId } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -270,7 +306,12 @@ export function HeaderActions() {
   };
 
   const isMemberView = location.pathname === '/portal';
-  const unreadCount = MOCK_NOTIFICATIONS.filter((n) => !n.is_read).length;
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (role !== 'admin') return;
+    fetchUnreadNotificationCount().then(setUnreadCount);
+  }, [role]);
 
   return (
     <div className="flex items-center gap-4">
@@ -312,6 +353,33 @@ export function HeaderActions() {
           className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700"
         >
           + Add member
+        </button>
+      )}
+      {role === 'admin' && (
+        <button
+          type="button"
+          onClick={() => navigate('/admin/substack-import')}
+          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+        >
+          Import Substack CSV
+        </button>
+      )}
+      {isMemberView && (
+        <button
+          type="button"
+          onClick={() => navigate(memberId ? '/my-profile' : '/complete-profile')}
+          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+        >
+          My Profile
+        </button>
+      )}
+      {isMemberView && (
+        <button
+          type="button"
+          onClick={() => navigate('/portal/speaker-application')}
+          className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700"
+        >
+        Apply to speak
         </button>
       )}
       {role === 'admin' && (

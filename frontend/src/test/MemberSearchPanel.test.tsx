@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { MemberSearchPanel } from '../components/MemberSearchPanel';
-import { MOCK_MEMBERS } from '../api/mockMembers';
+import { MOCK_MEMBERS } from '../testFixtures/members';
 import { advanceSearchTimers } from './testHelpers';
 
 function renderPanel() {
