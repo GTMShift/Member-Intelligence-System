@@ -12,12 +12,16 @@ const eventsRouter = require('./routes/events');
 const substackRouter = require('./routes/substackImport');
 const formResponsesRouter = require('./routes/formResponses');
 
-app.use(express.json());
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000'],
+  origin: [
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://localhost:3000',
+  ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+app.use(express.json());
 
 app.use('/members/:id/enrich', enrichmentRouter);
 app.use('/enrich/status', enrichmentStatusRouter);

@@ -388,34 +388,6 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
   const [enriching, setEnriching] = useState(false);
   const [enrichError, setEnrichError] = useState<string | null>(null);
   const [enrichmentResult, setEnrichmentResult] = useState<EnrichmentResult | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      setEnrichError(null);
-      setEnriching(false);
-      setEnrichmentResult(null);
-      setLoading(true);
-      setError(null);
-
-      try {
-        const data = await getMember(memberId, role);
-        if (!cancelled) {
-          if (!data) {
-            setError('Member not found.');
-            setMember(null);
-          } else {
-            setMember(data);
-          }
-        }
-      } catch {
-        if (!cancelled) {
-          setError('Failed to load member profile.');
-          setMember(null);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<EditFormState | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -441,22 +413,14 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
   }, [memberId, role]);
 
   useEffect(() => {
-    let cancelled = false;
-    loadMember().then(() => {
-      if (cancelled) return;
-    });
-    return () => {
-      cancelled = true;
-    };
+    setEnrichError(null);
+    setEnriching(false);
+    setEnrichmentResult(null);
+    loadMember();
   }, [loadMember]);
 
   const reloadMember = async () => {
-    try {
-      const data = await getMember(memberId, role);
-      setMember(data);
-    } catch {
-      setError('Failed to reload member profile.');
-    }
+    await loadMember();
   };
 
   const handleEnrich = async () => {
@@ -547,7 +511,6 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
   const currentRole =
     member.employment_history.find((entry) => entry.is_current)?.role ?? null;
   const canEnrich = isAdmin || user?.email === member.email;
-  const currentRole = member.employment_history.find((entry) => entry.is_current)?.role ?? null;
 
   const startEditing = () => {
     setSaveError(null);
@@ -689,11 +652,24 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                   <> · Profile updated {formatTimestamp(profile.updated_at)}</>
                 )}
               </p>
+              {enrichError && (
+                <p className="mt-2 text-xs text-red-600">{enrichError}</p>
+              )}
             </div>
           </div>
-          {isAdmin && (
-            <div className="flex shrink-0 items-center gap-2">
-              {isEditing ? (
+          <div className="flex shrink-0 items-center gap-2">
+            {canEnrich && (
+              <button
+                type="button"
+                onClick={handleEnrich}
+                disabled={enriching}
+                className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {enriching ? 'Enriching…' : 'Enrich profile'}
+              </button>
+            )}
+            {isAdmin &&
+              (isEditing ? (
                 <>
                   <button
                     type="button"
@@ -720,32 +696,8 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                 >
                   Edit
                 </button>
-              )}
-            </>
-          ) : null}
-        </p>
-        <div className="mt-2 flex flex-wrap items-center gap-3">
-          <p className="text-xs text-slate-400">
-            Last updated {formatTimestamp(member.last_updated)}
-            {profile.updated_at !== member.last_updated && (
-              <> · Profile updated {formatTimestamp(profile.updated_at)}</>
-            )}
-          </p>
-          {canEnrich && (
-            <button
-              type="button"
-              onClick={handleEnrich}
-              disabled={enriching}
-              className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {enriching ? 'Enriching…' : 'Enrich profile'}
-            </button>
-          )}
-        </div>
-        {enrichError && (
-          <p className="mt-2 text-xs text-red-600">{enrichError}</p>
-            </div>
-          )}
+              ))}
+          </div>
         </div>
         {saveError && (
           <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
