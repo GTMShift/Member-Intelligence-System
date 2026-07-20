@@ -20,6 +20,14 @@ const SOCIAL_PLATFORMS = ['Twitter/X', 'Instagram', 'TikTok', 'YouTube', 'Facebo
 
 const TSHIRT_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'] as const;
 
+const MANAGEMENT_LAYER_OPTIONS = [
+  { value: '', label: 'Select layers' },
+  { value: '1', label: '1 layer' },
+  { value: '2', label: '2 layers' },
+  { value: '3', label: '3 layers' },
+  { value: '4+', label: '4+ layers' },
+];
+
 const TEAM_FIELDS = [
   { key: 'oversees_solutions_engineering_consulting', label: 'Solutions Engineering / Consulting' },
   { key: 'oversees_customer_success', label: 'Customer Success' },
@@ -445,15 +453,19 @@ export function MemberEntryPage() {
                   <label className="text-xs font-medium text-slate-600">
                     Management layers <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="text"
+                  <select
                     name="management_layers"
                     value={form.management_layers}
                     onChange={handleChange}
                     required
-                    placeholder="e.g. 2 layers"
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
-                  />
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  >
+                    {MANAGEMENT_LAYER_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-medium text-slate-600">Event interest</label>
