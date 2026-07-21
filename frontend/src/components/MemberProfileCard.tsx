@@ -4,8 +4,9 @@ import { getMember } from '../api/membersApi';
 import { updateMemberAsAdmin, type AdminUpdateMemberInput } from '../api/adminUpdateMember';
 import { calculateFitScore, suggestIcpBucket, type IcpBucketSuggestion } from '../api/icpScoring';
 import { useAuth } from '../context/AuthContext';
-import type { MemberDataEntry, MemberDetail } from '../types/api';
+import type { EnrichmentResult, MemberDataEntry, MemberDetail } from '../types/api';
 import { formatTimestamp, fullName } from '../utils/format';
+import { EnrichmentReviewPanel } from './EnrichmentReviewPanel';
 import { InteractionTimeline } from './InteractionTimeline';
 
 // NOTE: aligned to the icp_bucket enum from migration 021 / Meghan's taxonomy.
@@ -384,6 +385,9 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
   const [member, setMember] = useState<MemberDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [enriching, setEnriching] = useState(false);
+  const [enrichError, setEnrichError] = useState<string | null>(null);
+  const [enrichmentResult, setEnrichmentResult] = useState<EnrichmentResult | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<EditFormState | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -409,14 +413,81 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
   }, [memberId, role]);
 
   useEffect(() => {
-    let cancelled = false;
-    loadMember().then(() => {
-      if (cancelled) return;
-    });
-    return () => {
-      cancelled = true;
-    };
+    setEnrichError(null);
+    setEnriching(false);
+    setEnrichmentResult(null);
+    loadMember();
   }, [loadMember]);
+
+  const reloadMember = async () => {
+    await loadMember();
+  };
+
+  const handleEnrich = async () => {
+    setEnriching(true);
+    setEnrichError(null);
+
+    try {
+      const startResponse = await fetch(
+        `http://localhost:3000/members/${memberId}/enrich`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ run_type: 'manual' }),
+        },
+      );
+
+      if (!startResponse.ok) {
+        throw new Error('Failed to start enrichment');
+      }
+
+      const startData = await startResponse.json();
+      const enrichmentId = startData.enrichment_id as string | undefined;
+
+      if (!enrichmentId) {
+        throw new Error('No enrichment_id returned');
+      }
+
+      const pollIntervalMs = 5_000;
+      const maxAttempts = 36;
+      let finishedResult: EnrichmentResult | null = null;
+
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+
+        const statusResponse = await fetch(
+          `http://localhost:3000/enrich/status/${enrichmentId}`,
+        );
+
+        if (!statusResponse.ok) {
+          throw new Error('Failed to fetch enrichment status');
+        }
+
+        const pollingResponse = await statusResponse.json();
+
+        if (pollingResponse.status === 'FINISHED') {
+          const contact = pollingResponse.datas?.[0]?.contact ?? null;
+          finishedResult = {
+            enrichment_id: enrichmentId,
+            status: pollingResponse.status,
+            contact,
+          };
+          break;
+        }
+      }
+
+      if (!finishedResult) {
+        setEnrichError('Enrichment is taking longer than expected — check back later');
+        return;
+      }
+
+      setEnrichmentResult(finishedResult);
+    } catch {
+      setEnrichError('Enrichment failed — please try again later');
+    } finally {
+      setEnriching(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -437,7 +508,9 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
   const { profile } = member;
   const userEditableEntries = member.member_data.filter((e) => e.tier === 'user_editable');
   const adminOnlyEntries = member.member_data.filter((e) => e.tier === 'admin_only');
-  const currentRole = member.employment_history.find((entry) => entry.is_current)?.role ?? null;
+  const currentRole =
+    member.employment_history.find((entry) => entry.is_current)?.role ?? null;
+  const canEnrich = isAdmin || user?.email === member.email;
 
   const startEditing = () => {
     setSaveError(null);
@@ -579,11 +652,24 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                   <> · Profile updated {formatTimestamp(profile.updated_at)}</>
                 )}
               </p>
+              {enrichError && (
+                <p className="mt-2 text-xs text-red-600">{enrichError}</p>
+              )}
             </div>
           </div>
-          {isAdmin && (
-            <div className="flex shrink-0 items-center gap-2">
-              {isEditing ? (
+          <div className="flex shrink-0 items-center gap-2">
+            {canEnrich && (
+              <button
+                type="button"
+                onClick={handleEnrich}
+                disabled={enriching}
+                className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {enriching ? 'Enriching…' : 'Enrich profile'}
+              </button>
+            )}
+            {isAdmin &&
+              (isEditing ? (
                 <>
                   <button
                     type="button"
@@ -610,9 +696,8 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                 >
                   Edit
                 </button>
-              )}
-            </div>
-          )}
+              ))}
+          </div>
         </div>
         {saveError && (
           <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -879,6 +964,23 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
           </section>
         )}
       </div>
+
+      {enrichmentResult && (
+        <EnrichmentReviewPanel
+          memberId={memberId}
+          existingMember={member}
+          enrichedData={enrichmentResult}
+          onClose={() => {
+            setEnrichmentResult(null);
+            setEnriching(false);
+          }}
+          onApplied={async () => {
+            setEnrichmentResult(null);
+            setEnriching(false);
+            await reloadMember();
+          }}
+        />
+      )}
     </div>
   );
 }
