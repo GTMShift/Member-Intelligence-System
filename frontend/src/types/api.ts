@@ -25,7 +25,8 @@ export type NotificationType =
   | 'new_signup'
   | 'enrichment_complete'
   | 'enrichment_failed'
-  | 'profile_updated';
+  | 'profile_updated'
+  | 'speaker_application';
 
 export interface Notification {
   id: string;

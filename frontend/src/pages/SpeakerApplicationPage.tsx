@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
+import { createNotification } from '../api/notificationsApi';
 
 const SPEAKING_INTERESTS = ['Roundtable', 'OTR', 'Other'] as const;
 
@@ -175,6 +176,14 @@ export function SpeakerApplicationPage() {
         });
 
       if (submitError) throw new Error(submitError.message);
+      
+      await createNotification({
+        type: 'speaker_application',
+        title: 'New speaker application',
+        body: `${profile.first_name} ${profile.last_name} has submitted a speaker application.`,
+        member_id: profile.member_id,
+        member_name: `${profile.first_name} ${profile.last_name}`,
+      });
 
       setSuccess(true);
       setForm(INITIAL_FORM);
