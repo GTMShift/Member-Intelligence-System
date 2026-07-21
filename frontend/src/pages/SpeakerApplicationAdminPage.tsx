@@ -282,19 +282,29 @@ export function SpeakerApplicationsAdminPage() {
   const handleStatusChange = async (id: string, status: ApplicationStatus) => {
     setUpdatingId(id);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+  
       const { error: updateError } = await supabase
         .from('speaker_applications')
         .update({
           status,
           reviewed_at: new Date().toISOString(),
+          reviewed_by: user?.id ?? null,
         })
         .eq('id', id);
-
+  
       if (updateError) throw new Error(updateError.message);
-
+  
       setApplications((prev) =>
         prev.map((a) =>
-          a.id === id ? { ...a, status, reviewed_at: new Date().toISOString() } : a,
+          a.id === id
+            ? {
+                ...a,
+                status,
+                reviewed_at: new Date().toISOString(),
+                reviewed_by: user?.id ?? null,
+              }
+            : a,
         ),
       );
     } catch (err) {
