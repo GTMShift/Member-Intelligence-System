@@ -291,7 +291,10 @@ export function SpeakerApplicationsAdminPage() {
   }, []);
  
   useEffect(() => {
-    loadApplications().catch(console.error);
+    async function run() {
+      await loadApplications();
+    }
+    run().catch(console.error);
   }, [loadApplications]);
  
   const handleStatusChange = async (id: string, status: ApplicationStatus) => {
