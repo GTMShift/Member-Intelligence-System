@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
- 
+import { createNotification } from '../api/notificationsApi';
+
 const SPEAKING_INTERESTS = ['Roundtable', 'OTR', 'Other'] as const;
- 
+
 const SPEAKING_EXPERIENCE_OPTIONS = [
   { value: '', label: 'Select experience level' },
   { value: 'Often', label: 'Often' },
@@ -11,7 +12,7 @@ const SPEAKING_EXPERIENCE_OPTIONS = [
   { value: 'Rarely', label: 'Rarely' },
   { value: 'Never', label: 'Never' },
 ];
- 
+
 const TEAM_OPTIONS = [
   { key: 'Solutions Engineering/Consulting', label: 'Solutions Engineering / Consulting' },
   { key: 'Customer Success', label: 'Customer Success' },
@@ -23,8 +24,9 @@ const TEAM_OPTIONS = [
   { key: 'Enablement', label: 'Enablement' },
   { key: 'Professional Services', label: 'Professional Services' },
   { key: 'Implementation / Onboarding', label: 'Implementation / Onboarding' },
+  { key: 'Other', label: 'Other' },
 ];
- 
+
 interface MemberProfile {
   first_name: string;
   last_name: string;
@@ -34,27 +36,29 @@ interface MemberProfile {
   state_region: string | null;
   member_id: string;
 }
- 
+
 type FormState = {
   bio: string;
   speaking_interests: string[];
   speaking_experience: string;
   speaking_topics: string;
   teams_that_benefit: string[];
+  teams_that_benefit_other_text: string;
   requires_company_approval: boolean;
   other_comments: string;
 };
- 
+
 const INITIAL_FORM: FormState = {
   bio: '',
   speaking_interests: [],
   speaking_experience: '',
   speaking_topics: '',
   teams_that_benefit: [],
+  teams_that_benefit_other_text: '',
   requires_company_approval: false,
   other_comments: '',
 };
- 
+
 export function SpeakerApplicationPage() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<MemberProfile | null>(null);
@@ -63,27 +67,24 @@ export function SpeakerApplicationPage() {
   const [profileLoading, setProfileLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
- 
-  // Auto-fill from member profile on load
+
   useEffect(() => {
     async function loadProfile() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
- 
-        // Get member record linked to this auth user
+
         const { data: member, error: memberError } = await supabase
-            .from('members')
-            .select('id, first_name, last_name, email, linkedin_url')
-            .eq('email', user.email)
-            .single();
- 
+          .from('members')
+          .select('id, first_name, last_name, email, linkedin_url')
+          .eq('email', user.email)
+          .single();
+
         if (memberError || !member) {
           setError('Could not find your member profile. Please contact support.');
           return;
         }
- 
-        // Get profile for city and state
+
         const { data: memberProfile } = await supabase
           .from('member_profile')
           .select('city, state_region')
@@ -91,7 +92,7 @@ export function SpeakerApplicationPage() {
           .order('updated_at', { ascending: false })
           .limit(1)
           .single();
- 
+
         setProfile({
           first_name: member.first_name,
           last_name: member.last_name,
@@ -105,19 +106,19 @@ export function SpeakerApplicationPage() {
         setError('Failed to load your profile.');
       } finally {
         setProfileLoading(false);
-      }
+        }
     }
- 
+
     void loadProfile();
   }, []);
- 
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   };
- 
+
   const toggleInterest = (value: string) => {
     setForm((prev) => ({
       ...prev,
@@ -126,23 +127,38 @@ export function SpeakerApplicationPage() {
         : [...prev.speaking_interests, value],
     }));
   };
- 
+
   const toggleTeam = (value: string) => {
-    setForm((prev) => ({
-      ...prev,
-      teams_that_benefit: prev.teams_that_benefit.includes(value)
-        ? prev.teams_that_benefit.filter((v) => v !== value)
-        : [...prev.teams_that_benefit, value],
-    }));
+    setForm((prev) => {
+      const isSelected = prev.teams_that_benefit.includes(value);
+      return {
+        ...prev,
+        teams_that_benefit: isSelected
+          ? prev.teams_that_benefit.filter((v) => v !== value)
+          : [...prev.teams_that_benefit, value],
+        // Clear other text if deselecting Other
+        teams_that_benefit_other_text:
+          value === 'Other' && isSelected ? '' : prev.teams_that_benefit_other_text,
+      };
+    });
   };
- 
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
- 
+
     setLoading(true);
     setError(null);
- 
+
+    // Build the final teams array — if Other is selected and they typed
+    // something, replace the plain 'Other' entry with 'Other: <their text>'
+    const teamsWithOther = form.teams_that_benefit.map((t) => {
+      if (t === 'Other' && form.teams_that_benefit_other_text.trim()) {
+        return `Other: ${form.teams_that_benefit_other_text.trim()}`;
+      }
+      return t;
+    });
+
     try {
       const { error: submitError } = await supabase
         .from('speaker_applications')
@@ -152,15 +168,23 @@ export function SpeakerApplicationPage() {
           speaking_interest: form.speaking_interests,
           speaking_experience: form.speaking_experience || null,
           speaking_topics: form.speaking_topics.trim() || null,
-          teams_that_benefit: form.teams_that_benefit,
+          teams_that_benefit: teamsWithOther,
           requires_company_approval: form.requires_company_approval,
           other_comments: form.other_comments.trim() || null,
           status: 'pending',
           submitted_at: new Date().toISOString(),
         });
- 
+
       if (submitError) throw new Error(submitError.message);
- 
+      
+      await createNotification({
+        type: 'speaker_application',
+        title: 'New speaker application',
+        body: `${profile.first_name} ${profile.last_name} has submitted a speaker application.`,
+        member_id: profile.member_id,
+        member_name: `${profile.first_name} ${profile.last_name}`,
+      });
+
       setSuccess(true);
       setForm(INITIAL_FORM);
     } catch (err) {
@@ -169,7 +193,7 @@ export function SpeakerApplicationPage() {
       setLoading(false);
     }
   };
- 
+
   if (profileLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
@@ -177,7 +201,7 @@ export function SpeakerApplicationPage() {
       </div>
     );
   }
- 
+
   return (
     <div className="flex min-h-screen flex-col">
       <header className="border-b border-slate-200 bg-white">
@@ -197,7 +221,7 @@ export function SpeakerApplicationPage() {
           </button>
         </div>
       </header>
- 
+
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 sm:px-6">
         {success && (
           <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3">
@@ -213,15 +237,15 @@ export function SpeakerApplicationPage() {
             </p>
           </div>
         )}
- 
+
         {error && (
           <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
             <p className="text-sm text-red-700">{error}</p>
           </div>
         )}
- 
+
         <form onSubmit={handleSubmit} className="space-y-6">
- 
+
           {/* Auto-filled profile info */}
           <section className="rounded-xl border border-slate-200 bg-slate-50 p-6">
             <h2 className="mb-1 text-sm font-semibold text-slate-900">Your info</h2>
@@ -249,12 +273,12 @@ export function SpeakerApplicationPage() {
               </div>
             </div>
           </section>
- 
+
           {/* Speaking details */}
           <section className="rounded-xl border border-slate-200 bg-white p-6">
             <h2 className="mb-4 text-sm font-semibold text-slate-900">Speaking details</h2>
             <div className="space-y-4">
- 
+
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-slate-600">
                   Bio / About you <span className="text-red-500">*</span>
@@ -269,7 +293,7 @@ export function SpeakerApplicationPage() {
                   className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
                 />
               </div>
- 
+
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-slate-600">
                   Interested in speaking at <span className="text-red-500">*</span>
@@ -291,7 +315,7 @@ export function SpeakerApplicationPage() {
                   ))}
                 </div>
               </div>
- 
+
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-slate-600">
                   Public speaking experience <span className="text-red-500">*</span>
@@ -308,7 +332,7 @@ export function SpeakerApplicationPage() {
                   ))}
                 </select>
               </div>
- 
+
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-slate-600">
                   What would you like to speak about? <span className="text-red-500">*</span>
@@ -323,7 +347,7 @@ export function SpeakerApplicationPage() {
                   className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
                 />
               </div>
- 
+
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-slate-600">
                   Which teams would benefit from this?
@@ -344,8 +368,18 @@ export function SpeakerApplicationPage() {
                     </button>
                   ))}
                 </div>
+                {form.teams_that_benefit.includes('Other') && (
+                  <input
+                    type="text"
+                    name="teams_that_benefit_other_text"
+                    value={form.teams_that_benefit_other_text}
+                    onChange={handleChange}
+                    placeholder="Describe the team..."
+                    className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  />
+                )}
               </div>
- 
+
               <div className="flex items-center gap-3">
                 <input
                   type="checkbox"
@@ -366,7 +400,7 @@ export function SpeakerApplicationPage() {
                   This requires company approval before I can commit
                 </label>
               </div>
- 
+
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-slate-600">Other comments</label>
                 <textarea
@@ -378,10 +412,10 @@ export function SpeakerApplicationPage() {
                   className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
                 />
               </div>
- 
+
             </div>
           </section>
- 
+
           {/* Actions */}
           <div className="flex items-center justify-between pb-8">
             <button
@@ -404,4 +438,3 @@ export function SpeakerApplicationPage() {
     </div>
   );
 }
- 

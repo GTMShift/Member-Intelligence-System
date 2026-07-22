@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createMember, type CreateMemberInput, type SocialEntry } from '../api/createMember';
-
+ 
 const BUCKET_OPTIONS = [
   { value: '', label: 'Select a category' },
   { value: 'primary_icp', label: 'Primary ICP' },
@@ -13,13 +13,21 @@ const BUCKET_OPTIONS = [
   { value: 'icp_no', label: 'ICP No' },
   { value: 'manual_review', label: 'Manual Review' },
 ];
-
+ 
 const ICP_SCORE_BUCKETS = ['primary_icp', 'secondary_icp'];
-
+ 
 const SOCIAL_PLATFORMS = ['Twitter/X', 'Instagram', 'TikTok', 'YouTube', 'Facebook'] as const;
-
+ 
 const TSHIRT_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'] as const;
-
+ 
+const MANAGEMENT_LAYER_OPTIONS = [
+  { value: '', label: 'Select layers' },
+  { value: '1', label: '1 layer' },
+  { value: '2', label: '2 layers' },
+  { value: '3', label: '3 layers' },
+  { value: '4+', label: '4+ layers' },
+];
+ 
 const TEAM_FIELDS = [
   { key: 'oversees_solutions_engineering_consulting', label: 'Solutions Engineering / Consulting' },
   { key: 'oversees_customer_success', label: 'Customer Success' },
@@ -31,8 +39,9 @@ const TEAM_FIELDS = [
   { key: 'oversees_enablement', label: 'Enablement' },
   { key: 'oversees_professional_services', label: 'Professional Services' },
   { key: 'oversees_implementation_onboarding', label: 'Implementation / Onboarding' },
+  { key: 'oversees_other', label: 'Other' },
 ] as const;
-
+ 
 const REGION_FIELDS = [
   { key: 'region_north_america', label: 'North America' },
   { key: 'region_regional_usa', label: 'Regional USA' },
@@ -41,18 +50,16 @@ const REGION_FIELDS = [
   { key: 'region_apac', label: 'APAC' },
   { key: 'region_latin_america', label: 'Latin America' },
 ] as const;
-
+ 
 type TeamKey = typeof TEAM_FIELDS[number]['key'];
 type RegionKey = typeof REGION_FIELDS[number]['key'];
-
+ 
 type FormState = {
-  
   first_name: string;
   last_name: string;
   email: string;
   linkedin_url: string;
   phone: string;
-  
   team_size: string;
   company_name: string;
   current_role: string;
@@ -70,13 +77,14 @@ type FormState = {
   oversees_solutions_architecture: boolean;
   oversees_solutions_engineering_consulting: boolean;
   oversees_value_engineering: boolean;
+  oversees_other: boolean;
+  oversees_other_text: string;
   region_north_america: boolean;
   region_regional_usa: boolean;
   region_global: boolean;
   region_emea: boolean;
   region_apac: boolean;
   region_latin_america: boolean;
-  
   address: string;
   city: string;
   state_region: string;
@@ -84,12 +92,11 @@ type FormState = {
   country: string;
   tshirt_size: string;
   dietary_restrictions: string;
-  
   bucket: string;
   fit_score: string;
   tag_note: string;
 };
-
+ 
 const INITIAL_STATE: FormState = {
   first_name: '',
   last_name: '',
@@ -113,6 +120,8 @@ const INITIAL_STATE: FormState = {
   oversees_solutions_architecture: false,
   oversees_solutions_engineering_consulting: false,
   oversees_value_engineering: false,
+  oversees_other: false,
+  oversees_other_text: '',
   region_north_america: false,
   region_regional_usa: false,
   region_global: false,
@@ -130,9 +139,9 @@ const INITIAL_STATE: FormState = {
   fit_score: '',
   tag_note: '',
 };
-
+ 
 const EMPTY_SOCIAL: SocialEntry = { platform: 'Twitter/X', username: '', url: '' };
-
+ 
 export function MemberEntryPage() {
   const navigate = useNavigate();
   const [form, setForm] = useState<FormState>(INITIAL_STATE);
@@ -140,9 +149,9 @@ export function MemberEntryPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-
+ 
   const showFitScore = ICP_SCORE_BUCKETS.includes(form.bucket);
-
+ 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
   ) => {
@@ -152,28 +161,28 @@ export function MemberEntryPage() {
       setForm((prev) => ({ ...prev, bucket: value, fit_score: '' }));
     }
   };
-
+ 
   const toggleBoolean = (field: TeamKey | RegionKey) => {
     setForm((prev) => ({ ...prev, [field]: !prev[field] }));
   };
-
+ 
   const addSocial = () => {
     setSocials((prev) => [...prev, { ...EMPTY_SOCIAL }]);
   };
-
+ 
   const removeSocial = (index: number) => {
     setSocials((prev) => prev.filter((_, i) => i !== index));
   };
-
+ 
   const updateSocial = (index: number, field: keyof SocialEntry, value: string) => {
     setSocials((prev) => prev.map((s, i) => i === index ? { ...s, [field]: value } : s));
   };
-
+ 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-
+ 
     try {
       const input: CreateMemberInput = {
         first_name: form.first_name.trim(),
@@ -186,7 +195,7 @@ export function MemberEntryPage() {
         current_role: form.current_role.trim() || null,
         seniority_level: form.seniority_level || null,
         current_start_date: form.current_start_date || null,
-        management_layers: form.management_layers.trim() || null,
+        management_layers: form.management_layers || null,
         event_interest: form.event_interest.trim() || null,
         oversees_customer_success: form.oversees_customer_success,
         oversees_demo_engineering: form.oversees_demo_engineering,
@@ -198,6 +207,8 @@ export function MemberEntryPage() {
         oversees_solutions_architecture: form.oversees_solutions_architecture,
         oversees_solutions_engineering_consulting: form.oversees_solutions_engineering_consulting,
         oversees_value_engineering: form.oversees_value_engineering,
+        oversees_other: form.oversees_other,
+        oversees_other_text: form.oversees_other_text.trim() || null,
         region_north_america: form.region_north_america,
         region_regional_usa: form.region_regional_usa,
         region_global: form.region_global,
@@ -216,9 +227,9 @@ export function MemberEntryPage() {
         fit_score: form.fit_score ? parseInt(form.fit_score, 10) : null,
         tag_note: form.tag_note.trim() || null,
       };
-
+ 
       const created = await createMember(input);
-
+ 
       if (created?.id) {
         setSuccess(true);
         setForm(INITIAL_STATE);
@@ -230,7 +241,7 @@ export function MemberEntryPage() {
       setLoading(false);
     }
   };
-
+ 
   return (
     <div className="flex min-h-screen flex-col">
       <header className="border-b border-slate-200 bg-white">
@@ -246,11 +257,11 @@ export function MemberEntryPage() {
             onClick={() => navigate('/')}
             className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
           >
-            ← Back to dashboard
+            Back to dashboard
           </button>
         </div>
       </header>
-
+ 
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 sm:px-6">
         {success && (
           <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3">
@@ -267,15 +278,15 @@ export function MemberEntryPage() {
             </p>
           </div>
         )}
-
+ 
         {error && (
           <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
             <p className="text-sm text-red-700">{error}</p>
           </div>
         )}
-
+ 
         <form onSubmit={handleSubmit} className="space-y-6">
-
+ 
           {/* Section 1 — Profile Information */}
           <section className="rounded-xl border border-slate-200 bg-white p-6">
             <h2 className="mb-4 text-sm font-semibold text-slate-900">Profile Information</h2>
@@ -355,7 +366,7 @@ export function MemberEntryPage() {
               </div>
             </div>
           </section>
-
+ 
           {/* Section 2 — Organizational Details */}
           <section className="rounded-xl border border-slate-200 bg-white p-6">
             <h2 className="mb-4 text-sm font-semibold text-slate-900">Organizational Details</h2>
@@ -445,15 +456,19 @@ export function MemberEntryPage() {
                   <label className="text-xs font-medium text-slate-600">
                     Management layers <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="text"
+                  <select
                     name="management_layers"
                     value={form.management_layers}
                     onChange={handleChange}
                     required
-                    placeholder="e.g. 2 layers"
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
-                  />
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  >
+                    {MANAGEMENT_LAYER_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-medium text-slate-600">Event interest</label>
@@ -467,7 +482,7 @@ export function MemberEntryPage() {
                   />
                 </div>
               </div>
-
+ 
               {/* Teams */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-slate-600">
@@ -489,8 +504,18 @@ export function MemberEntryPage() {
                     </button>
                   ))}
                 </div>
+                {form.oversees_other && (
+                  <input
+                    type="text"
+                    name="oversees_other_text"
+                    value={form.oversees_other_text}
+                    onChange={handleChange}
+                    placeholder="Describe the team..."
+                    className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  />
+                )}
               </div>
-
+ 
               {/* Regions */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-slate-600">
@@ -515,7 +540,7 @@ export function MemberEntryPage() {
               </div>
             </div>
           </section>
-
+ 
           {/* Section 3 — Personal Details */}
           <section className="rounded-xl border border-slate-200 bg-white p-6">
             <h2 className="mb-4 text-sm font-semibold text-slate-900">Personal Details</h2>
@@ -620,7 +645,7 @@ export function MemberEntryPage() {
                   />
                 </div>
               </div>
-
+ 
               {/* Social media */}
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-medium text-slate-600">Social media</label>
@@ -668,7 +693,7 @@ export function MemberEntryPage() {
               </div>
             </div>
           </section>
-
+ 
           {/* Section 4 — ICP Classification */}
           <section className="rounded-xl border border-slate-200 bg-white p-6">
             <h2 className="mb-1 text-sm font-semibold text-slate-900">ICP Classification</h2>
@@ -720,7 +745,7 @@ export function MemberEntryPage() {
               </div>
             </div>
           </section>
-
+ 
           {/* Actions */}
           <div className="flex items-center justify-between pb-8">
             <button

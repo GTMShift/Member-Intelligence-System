@@ -20,6 +20,8 @@ export interface CreateMemberInput {
   current_role: string | null;
   seniority_level: string | null;
   current_start_date: string | null;
+  oversees_other: boolean;
+  oversees_other_text: string | null;
   management_layers: string | null;
   event_interest: string | null;
   oversees_customer_success: boolean;
@@ -94,6 +96,8 @@ export async function createMember(input: CreateMemberInput): Promise<{ id: stri
     p_oversees_solutions_architecture: input.oversees_solutions_architecture,
     p_oversees_solutions_engineering_consulting: input.oversees_solutions_engineering_consulting,
     p_oversees_value_engineering: input.oversees_value_engineering,
+    p_oversees_other: input.oversees_other,
+    p_oversees_other_text: input.oversees_other_text,
     p_region_north_america: input.region_north_america,
     p_region_regional_usa: input.region_regional_usa,
     p_region_global: input.region_global,

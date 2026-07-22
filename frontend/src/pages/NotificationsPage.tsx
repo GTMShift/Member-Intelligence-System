@@ -24,6 +24,7 @@ const FILTERS: FilterOption[] = [
   { id: 'new_signup', label: 'New Signup' },
   { id: 'enrichment', label: 'Enrichment' },
   { id: 'profile_updated', label: 'Profile Updated' },
+  { id: 'speaker_application', label: 'Speaker Application' },
 ];
 
 interface TypeMeta {
@@ -74,6 +75,12 @@ const TYPE_META: Record<NotificationType, TypeMeta> = {
     iconClass: 'bg-indigo-100 text-indigo-700',
     iconPath:
       'M16.86 4.49 19.5 7.13m-1.41-4.05a1.87 1.87 0 0 1 2.64 2.64L7.5 18.59 3 19.99l1.4-4.5L18.1 3.08Z',
+  },
+  speaker_application: {
+    label: 'Speaker Application',
+    badgeClass: 'bg-violet-50 text-violet-700 ring-violet-200',
+    iconClass: 'bg-violet-100 text-violet-700',
+    iconPath: 'M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 1-3-3V4.5a3 3 0 1 1 6 0v8.25a3 3 0 0 1-3 3Z',
   },
 };
 

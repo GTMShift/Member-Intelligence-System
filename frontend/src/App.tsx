@@ -13,6 +13,7 @@ import { LoginPage } from './pages/LoginPage';
 import { UnauthorizedPage } from './pages/UnauthorizedPage';
 import { MemberEntryPage } from './pages/MemberEntryPage';
 import { SpeakerApplicationPage } from './pages/SpeakerApplicationPage';
+import { SpeakerApplicationsAdminPage } from './pages/SpeakerApplicationAdminPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { SubstackImportPage } from './pages/SubstackImportPage';
 import { CompleteProfilePage } from './pages/CompleteProfilePage';
@@ -22,7 +23,7 @@ import type { MemberDetail, UserRole } from './types/api';
 interface DashboardLocationState {
   selectedMemberId?: string;
 }
-
+ 
 function PortalRoleOverride({ children }: { children: ReactNode }) {
   const auth = useAuth();
   const overriddenAuth = { ...auth, role: 'member' as UserRole, isAdmin: false };
@@ -30,10 +31,10 @@ function PortalRoleOverride({ children }: { children: ReactNode }) {
     <AuthContext.Provider value={overriddenAuth}>{children}</AuthContext.Provider>
   );
 }
-
+ 
 function RoleBasedRedirect() {
   const { role, loading } = useAuth();
-
+ 
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
@@ -41,12 +42,12 @@ function RoleBasedRedirect() {
       </div>
     );
   }
-
+ 
   if (role === 'admin') return <Navigate to="/" replace />;
   if (role === 'member') return <Navigate to="/portal" replace />;
   return <Navigate to="/unauthorized" replace />;
 }
-
+ 
 function App() {
   return (
     <BrowserRouter>
@@ -95,6 +96,14 @@ function App() {
           }
         />
         <Route
+          path="/admin/speaker-applications"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <SpeakerApplicationsAdminPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/companies/:id"
           element={
             <ProtectedRoute requiredRole="admin">
@@ -130,11 +139,11 @@ function App() {
     </BrowserRouter>
   );
 }
-
+ 
 function DashboardPage() {
   return <MemberDirectoryLayout subtitle="Admin dashboard" showDuplicateAlerts />;
 }
-
+ 
 function CompanyPageLayout() {
   return (
     <div className="flex min-h-screen flex-col">
@@ -149,18 +158,18 @@ function CompanyPageLayout() {
           <HeaderActions />
         </div>
       </header>
-
+ 
       <main className="mx-auto w-full max-w-[90rem] flex-1 bg-slate-50 lg:min-h-[calc(100vh-4.5rem)]">
         <CompanyDetailPage />
       </main>
     </div>
   );
 }
-
+ 
 function MemberPortalPage() {
   return <MemberDirectoryLayout subtitle="Member portal" portalView />;
 }
-
+ 
 function MemberDirectoryLayout({
   subtitle,
   showDuplicateAlerts = false,
@@ -239,7 +248,7 @@ function MemberDirectoryLayout({
           />
         </div>
       </aside>
-
+ 
       <section className="min-h-[24rem] flex-1 bg-slate-50 lg:min-h-[calc(100vh-4.5rem)]">
         {selectedMemberId ? (
           <div className="flex h-full flex-col">
@@ -268,7 +277,7 @@ function MemberDirectoryLayout({
       </section>
     </>
   );
-
+ 
   return (
     <div className="flex min-h-screen flex-col">
       <header className="border-b border-slate-200 bg-white">
@@ -282,11 +291,11 @@ function MemberDirectoryLayout({
           <HeaderActions />
         </div>
       </header>
-
+ 
       {showDuplicateAlerts && (
         <DuplicateFlagAlerts onViewExistingMember={handleViewExistingMember} />
       )}
-
+ 
       <main className="mx-auto flex w-full max-w-[90rem] flex-1 flex-col lg:flex-row">
         {portalView ? (
           <PortalRoleOverride>{directoryContent}</PortalRoleOverride>
