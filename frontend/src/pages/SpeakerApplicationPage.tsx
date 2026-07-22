@@ -101,7 +101,7 @@ export function SpeakerApplicationPage() {
           state_region: memberProfile?.state_region ?? null,
           member_id: member.id,
         });
-      } catch (err) {
+      } catch {
         setError('Failed to load your profile.');
       } finally {
         setProfileLoading(false);

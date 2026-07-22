@@ -413,10 +413,22 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
   }, [memberId, role]);
 
   useEffect(() => {
-    setEnrichError(null);
-    setEnriching(false);
-    setEnrichmentResult(null);
-    loadMember();
+    let cancelled = false;
+
+    async function run() {
+      // Yield so enrich resets / loadMember setState aren't sync inside the effect.
+      await Promise.resolve();
+      if (cancelled) return;
+      setEnrichError(null);
+      setEnriching(false);
+      setEnrichmentResult(null);
+      await loadMember();
+    }
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
   }, [loadMember]);
 
   const reloadMember = async () => {

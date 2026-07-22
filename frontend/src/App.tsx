@@ -174,16 +174,19 @@ function MemberDirectoryLayout({
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [portalMember, setPortalMember] = useState<MemberDetail | null>(null);
 
-  useEffect(() => {
-    const state = location.state as DashboardLocationState | null;
-    if (state?.selectedMemberId) {
-      setSelectedMemberId(state.selectedMemberId);
-    }
-  }, [location.state]);
+  const incomingMemberId = (location.state as DashboardLocationState | null)?.selectedMemberId;
+  const [appliedIncomingId, setAppliedIncomingId] = useState<string | undefined>(undefined);
+  if (incomingMemberId && incomingMemberId !== appliedIncomingId) {
+    setAppliedIncomingId(incomingMemberId);
+    setSelectedMemberId(incomingMemberId);
+  }
+
+  if ((!portalView || !selectedMemberId) && portalMember !== null) {
+    setPortalMember(null);
+  }
 
   useEffect(() => {
     if (!portalView || !selectedMemberId) {
-      setPortalMember(null);
       return;
     }
 
@@ -198,7 +201,7 @@ function MemberDirectoryLayout({
       }
     }
 
-    loadPortalMember();
+    void loadPortalMember();
     return () => {
       cancelled = true;
     };
