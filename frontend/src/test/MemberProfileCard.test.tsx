@@ -1,13 +1,13 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { MemberProfileCard } from '../components/MemberProfileCard';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/authShared';
 import { MOCK_MEMBERS } from '../testFixtures/members';
 import { formatTimestamp } from '../utils/format';
 import { renderWithProviders } from './testHelpers';
 
-vi.mock('../context/AuthContext', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../context/AuthContext')>();
+vi.mock('../context/authShared', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../context/authShared')>();
   return {
     ...actual,
     useAuth: vi.fn(),

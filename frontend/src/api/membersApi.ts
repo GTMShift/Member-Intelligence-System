@@ -1,8 +1,11 @@
 // src/api/membersApi.ts
 import { supabase } from '../lib/supabaseClient';
 import type {
+  EmploymentHistoryEntry,
   FilterOptions,
   IcpStatus,
+  Interaction,
+  MemberDataEntry,
   MemberDetail,
   MemberSearchParams,
   MemberSearchResponse,
@@ -44,6 +47,58 @@ const TEAM_SIZE_RANGES = [
   { value: '1000+', min: 1001, max: Infinity },
 ];
 
+type CompanyJoin = {
+  name?: string | null;
+  size?: string | null;
+  tags?: string | null;
+  industry?: string | null;
+};
+
+type MetroAreaJoin = {
+  name?: string | null;
+};
+
+type ProfileJoin = {
+  current_job_start_date?: string | null;
+  seniority_level?: string | null;
+  company_id?: string | null;
+  country?: string | null;
+  state_region?: string | null;
+  city?: string | null;
+  work_email_enriched?: string | null;
+  icp?: string | null;
+  signup_source?: string | null;
+  updated_at?: string;
+  team_size?: number | null;
+  tags?: string[];
+  bucket?: string | null;
+  fit_score?: number | null;
+  tag_note?: string | null;
+  company?: CompanyJoin | CompanyJoin[] | null;
+  metro_area?: MetroAreaJoin | MetroAreaJoin[] | null;
+};
+
+type LinkedProfileJoin = {
+  avatar_url?: string | null;
+};
+
+/** Shape returned by the members select join before normalization. */
+type MemberRow = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  linkedin_url: string;
+  phone: string | null;
+  created_at: string;
+  last_updated: string;
+  profile?: ProfileJoin | ProfileJoin[] | null;
+  linked_profile?: LinkedProfileJoin | LinkedProfileJoin[] | null;
+  employment_history?: EmploymentHistoryEntry[] | null;
+  member_data?: MemberDataEntry[] | null;
+  interactions?: Interaction[] | null;
+};
+
 // Supabase returns a to-one relation as an object if a unique constraint is
 // detected, but as an array otherwise — this normalizes either shape.
 function firstOrSelf<T>(value: T | T[] | null | undefined): T | null {
@@ -51,17 +106,17 @@ function firstOrSelf<T>(value: T | T[] | null | undefined): T | null {
   return Array.isArray(value) ? value[0] ?? null : value;
 }
 
-function toMemberDetail(row: any): MemberDetail {
+function toMemberDetail(row: MemberRow): MemberDetail {
   const profileRaw = firstOrSelf(row.profile);
   const linkedProfile = firstOrSelf(row.linked_profile);
   const company = firstOrSelf(profileRaw?.company);
   const metroArea = firstOrSelf(profileRaw?.metro_area);
   const employment = row.employment_history ?? [];
 
-  const currentEntry = employment.find((e: any) => e.is_current);
+  const currentEntry = employment.find((e) => e.is_current);
   const prevEntries = [...employment]
-    .filter((e: any) => !e.is_current)
-    .sort((a: any, b: any) => (b.start_date ?? '').localeCompare(a.start_date ?? ''));
+    .filter((e) => !e.is_current)
+    .sort((a, b) => (b.start_date ?? '').localeCompare(a.start_date ?? ''));
 
   industryByMemberId.set(row.id, company?.industry ?? null);
 
@@ -190,7 +245,7 @@ async function fetchAllMemberDetails(): Promise<MemberDetail[]> {
     .order('first_name', { ascending: true })
     .order('id', { ascending: true }); // final tie-breaker for fully stable ordering
   if (error) throw new Error(`Failed to fetch members: ${error.message}`);
-  return (data ?? []).map(toMemberDetail);
+  return (data ?? []).map((row) => toMemberDetail(row as MemberRow));
 }
 
 export async function searchMembers(
@@ -217,7 +272,7 @@ export async function getMember(id: string, role: UserRole): Promise<MemberDetai
   if (error) throw new Error(`Failed to fetch member ${id}: ${error.message}`);
   if (!data) return null;
 
-  return applyRoleFilter(toMemberDetail(data), role);
+  return applyRoleFilter(toMemberDetail(data as MemberRow), role);
 }
 
 export async function getMetroAreas(): Promise<{ id: string; name: string }[]> {
