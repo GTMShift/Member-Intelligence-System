@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/authShared';
 import {
   dismissDuplicateFlag,
   fetchPendingDuplicateFlags,
@@ -117,31 +117,38 @@ export function DuplicateFlagAlerts({ onViewExistingMember }: DuplicateFlagAlert
   const [flags, setFlags] = useState<PendingDuplicateFlag[]>([]);
   const [existingNames, setExistingNames] = useState<Record<string, string>>({});
 
-  const load = useCallback(async () => {
-    try {
-      const data = await fetchPendingDuplicateFlags();
-      setFlags(data);
-
-      const memberIds = [...new Set(data.map((f) => f.check.existing_member_id))];
-      if (memberIds.length > 0) {
-        const { data: members } = await supabase
-          .from('members')
-          .select('id, first_name, last_name')
-          .in('id', memberIds);
-        const names: Record<string, string> = {};
-        for (const m of members ?? []) {
-          names[m.id] = fullName(m.first_name, m.last_name);
-        }
-        setExistingNames(names);
-      }
-    } catch {
-      setFlags([]);
-    }
-  }, []);
-
   useEffect(() => {
-    load();
-  }, [load]);
+    let cancelled = false;
+
+    async function run() {
+      try {
+        const data = await fetchPendingDuplicateFlags();
+        if (cancelled) return;
+        setFlags(data);
+
+        const memberIds = [...new Set(data.map((f) => f.check.existing_member_id))];
+        if (memberIds.length > 0) {
+          const { data: members } = await supabase
+            .from('members')
+            .select('id, first_name, last_name')
+            .in('id', memberIds);
+          if (cancelled) return;
+          const names: Record<string, string> = {};
+          for (const m of members ?? []) {
+            names[m.id] = fullName(m.first_name, m.last_name);
+          }
+          setExistingNames(names);
+        }
+      } catch {
+        if (!cancelled) setFlags([]);
+      }
+    }
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   if (flags.length === 0) return null;
 
@@ -151,7 +158,12 @@ export function DuplicateFlagAlerts({ onViewExistingMember }: DuplicateFlagAlert
     try {
       await dismissDuplicateFlag(flagId, user.id);
     } catch {
-      load();
+      try {
+        const data = await fetchPendingDuplicateFlags();
+        setFlags(data);
+      } catch {
+        setFlags([]);
+      }
     }
   };
 

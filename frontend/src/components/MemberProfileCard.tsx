@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { getMember } from '../api/membersApi';
 import { updateMemberAsAdmin, type AdminUpdateMemberInput } from '../api/adminUpdateMember';
 import { calculateFitScore, suggestIcpBucket, type IcpBucketSuggestion } from '../api/icpScoring';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/authShared';
 import type { EnrichmentResult, MemberDataEntry, MemberDetail } from '../types/api';
 import { formatTimestamp, fullName } from '../utils/format';
 import { EnrichmentReviewPanel } from './EnrichmentReviewPanel';
