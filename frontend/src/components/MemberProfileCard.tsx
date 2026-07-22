@@ -62,21 +62,34 @@ interface ProfileField {
   value: string | null | undefined;
 }
 
+// Values over this length stack (label above, left-aligned text below)
+// instead of sitting inline as a row — a right-aligned paragraph reads badly.
+const LONG_VALUE_THRESHOLD = 50;
+
 function FieldGrid({ fields }: { fields: ProfileField[] }) {
   const visible = fields.filter((f) => f.value);
   if (visible.length === 0) {
     return <p className="text-sm text-slate-500">No data available.</p>;
   }
   return (
-    <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-      {visible.map((field) => (
-        <div key={field.label}>
-          <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-            {field.label}
-          </dt>
-          <dd className="mt-0.5 text-sm text-slate-900">{field.value}</dd>
-        </div>
-      ))}
+    <dl className="divide-y divide-slate-100">
+      {visible.map((field) => {
+        const isLong = (field.value?.length ?? 0) > LONG_VALUE_THRESHOLD;
+        if (isLong) {
+          return (
+            <div key={field.label} className="py-1.5">
+              <dt className="text-sm text-slate-500">{field.label}</dt>
+              <dd className="mt-0.5 text-sm text-slate-900">{field.value}</dd>
+            </div>
+          );
+        }
+        return (
+          <div key={field.label} className="flex items-baseline justify-between gap-4 py-1.5">
+            <dt className="shrink-0 text-sm text-slate-500">{field.label}</dt>
+            <dd className="text-right text-sm text-slate-900">{field.value}</dd>
+          </div>
+        );
+      })}
     </dl>
   );
 }
@@ -159,7 +172,8 @@ function FeedbackPrompts({ entries }: { entries: MemberDataEntry[] }) {
               .map((entry) => (
                 <li
                   key={entry.id}
-                  className="rounded-md border border-sage/20 bg-white p-3"
+                  className="border-l-2 border-sage/50 py-0.5 pl-3"
+                  style={{ borderRadius: 0 }}
                 >
                   <FeedbackEntryContent entry={entry} />
                   <p className="mt-2 text-xs text-slate-400">
@@ -201,8 +215,8 @@ function AdminDataEntry({ entry }: { entry: MemberDataEntry }) {
     flag: 'Flag',
   };
   return (
-    <div className="rounded-md border border-orange/20 bg-orange/5 p-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-orange-dark">
+    <div className="border-l-2 border-orange/40 py-0.5 pl-3" style={{ borderRadius: 0 }}>
+      <p className="text-xs font-semibold text-orange-dark">
         {categoryLabels[category] ?? category}
       </p>
       <AdminEntryContent entry={entry} />
@@ -488,7 +502,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                   disabled={isSaving}
                   className="rounded-md bg-orange px-3 py-1.5 text-sm font-medium text-white hover:bg-orange-dark disabled:opacity-50"
                 >
-                  {isSaving ? 'Saving…' : 'Save'}
+                  {isSaving ? 'Saving…' : 'Save changes'}
                 </button>
               </>
             ) : (
@@ -497,7 +511,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                 onClick={startEditing}
                 className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
               >
-                Edit
+                Edit profile
               </button>
             )}
           </div>
@@ -517,7 +531,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
         >
           <div className="space-y-5">
             <div>
-              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <h4 className="mb-2 text-sm font-semibold text-slate-700">
                 Identity
               </h4>
               {isEditing && editForm ? (
@@ -572,7 +586,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
               )}
             </div>
             <div>
-              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <h4 className="mb-2 text-sm font-semibold text-slate-700">
                 Current role
               </h4>
               {isEditing && editForm ? (
@@ -619,7 +633,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
             </div>
             {(profile.company_name || isEditing) && (
               <div>
-                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <h4 className="mb-2 text-sm font-semibold text-slate-700">
                   Company
                 </h4>
                 {isEditing && editForm ? (
@@ -644,7 +658,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
               </div>
             )}
             <div>
-              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <h4 className="mb-2 text-sm font-semibold text-slate-700">
                 Location
               </h4>
               {isEditing && editForm ? (
@@ -685,7 +699,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
               )}
             </div>
             <div>
-              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <h4 className="mb-2 text-sm font-semibold text-slate-700">
                 History & source
               </h4>
               <FieldGrid fields={historyFields} />

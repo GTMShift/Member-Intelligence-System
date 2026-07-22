@@ -14,6 +14,10 @@ interface ProfileField {
   isLink?: boolean;
 }
 
+// Values over this length stack (label above, left-aligned text below)
+// instead of sitting inline as a row — a right-aligned paragraph reads badly.
+const LONG_VALUE_THRESHOLD = 50;
+
 function FieldGrid({ fields }: { fields: ProfileField[] }) {
   const visible = fields.filter((f) => f.value);
   if (visible.length === 0) {
@@ -21,28 +25,39 @@ function FieldGrid({ fields }: { fields: ProfileField[] }) {
   }
 
   return (
-    <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-      {visible.map((field) => (
-        <div key={field.label} className={field.label === 'Overview' ? 'sm:col-span-2' : undefined}>
-          <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-            {field.label}
-          </dt>
-          <dd className="mt-0.5 text-sm text-slate-900">
-            {field.isLink && field.value ? (
-              <a
-                href={field.value}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-orange-dark hover:text-orange hover:underline"
-              >
-                {field.value}
-              </a>
-            ) : (
-              field.value
-            )}
-          </dd>
-        </div>
-      ))}
+    <dl className="divide-y divide-slate-100">
+      {visible.map((field) => {
+        const isLong = (field.value?.length ?? 0) > LONG_VALUE_THRESHOLD;
+        const valueContent =
+          field.isLink && field.value ? (
+            <a
+              href={field.value}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-orange-dark hover:text-orange hover:underline"
+            >
+              {field.value}
+            </a>
+          ) : (
+            field.value
+          );
+
+        if (isLong) {
+          return (
+            <div key={field.label} className="py-1.5">
+              <dt className="text-sm text-slate-500">{field.label}</dt>
+              <dd className="mt-0.5 text-sm text-slate-900">{valueContent}</dd>
+            </div>
+          );
+        }
+
+        return (
+          <div key={field.label} className="flex items-baseline justify-between gap-4 py-1.5">
+            <dt className="shrink-0 text-sm text-slate-500">{field.label}</dt>
+            <dd className="text-right text-sm text-slate-900">{valueContent}</dd>
+          </div>
+        );
+      })}
     </dl>
   );
 }

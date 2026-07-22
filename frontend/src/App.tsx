@@ -162,7 +162,7 @@ function WelcomeToast() {
   if (!visible) return null;
 
   return (
-    <div className="fixed left-1/2 top-4 z-50 w-[90%] max-w-md -translate-x-1/2 rounded-lg border border-sage bg-sage-tint px-4 py-3 shadow-lg">
+    <div className="fixed left-1/2 top-4 z-[var(--z-toast)] w-[90%] max-w-md -translate-x-1/2 rounded-lg border border-sage bg-sage-tint px-4 py-3 shadow-lg">
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm font-medium text-ink">
           Welcome! Your profile has been created.
