@@ -11,6 +11,7 @@ const enrichmentStatusRouter = require('./routes/enrichmentStatus');
 const eventsRouter = require('./routes/events');
 const substackRouter = require('./routes/substackImport');
 const formResponsesRouter = require('./routes/formResponses');
+const emailWebhookRouter = require('./routes/emailWebhook');
 
 app.use(cors({
   origin: [
@@ -31,6 +32,7 @@ app.use('/members/:id/employment', employmentRouter);
 app.use('/events', eventsRouter);
 app.use('/substack', substackRouter);
 app.use('/form-responses', formResponsesRouter);
+app.use('/webhook/email', emailWebhookRouter);
 
 const PORT = 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
