@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
-
+ 
 type ApplicationStatus = 'pending' | 'approved' | 'declined' | 'waitlist';
-
+ 
 interface SpeakerApplication {
   id: string;
   member_id: string;
@@ -27,21 +28,38 @@ interface SpeakerApplication {
   company_name: string | null;
   current_role: string | null;
 }
-
+ 
+interface MemberRow {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+}
+ 
+interface AppRow extends Omit<SpeakerApplication, 'first_name' | 'last_name' | 'email' | 'company_name' | 'current_role'> {
+  members: MemberRow | null;
+}
+ 
+interface ProfileRow {
+  member_id: string;
+  company_name: string | null;
+  seniority_level: string | null;
+}
+ 
 const STATUS_STYLES: Record<ApplicationStatus, string> = {
   pending: 'bg-amber-100 text-amber-800 border-amber-200',
   approved: 'bg-green-100 text-green-800 border-green-200',
   declined: 'bg-red-100 text-red-800 border-red-200',
   waitlist: 'bg-blue-100 text-blue-800 border-blue-200',
 };
-
+ 
 const STATUS_LABELS: Record<ApplicationStatus, string> = {
   pending: 'Pending',
   approved: 'Approved',
   declined: 'Declined',
   waitlist: 'Waitlist',
 };
-
+ 
 const FILTER_OPTIONS: { value: ApplicationStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'pending', label: 'Pending' },
@@ -49,7 +67,7 @@ const FILTER_OPTIONS: { value: ApplicationStatus | 'all'; label: string }[] = [
   { value: 'waitlist', label: 'Waitlist' },
   { value: 'declined', label: 'Declined' },
 ];
-
+ 
 function StatusBadge({ status }: { status: ApplicationStatus }) {
   return (
     <span
@@ -59,7 +77,7 @@ function StatusBadge({ status }: { status: ApplicationStatus }) {
     </span>
   );
 }
-
+ 
 function ApplicationCard({
   application,
   onStatusChange,
@@ -70,10 +88,10 @@ function ApplicationCard({
   isUpdating: boolean;
 }) {
   const fullName = `${application.first_name} ${application.last_name}`;
-
+ 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-6 space-y-5">
-
+ 
       {/* Header row */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -92,7 +110,7 @@ function ApplicationCard({
           })}
         </p>
       </div>
-
+ 
       {/* Details grid */}
       <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
         <div>
@@ -113,7 +131,7 @@ function ApplicationCard({
             }
           </dd>
         </div>
-
+ 
         <div>
           <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
             Speaking experience
@@ -122,12 +140,12 @@ function ApplicationCard({
             {application.speaking_experience ?? '—'}
           </dd>
         </div>
-
+ 
         <div className="sm:col-span-2">
           <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Bio</dt>
           <dd className="mt-1 text-sm text-slate-900 whitespace-pre-wrap">{application.bio}</dd>
         </div>
-
+ 
         <div className="sm:col-span-2">
           <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
             Speaking topics
@@ -136,7 +154,7 @@ function ApplicationCard({
             {application.speaking_topics ?? '—'}
           </dd>
         </div>
-
+ 
         <div className="sm:col-span-2">
           <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
             Teams that would benefit
@@ -155,7 +173,7 @@ function ApplicationCard({
             }
           </dd>
         </div>
-
+ 
         <div>
           <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
             Company approval required
@@ -164,7 +182,7 @@ function ApplicationCard({
             {application.requires_company_approval ? 'Yes' : 'No'}
           </dd>
         </div>
-
+ 
         {application.other_comments && (
           <div className="sm:col-span-2">
             <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
@@ -176,7 +194,7 @@ function ApplicationCard({
           </div>
         )}
       </dl>
-
+ 
       {/* Action buttons */}
       <div className="flex items-center gap-2 border-t border-slate-100 pt-4">
         <span className="text-xs font-medium text-slate-500 mr-1">Set status:</span>
@@ -185,7 +203,7 @@ function ApplicationCard({
             key={status}
             type="button"
             disabled={isUpdating || application.status === status}
-            onClick={() => onStatusChange(application.id, status)}
+            onClick={() => { void onStatusChange(application.id, status); }}
             className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-40 ${
               application.status === status
                 ? STATUS_STYLES[status]
@@ -199,7 +217,7 @@ function ApplicationCard({
           <button
             type="button"
             disabled={isUpdating}
-            onClick={() => onStatusChange(application.id, 'pending')}
+            onClick={() => { void onStatusChange(application.id, 'pending'); }}
             className="ml-auto rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-40"
           >
             Reset to pending
@@ -209,7 +227,7 @@ function ApplicationCard({
     </div>
   );
 }
-
+ 
 export function SpeakerApplicationsAdminPage() {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
@@ -218,17 +236,15 @@ export function SpeakerApplicationsAdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<ApplicationStatus | 'all'>('all');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
-
-  // Redirect non-admins
+ 
   useEffect(() => {
     if (!isAdmin) navigate('/');
   }, [isAdmin, navigate]);
-
-  const loadApplications = async () => {
+ 
+  const loadApplications = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      // Step 1: fetch applications + member name/email
       const { data: apps, error: appsError } = await supabase
         .from('speaker_applications')
         .select(`
@@ -241,49 +257,48 @@ export function SpeakerApplicationsAdminPage() {
           )
         `)
         .order('submitted_at', { ascending: false });
-  
+ 
       if (appsError) throw new Error(appsError.message);
-  
-      // Step 2: fetch member_profile for all member_ids in the result
-      const memberIds = (apps ?? []).map((a: any) => a.members.id);
+ 
+      const memberIds = (apps ?? []).map((a: AppRow) => a.members?.id).filter(Boolean) as string[];
+ 
       const { data: profiles } = memberIds.length > 0
         ? await supabase
             .from('member_profile')
             .select('member_id, company_name, seniority_level')
             .in('member_id', memberIds)
-        : { data: [] };
-  
+        : { data: [] as ProfileRow[] };
+ 
       const profileMap = Object.fromEntries(
-        (profiles ?? []).map((p: any) => [p.member_id, p]),
+        (profiles ?? []).map((p: ProfileRow) => [p.member_id, p]),
       );
-  
-      // Step 3: flatten
-      const flat: SpeakerApplication[] = (apps ?? []).map((row: any) => ({
+ 
+      const flat: SpeakerApplication[] = (apps ?? []).map((row: AppRow) => ({
         ...row,
         first_name: row.members?.first_name ?? '',
         last_name: row.members?.last_name ?? '',
         email: row.members?.email ?? '',
-        company_name: profileMap[row.members?.id]?.company_name ?? null,
-        current_role: profileMap[row.members?.id]?.seniority_level ?? null,
+        company_name: profileMap[row.members?.id ?? '']?.company_name ?? null,
+        current_role: profileMap[row.members?.id ?? '']?.seniority_level ?? null,
       }));
-  
+ 
       setApplications(flat);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load applications.');
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    void loadApplications();
   }, []);
-
+ 
+  useEffect(() => {
+    loadApplications().catch(console.error);
+  }, [loadApplications]);
+ 
   const handleStatusChange = async (id: string, status: ApplicationStatus) => {
     setUpdatingId(id);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-  
+ 
       const { error: updateError } = await supabase
         .from('speaker_applications')
         .update({
@@ -292,9 +307,9 @@ export function SpeakerApplicationsAdminPage() {
           reviewed_by: user?.id ?? null,
         })
         .eq('id', id);
-  
+ 
       if (updateError) throw new Error(updateError.message);
-  
+ 
       setApplications((prev) =>
         prev.map((a) =>
           a.id === id
@@ -313,16 +328,16 @@ export function SpeakerApplicationsAdminPage() {
       setUpdatingId(null);
     }
   };
-
+ 
   const filtered = filter === 'all'
     ? applications
     : applications.filter((a) => a.status === filter);
-
+ 
   const counts = applications.reduce<Record<string, number>>(
     (acc, a) => ({ ...acc, [a.status]: (acc[a.status] ?? 0) + 1 }),
     {},
   );
-
+ 
   return (
     <div className="flex min-h-screen flex-col">
       <header className="border-b border-slate-200 bg-white">
@@ -342,9 +357,9 @@ export function SpeakerApplicationsAdminPage() {
           </button>
         </div>
       </header>
-
+ 
       <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-6">
-
+ 
         {/* Summary counts */}
         <div className="mb-6 grid grid-cols-4 gap-3">
           {(['pending', 'approved', 'waitlist', 'declined'] as ApplicationStatus[]).map((s) => (
@@ -357,7 +372,7 @@ export function SpeakerApplicationsAdminPage() {
             </div>
           ))}
         </div>
-
+ 
         {/* Filter tabs */}
         <div className="mb-5 flex gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 w-fit">
           {FILTER_OPTIONS.map((opt) => (
@@ -378,13 +393,13 @@ export function SpeakerApplicationsAdminPage() {
             </button>
           ))}
         </div>
-
+ 
         {error && (
           <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
             <p className="text-sm text-red-700">{error}</p>
           </div>
         )}
-
+ 
         {loading ? (
           <p className="text-sm text-slate-500">Loading applications...</p>
         ) : filtered.length === 0 ? (
@@ -409,3 +424,4 @@ export function SpeakerApplicationsAdminPage() {
     </div>
   );
 }
+ 
