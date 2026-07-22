@@ -204,13 +204,22 @@ export interface MetroArea {
   radius_miles: number;
 }
 
-export interface Notification {
-  id: string;
-  type: NotificationType;
-  title: string;
-  body: string;
-  member_id: string | null;
-  member_name: string | null;
-  is_read: boolean;
-  created_at: string;
+export interface EnrichmentResult {
+  enrichment_id: string;
+  status: string;
+  contact: {
+    most_probable_email?: string;
+    most_probable_email_status?: string;
+    profile?: {
+      location?: string;
+      position?: {
+        title?: string;
+        company?: {
+          name?: string;
+          website?: string;
+        };
+        start_at?: { month?: number; year?: number };
+      };
+    };
+  } | null;
 }
