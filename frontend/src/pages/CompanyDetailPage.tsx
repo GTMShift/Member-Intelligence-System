@@ -33,7 +33,7 @@ function FieldGrid({ fields }: { fields: ProfileField[] }) {
                 href={field.value}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-600 hover:text-blue-800 hover:underline"
+                className="text-orange-dark hover:text-orange hover:underline"
               >
                 {field.value}
               </a>
@@ -120,7 +120,7 @@ export function CompanyDetailPage() {
         <button
           type="button"
           onClick={handleBack}
-          className="text-sm font-medium text-blue-600 hover:text-blue-800"
+          className="text-sm font-medium text-orange-dark hover:text-orange"
         >
           ← Back
         </button>
@@ -146,7 +146,7 @@ export function CompanyDetailPage() {
         <button
           type="button"
           onClick={handleBack}
-          className="mb-3 text-sm font-medium text-blue-600 hover:text-blue-800"
+          className="mb-3 text-sm font-medium text-orange-dark hover:text-orange"
         >
           ← Back to member profile
         </button>

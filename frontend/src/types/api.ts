@@ -25,7 +25,8 @@ export type NotificationType =
   | 'new_signup'
   | 'enrichment_complete'
   | 'enrichment_failed'
-  | 'profile_updated';
+  | 'profile_updated'
+  | 'speaker_application';
 
 export interface Notification {
   id: string;
@@ -147,6 +148,16 @@ export interface CompanyDetail {
   updated_at: string;
 }
 
+export type MemberSortOption =
+  | 'last_name_asc'
+  | 'last_name_desc'
+  | 'first_name_asc'
+  | 'first_name_desc'
+  | 'signup_newest'
+  | 'signup_oldest'
+  | 'updated_newest'
+  | 'updated_oldest';
+  
 export interface MemberSearchParams {
   q?: string;
   metro_area_name?: string;
@@ -160,6 +171,7 @@ export interface MemberSearchParams {
   limit?: number;
   icp?: 'YES' | 'NO' | 'TBD' | 'NONE';
   team_size?: string;
+  sort?: MemberSortOption;
 }
 
 export interface FilterOptions {

@@ -161,26 +161,26 @@ export function MyProfilePage() {
 
   if (isLoadingData) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+      <div className="flex min-h-screen items-center justify-center bg-surface">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-charcoal/20 border-t-charcoal" />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
+    <div className="flex min-h-screen flex-col bg-surface">
+      <header className="bg-charcoal">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-4 sm:px-6">
           <div>
-            <h1 className="text-lg font-semibold text-slate-900">
+            <h1 className="text-lg font-semibold text-white">
               SolutionExec Member Intelligence Platform
             </h1>
-            <p className="text-sm text-slate-500">My profile</p>
+            <p className="text-sm text-white/60">My profile</p>
           </div>
           <button
             type="button"
             onClick={() => navigate('/portal')}
-            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="rounded-md border border-white/20 bg-transparent px-3 py-1.5 text-sm font-medium text-white/80 hover:bg-white/10 hover:text-white"
           >
             ← Back
           </button>
@@ -194,8 +194,8 @@ export function MyProfilePage() {
           </div>
         )}
         {saved && (
-          <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3">
-            <p className="text-sm text-green-800">Your profile has been updated.</p>
+          <div className="mb-6 rounded-lg border border-sage bg-sage-tint px-4 py-3">
+            <p className="text-sm text-ink">Your profile has been updated.</p>
           </div>
         )}
 
@@ -243,7 +243,7 @@ export function MyProfilePage() {
                   value={form.first_name}
                   onChange={handleChange}
                   required
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -254,7 +254,7 @@ export function MyProfilePage() {
                   value={form.last_name}
                   onChange={handleChange}
                   required
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -273,7 +273,7 @@ export function MyProfilePage() {
                   name="phone"
                   value={form.phone}
                   onChange={handleChange}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="col-span-2 flex flex-col gap-1.5">
@@ -284,7 +284,7 @@ export function MyProfilePage() {
                   value={form.linkedin_url}
                   onChange={handleChange}
                   placeholder="linkedin.com/in/yourname"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
             </div>
@@ -300,7 +300,7 @@ export function MyProfilePage() {
                   name="job_title"
                   value={form.job_title}
                   onChange={handleChange}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -309,7 +309,7 @@ export function MyProfilePage() {
                   name="seniority_level"
                   value={form.seniority_level}
                   onChange={handleChange}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 >
                   {SENIORITY_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -325,7 +325,7 @@ export function MyProfilePage() {
                   name="company_name"
                   value={form.company_name}
                   onChange={handleChange}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -335,7 +335,7 @@ export function MyProfilePage() {
                   name="current_job_start_date"
                   value={form.current_job_start_date}
                   onChange={handleChange}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
             </div>
@@ -351,7 +351,7 @@ export function MyProfilePage() {
                   name="city"
                   value={form.city}
                   onChange={handleChange}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -361,7 +361,7 @@ export function MyProfilePage() {
                   name="state_region"
                   value={form.state_region}
                   onChange={handleChange}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -371,7 +371,7 @@ export function MyProfilePage() {
                   name="country"
                   value={form.country}
                   onChange={handleChange}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
             </div>
@@ -381,7 +381,7 @@ export function MyProfilePage() {
             <button
               type="submit"
               disabled={isSaving}
-              className="rounded-md bg-slate-900 px-6 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+              className="rounded-md bg-orange px-6 py-2 text-sm font-medium text-white hover:bg-orange-dark disabled:opacity-50"
             >
               {isSaving ? 'Saving…' : 'Save changes'}
             </button>

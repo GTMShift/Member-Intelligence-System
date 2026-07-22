@@ -34,8 +34,8 @@ function RoleBasedRedirect() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+      <div className="flex min-h-screen items-center justify-center bg-surface">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-charcoal/20 border-t-charcoal" />
       </div>
     );
   }
@@ -128,19 +128,19 @@ function DashboardPage() {
 function CompanyPageLayout() {
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="border-b border-slate-200 bg-white">
+      <header className="bg-charcoal">
         <div className="mx-auto flex max-w-[90rem] items-center justify-between px-4 py-4 sm:px-6">
           <div>
-            <h1 className="text-lg font-semibold text-slate-900">
+            <h1 className="text-lg font-semibold text-white">
               SolutionExec Member Intelligence Platform
             </h1>
-            <p className="text-sm text-slate-500">Company details</p>
+            <p className="text-sm text-white/60">Company details</p>
           </div>
           <HeaderActions />
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-[90rem] flex-1 bg-slate-50 lg:min-h-[calc(100vh-4.5rem)]">
+      <main className="mx-auto w-full max-w-[90rem] flex-1 bg-surface lg:min-h-[calc(100vh-4.5rem)]">
         <CompanyDetailPage />
       </main>
     </div>
@@ -162,15 +162,15 @@ function WelcomeToast() {
   if (!visible) return null;
 
   return (
-    <div className="fixed left-1/2 top-4 z-50 w-[90%] max-w-md -translate-x-1/2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 shadow-lg">
+    <div className="fixed left-1/2 top-4 z-50 w-[90%] max-w-md -translate-x-1/2 rounded-lg border border-sage bg-sage-tint px-4 py-3 shadow-lg">
       <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-medium text-green-800">
+        <p className="text-sm font-medium text-ink">
           Welcome! Your profile has been created.
         </p>
         <button
           type="button"
           onClick={() => setVisible(false)}
-          className="shrink-0 text-green-700 hover:text-green-900"
+          className="shrink-0 text-sage hover:text-ink"
           aria-label="Dismiss"
         >
           ×
@@ -201,8 +201,6 @@ function MemberDirectoryLayout({
     }
     if (state?.justCreated) {
       setShowWelcome(true);
-      // Clear the flag from history state so refreshing the page (or coming
-      // back later) doesn't keep re-showing the welcome banner.
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.state, location.pathname, navigate]);
@@ -244,13 +242,13 @@ function MemberDirectoryLayout({
   return (
     <div className="flex min-h-screen flex-col">
       {showWelcome && <WelcomeToast />}
-      <header className="border-b border-slate-200 bg-white">
+      <header className="bg-charcoal">
         <div className="mx-auto flex max-w-[90rem] items-center justify-between px-4 py-4 sm:px-6">
           <div>
-            <h1 className="text-lg font-semibold text-slate-900">
+            <h1 className="text-lg font-semibold text-white">
               SolutionExec Member Intelligence Platform
             </h1>
-            <p className="text-sm text-slate-500">{subtitle}</p>
+            <p className="text-sm text-white/60">{subtitle}</p>
           </div>
           <HeaderActions />
         </div>
@@ -299,7 +297,7 @@ export function HeaderActions() {
               ? `Notifications, ${unreadCount} unread`
               : 'Notifications'
           }
-          className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+          className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white"
         >
           <svg
             className="h-5 w-5"
@@ -316,7 +314,7 @@ export function HeaderActions() {
             />
           </svg>
           {unreadCount > 0 && (
-            <span className="absolute -right-1 -top-1 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white">
+            <span className="absolute -right-1 -top-1 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-orange px-1 text-[10px] font-semibold leading-none text-white">
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}
@@ -326,7 +324,7 @@ export function HeaderActions() {
         <button
           type="button"
           onClick={() => navigate('/admin/add-member')}
-          className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700"
+          className="rounded-md bg-orange px-3 py-1.5 text-xs font-medium text-white hover:bg-orange-dark"
         >
           + Add member
         </button>
@@ -335,7 +333,7 @@ export function HeaderActions() {
         <button
           type="button"
           onClick={() => navigate('/admin/substack-import')}
-          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          className="rounded-md border border-white/20 bg-transparent px-3 py-1.5 text-xs font-medium text-white/80 hover:bg-white/10 hover:text-white"
         >
           Import Substack CSV
         </button>
@@ -344,13 +342,13 @@ export function HeaderActions() {
         <button
           type="button"
           onClick={() => navigate(memberId ? '/my-profile' : '/complete-profile')}
-          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          className="rounded-md border border-white/20 bg-transparent px-3 py-1.5 text-xs font-medium text-white/80 hover:bg-white/10 hover:text-white"
         >
           My Profile
         </button>
       )}
       {role === 'admin' && (
-        <div className="relative flex rounded-lg border border-slate-200 bg-slate-100 p-0.5">
+        <div className="relative flex rounded-lg border border-white/20 bg-white/5 p-0.5">
           <span
             aria-hidden="true"
             className={`absolute inset-y-0.5 w-[calc(50%-0.125rem)] rounded-md bg-white shadow-sm transition-transform duration-200 ease-out ${
@@ -361,7 +359,7 @@ export function HeaderActions() {
             type="button"
             onClick={() => navigate('/')}
             className={`relative z-10 w-20 rounded-md px-3 py-1 text-xs font-medium transition-colors ${
-              isMemberView ? 'text-slate-600 hover:text-slate-900' : 'text-slate-900'
+              isMemberView ? 'text-white/70 hover:text-white' : 'text-charcoal'
             }`}
           >
             Admin
@@ -370,7 +368,7 @@ export function HeaderActions() {
             type="button"
             onClick={() => navigate('/portal')}
             className={`relative z-10 w-20 rounded-md px-3 py-1 text-xs font-medium transition-colors ${
-              isMemberView ? 'text-slate-900' : 'text-slate-600 hover:text-slate-900'
+              isMemberView ? 'text-charcoal' : 'text-white/70 hover:text-white'
             }`}
           >
             Member
@@ -378,12 +376,12 @@ export function HeaderActions() {
         </div>
       )}
       {user?.email && (
-        <span className="text-sm text-slate-600">{user.email}</span>
+        <span className="text-sm text-white/60">{user.email}</span>
       )}
       <button
         type="button"
         onClick={handleSignOut}
-        className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        className="rounded-md border border-white/20 bg-transparent px-3 py-1.5 text-sm font-medium text-white/80 hover:bg-white/10 hover:text-white"
       >
         Sign out
       </button>

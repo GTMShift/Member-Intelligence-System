@@ -74,7 +74,7 @@ function DuplicateFlagCard({
                 <button
                   type="button"
                   onClick={() => onViewExistingMember(check.existing_member_id)}
-                  className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                  className="font-medium text-orange-dark hover:text-orange hover:underline"
                 >
                   {existingMemberName}
                 </button>
@@ -94,7 +94,7 @@ function DuplicateFlagCard({
             <button
               type="button"
               onClick={() => onViewExistingMember(check.existing_member_id)}
-              className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+              className="rounded-md bg-orange px-3 py-1.5 text-sm font-medium text-white hover:bg-orange-dark"
             >
               View Existing Member
             </button>

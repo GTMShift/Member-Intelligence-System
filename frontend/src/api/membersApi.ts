@@ -7,6 +7,7 @@ import type {
   MemberSearchParams,
   MemberSearchResponse,
   MemberSearchResult,
+  MemberSortOption,
   UserRole,
 } from '../types/api';
 
@@ -168,6 +169,55 @@ function filterMembers(all: MemberDetail[], params: MemberSearchParams): MemberD
   });
 }
 
+// Defaults to alphabetical by last name (then first name as a tie-breaker)
+// when no sort option is specified — i.e. the same default ordering the
+// underlying DB query already uses, just made explicit here so it stays true
+// even as more sort options are added.
+function sortMembers(members: MemberDetail[], sort: MemberSortOption | undefined): MemberDetail[] {
+  const sorted = [...members];
+
+  switch (sort) {
+    case 'last_name_desc':
+      sorted.sort((a, b) => {
+        const cmp = b.last_name.localeCompare(a.last_name);
+        return cmp !== 0 ? cmp : b.first_name.localeCompare(a.first_name);
+      });
+      break;
+    case 'first_name_asc':
+      sorted.sort((a, b) => {
+        const cmp = a.first_name.localeCompare(b.first_name);
+        return cmp !== 0 ? cmp : a.last_name.localeCompare(b.last_name);
+      });
+      break;
+    case 'first_name_desc':
+      sorted.sort((a, b) => {
+        const cmp = b.first_name.localeCompare(a.first_name);
+        return cmp !== 0 ? cmp : b.last_name.localeCompare(a.last_name);
+      });
+      break;
+    case 'signup_newest':
+      sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      break;
+    case 'signup_oldest':
+      sorted.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+      break;
+    case 'updated_newest':
+      sorted.sort((a, b) => new Date(b.last_updated).getTime() - new Date(a.last_updated).getTime());
+      break;
+    case 'updated_oldest':
+      sorted.sort((a, b) => new Date(a.last_updated).getTime() - new Date(b.last_updated).getTime());
+      break;
+    case 'last_name_asc':
+    default:
+      sorted.sort((a, b) => {
+        const cmp = a.last_name.localeCompare(b.last_name);
+        return cmp !== 0 ? cmp : a.first_name.localeCompare(b.first_name);
+      });
+      break;
+  }
+  return sorted;
+}
+
 function applyRoleFilter(member: MemberDetail, role: UserRole): MemberDetail {
   if (role === 'admin') return member;
 
@@ -201,11 +251,12 @@ export async function searchMembers(
   const page = params.page ?? 1;
   const limit = params.limit ?? 50;
   const filtered = filterMembers(all, params);
+  const sorted = sortMembers(filtered, params.sort);
   const start = (page - 1) * limit;
-  const pageResults = filtered.slice(start, start + limit);
+  const pageResults = sorted.slice(start, start + limit);
 
   return {
-    total: filtered.length,
+    total: sorted.length,
     page,
     limit,
     results: pageResults.map(toSearchResult),

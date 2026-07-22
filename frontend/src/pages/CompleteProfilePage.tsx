@@ -104,13 +104,13 @@ export function CompleteProfilePage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
+    <div className="flex min-h-screen flex-col bg-surface">
+      <header className="bg-charcoal">
         <div className="mx-auto max-w-2xl px-4 py-4 sm:px-6">
-          <h1 className="text-lg font-semibold text-slate-900">
+          <h1 className="text-lg font-semibold text-white">
             SolutionExec Member Intelligence Platform
           </h1>
-          <p className="text-sm text-slate-500">Complete your profile</p>
+          <p className="text-sm text-white/60">Complete your profile</p>
         </div>
       </header>
 
@@ -140,7 +140,7 @@ export function CompleteProfilePage() {
                   value={form.first_name}
                   onChange={handleChange}
                   required
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -153,7 +153,7 @@ export function CompleteProfilePage() {
                   value={form.last_name}
                   onChange={handleChange}
                   required
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -172,7 +172,7 @@ export function CompleteProfilePage() {
                   name="phone"
                   value={form.phone}
                   onChange={handleChange}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="col-span-2 flex flex-col gap-1.5">
@@ -186,7 +186,7 @@ export function CompleteProfilePage() {
                   onChange={handleChange}
                   required
                   placeholder="linkedin.com/in/yourname"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
             </div>
@@ -202,7 +202,7 @@ export function CompleteProfilePage() {
                   name="job_title"
                   value={form.job_title}
                   onChange={handleChange}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -211,7 +211,7 @@ export function CompleteProfilePage() {
                   name="seniority_level"
                   value={form.seniority_level}
                   onChange={handleChange}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 >
                   {SENIORITY_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -227,7 +227,7 @@ export function CompleteProfilePage() {
                   name="company_name"
                   value={form.company_name}
                   onChange={handleChange}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -237,7 +237,7 @@ export function CompleteProfilePage() {
                   name="current_job_start_date"
                   value={form.current_job_start_date}
                   onChange={handleChange}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
             </div>
@@ -253,7 +253,7 @@ export function CompleteProfilePage() {
                   name="city"
                   value={form.city}
                   onChange={handleChange}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -263,7 +263,7 @@ export function CompleteProfilePage() {
                   name="state_region"
                   value={form.state_region}
                   onChange={handleChange}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -273,7 +273,7 @@ export function CompleteProfilePage() {
                   name="country"
                   value={form.country}
                   onChange={handleChange}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
             </div>
@@ -283,7 +283,7 @@ export function CompleteProfilePage() {
             <button
               type="submit"
               disabled={loading}
-              className="rounded-md bg-slate-900 px-6 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+              className="rounded-md bg-orange px-6 py-2 text-sm font-medium text-white hover:bg-orange-dark disabled:opacity-50"
             >
               {loading ? 'Saving…' : 'Complete profile'}
             </button>

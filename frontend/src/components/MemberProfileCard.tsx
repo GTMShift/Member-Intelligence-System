@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getMember } from '../api/membersApi';
 import { updateMemberAsAdmin, type AdminUpdateMemberInput } from '../api/adminUpdateMember';
@@ -89,18 +89,18 @@ function TierSection({
 }: {
   title: string;
   description: string;
-  tierColor: 'blue' | 'violet' | 'amber';
+  tierColor: 'neutral' | 'sage' | 'orange';
   children: React.ReactNode;
 }) {
   const borderColors = {
-    blue: 'border-blue-200',
-    violet: 'border-violet-200',
-    amber: 'border-amber-200',
+    neutral: 'border-charcoal/15',
+    sage: 'border-sage/30',
+    orange: 'border-orange/25',
   };
   const badgeColors = {
-    blue: 'bg-blue-100 text-blue-800',
-    violet: 'bg-violet-100 text-violet-800',
-    amber: 'bg-amber-100 text-amber-800',
+    neutral: 'bg-charcoal/5 text-charcoal',
+    sage: 'bg-sage-tint text-sage',
+    orange: 'bg-orange/10 text-orange-dark',
   };
   return (
     <section className={`rounded-xl border ${borderColors[tierColor]} bg-white p-5`}>
@@ -145,9 +145,9 @@ function FeedbackPrompts({ entries }: { entries: MemberDataEntry[] }) {
       {Object.entries(grouped).map(([category, items]) => (
         <div
           key={category}
-          className="rounded-lg border-2 border-violet-200 bg-violet-50/50 p-4"
+          className="rounded-lg border-2 border-sage/30 bg-sage-tint/50 p-4"
         >
-          <h4 className="text-sm font-semibold text-violet-900">
+          <h4 className="text-sm font-semibold text-sage">
             {FEEDBACK_PROMPT_LABELS[category] ?? category}
           </h4>
           <ul className="mt-3 space-y-3">
@@ -159,7 +159,7 @@ function FeedbackPrompts({ entries }: { entries: MemberDataEntry[] }) {
               .map((entry) => (
                 <li
                   key={entry.id}
-                  className="rounded-md border border-violet-100 bg-white p-3"
+                  className="rounded-md border border-sage/20 bg-white p-3"
                 >
                   <FeedbackEntryContent entry={entry} />
                   <p className="mt-2 text-xs text-slate-400">
@@ -201,8 +201,8 @@ function AdminDataEntry({ entry }: { entry: MemberDataEntry }) {
     flag: 'Flag',
   };
   return (
-    <div className="rounded-md border border-amber-100 bg-amber-50/30 p-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">
+    <div className="rounded-md border border-orange/20 bg-orange/5 p-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-orange-dark">
         {categoryLabels[category] ?? category}
       </p>
       <AdminEntryContent entry={entry} />
@@ -263,6 +263,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
   const [editForm, setEditForm] = useState<EditFormState | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const loadMember = useCallback(async () => {
     setLoading(true);
@@ -293,7 +294,21 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
     };
   }, [loadMember]);
 
-  if (loading) {
+  // Jump to the top of the card the moment a different member is selected,
+  // rather than keeping whatever scroll position was left over from the
+  // previously viewed member's (likely differently-sized) profile.
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 });
+  }, [memberId]);
+
+  // Only show the full-page "Loading…" placeholder on a genuinely first
+  // load, when there's no member data at all yet. When switching from one
+  // already-loaded member to another, keep the previous member's content
+  // visible (slightly dimmed) while the new one loads in the background —
+  // this avoids the content area suddenly collapsing to a tiny placeholder
+  // and then snapping back to full height, which is what caused the
+  // scroll-jump bug.
+  if (loading && !member) {
     return (
       <div className="flex h-full items-center justify-center">
         <p className="text-sm text-slate-500">Loading profile…</p>
@@ -419,7 +434,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
     : [];
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div ref={scrollRef} className={`h-full overflow-y-auto ${loading ? 'opacity-60 transition-opacity' : ''}`}>
       <div className="border-b border-slate-200 bg-white px-6 py-5">
         <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-4">
@@ -437,7 +452,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                     <Link
                       to={`/companies/${profile.company_id}`}
                       state={{ fromMemberId: memberId }}
-                      className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                      className="font-medium text-orange-dark hover:text-orange hover:underline"
                     >
                       {profile.company_name}
                     </Link>
@@ -471,7 +486,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                   type="button"
                   onClick={handleSaveEdit}
                   disabled={isSaving}
-                  className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+                  className="rounded-md bg-orange px-3 py-1.5 text-sm font-medium text-white hover:bg-orange-dark disabled:opacity-50"
                 >
                   {isSaving ? 'Saving…' : 'Save'}
                 </button>
@@ -498,7 +513,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
         <TierSection
           title="Public Profile"
           description="Tier 1 · Visible to all"
-          tierColor="blue"
+          tierColor="neutral"
         >
           <div className="space-y-5">
             <div>
@@ -514,7 +529,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                       name="first_name"
                       value={editForm.first_name}
                       onChange={handleEditChange}
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
@@ -524,7 +539,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                       name="last_name"
                       value={editForm.last_name}
                       onChange={handleEditChange}
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
@@ -534,7 +549,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                       name="phone"
                       value={editForm.phone}
                       onChange={handleEditChange}
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
@@ -545,7 +560,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                       value={editForm.linkedin_url}
                       onChange={handleEditChange}
                       placeholder="linkedin.com/in/name"
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                     />
                   </div>
                   <p className="col-span-2 text-xs text-slate-400">
@@ -569,7 +584,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                       name="job_title"
                       value={editForm.job_title}
                       onChange={handleEditChange}
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
@@ -578,7 +593,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                       name="seniority_level"
                       value={editForm.seniority_level}
                       onChange={handleEditChange}
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                     >
                       {SENIORITY_OPTIONS.map((opt) => (
                         <option key={opt.value} value={opt.value}>
@@ -594,7 +609,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                       name="current_job_start_date"
                       value={editForm.current_job_start_date}
                       onChange={handleEditChange}
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                     />
                   </div>
                 </div>
@@ -613,13 +628,13 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                     name="company_name"
                     value={editForm.company_name}
                     onChange={handleEditChange}
-                    className="w-full max-w-sm rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                    className="w-full max-w-sm rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                   />
                 ) : profile.company_id ? (
                   <Link
                     to={`/companies/${profile.company_id}`}
                     state={{ fromMemberId: memberId }}
-                    className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                    className="text-sm font-medium text-orange-dark hover:text-orange hover:underline"
                   >
                     {profile.company_name}
                   </Link>
@@ -641,7 +656,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                       name="city"
                       value={editForm.city}
                       onChange={handleEditChange}
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
@@ -651,7 +666,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                       name="state_region"
                       value={editForm.state_region}
                       onChange={handleEditChange}
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
@@ -661,7 +676,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                       name="country"
                       value={editForm.country}
                       onChange={handleEditChange}
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                     />
                   </div>
                 </div>
@@ -680,7 +695,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
         <TierSection
           title="Member Feedback"
           description="Tier 2 · User-editable"
-          tierColor="violet"
+          tierColor="sage"
         >
           <FeedbackPrompts entries={userEditableEntries} />
         </TierSection>
@@ -688,18 +703,18 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
           <TierSection
             title="Admin Intelligence"
             description="Tier 3 · Admin only"
-            tierColor="amber"
+            tierColor="orange"
           >
             <div className="space-y-4">
               {isEditing && editForm ? (
-                <div className="grid grid-cols-2 gap-4 rounded-lg border border-amber-100 bg-amber-50/30 p-4">
+                <div className="grid grid-cols-2 gap-4 rounded-lg border border-orange/20 bg-orange/5 p-4">
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-medium text-slate-600">Bucket</label>
                     <select
                       name="bucket"
                       value={editForm.bucket}
                       onChange={handleEditChange}
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                     >
                       {BUCKET_OPTIONS.map((opt) => (
                         <option key={opt.value} value={opt.value}>
@@ -717,7 +732,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                       max={100}
                       value={editForm.fit_score}
                       onChange={handleEditChange}
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                     />
                   </div>
                   <div className="col-span-2 flex flex-col gap-1.5">
@@ -727,7 +742,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                       rows={2}
                       value={editForm.tag_note}
                       onChange={handleEditChange}
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                     />
                   </div>
                   <p className="col-span-2 text-xs text-slate-400">

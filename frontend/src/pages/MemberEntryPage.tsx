@@ -141,28 +141,28 @@ export function MemberEntryPage() {
   return (
     <div className="flex min-h-screen flex-col">
       {/* Header */}
-      <header className="border-b border-slate-200 bg-white">
+      <header className="bg-charcoal">
         <div className="mx-auto flex max-w-[90rem] items-center justify-between px-4 py-4 sm:px-6">
           <div>
-            <h1 className="text-lg font-semibold text-slate-900">
+            <h1 className="text-lg font-semibold text-white">
               SolutionExec Member Intelligence Platform
             </h1>
-            <p className="text-sm text-slate-500">Add new member</p>
+            <p className="text-sm text-white/60">Add new member</p>
           </div>
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="rounded-md border border-white/20 bg-transparent px-3 py-1.5 text-sm font-medium text-white/80 hover:bg-white/10 hover:text-white"
           >
             ← Back to dashboard
           </button>
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 sm:px-6">
+      <main className="mx-auto w-full max-w-2xl flex-1 bg-surface px-4 py-8 sm:px-6">
         {success && (
-          <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3">
-            <p className="text-sm font-medium text-green-800">
+          <div className="mb-6 rounded-lg border border-sage bg-sage-tint px-4 py-3">
+            <p className="text-sm font-medium text-ink">
               Member added successfully.{' '}
               <button
                 type="button"
@@ -206,7 +206,7 @@ export function MemberEntryPage() {
                   onChange={handleChange}
                   required
                   placeholder="Jane"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -220,7 +220,7 @@ export function MemberEntryPage() {
                   onChange={handleChange}
                   required
                   placeholder="Smith"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -234,7 +234,7 @@ export function MemberEntryPage() {
                   onChange={handleChange}
                   required
                   placeholder="jane@company.com"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -245,7 +245,7 @@ export function MemberEntryPage() {
                   value={form.phone}
                   onChange={handleChange}
                   placeholder="+1 312 555 0101"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="col-span-2 flex flex-col gap-1.5">
@@ -259,7 +259,7 @@ export function MemberEntryPage() {
                   onChange={handleChange}
                   required
                   placeholder="https://linkedin.com/in/janesmith"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-orange focus:outline-none"
                 />
               </div>
             </div>
@@ -277,7 +277,7 @@ export function MemberEntryPage() {
                   value={form.job_title}
                   onChange={handleChange}
                   placeholder="Director of Solutions Engineering"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -286,7 +286,7 @@ export function MemberEntryPage() {
                   name="seniority_level"
                   value={form.seniority_level}
                   onChange={handleChange}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 >
                   {SENIORITY_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -303,7 +303,7 @@ export function MemberEntryPage() {
                   value={form.company_name}
                   onChange={handleChange}
                   placeholder="Acme Corp"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -313,7 +313,7 @@ export function MemberEntryPage() {
                   name="current_job_start_date"
                   value={form.current_job_start_date}
                   onChange={handleChange}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
             </div>
@@ -331,7 +331,7 @@ export function MemberEntryPage() {
                   value={form.city}
                   onChange={handleChange}
                   placeholder="Chicago"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -342,7 +342,7 @@ export function MemberEntryPage() {
                   value={form.state_region}
                   onChange={handleChange}
                   placeholder="Illinois"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -353,16 +353,15 @@ export function MemberEntryPage() {
                   value={form.country}
                   onChange={handleChange}
                   placeholder="United States"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-orange focus:outline-none"
                 />
               </div>
             </div>
           </section>
 
           {/* ICP classification */}
-          <section className="rounded-xl border border-slate-200 bg-white p-6">
+          <section className="rounded-xl border border-orange/25 bg-orange/5 p-6">
             <h2 className="mb-1 text-sm font-semibold text-slate-900">ICP classification</h2>
-            <p className="mb-4 text-xs text-slate-500">Internal only — members never see this</p>
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-slate-600">Bucket</label>
@@ -370,7 +369,7 @@ export function MemberEntryPage() {
                   name="bucket"
                   value={form.bucket}
                   onChange={handleChange}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 >
                   {BUCKET_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -392,7 +391,7 @@ export function MemberEntryPage() {
                     min={0}
                     max={100}
                     placeholder="e.g. 85"
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-orange focus:outline-none"
                   />
                 </div>
               )}
@@ -404,7 +403,7 @@ export function MemberEntryPage() {
                   onChange={handleChange}
                   rows={2}
                   placeholder="Optional context, e.g. how this person was connected"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-orange focus:outline-none"
                 />
               </div>
             </div>
@@ -419,7 +418,7 @@ export function MemberEntryPage() {
                 name="signup_source"
                 value={form.signup_source}
                 onChange={handleChange}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
               >
                 <option value="Manual">Manual</option>
                 <option value="Website">Website</option>
@@ -441,7 +440,7 @@ export function MemberEntryPage() {
             <button
               type="submit"
               disabled={loading}
-              className="rounded-md bg-slate-900 px-6 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+              className="rounded-md bg-orange px-6 py-2 text-sm font-medium text-white hover:bg-orange-dark disabled:opacity-50"
             >
               {loading ? 'Adding member...' : 'Add member'}
             </button>
