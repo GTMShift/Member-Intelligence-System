@@ -226,15 +226,23 @@ function MemberDirectoryLayout({
     setPortalMember(null);
   }
 
+  const justCreatedFlag = (location.state as DashboardLocationState | null)?.justCreated;
+  const [appliedJustCreated, setAppliedJustCreated] = useState(false);
+  if (justCreatedFlag && !appliedJustCreated) {
+    setAppliedJustCreated(true);
+    setShowWelcome(true);
+  }
+
+  // Clearing the flag from history state (so refreshing the page, or coming
+  // back later, doesn't keep re-showing the welcome banner) is a genuine side
+  // effect on the browser's history — that part belongs in an effect. Setting
+  // showWelcome itself happens above, directly during render, matching the
+  // same pattern already used for incomingMemberId in this file.
   useEffect(() => {
-    const state = location.state as DashboardLocationState | null;
-    if (state?.justCreated) {
-      setShowWelcome(true);
-      // Clear the flag from history state so refreshing the page (or coming
-      // back later) doesn't keep re-showing the welcome banner.
+    if (justCreatedFlag) {
       navigate(location.pathname, { replace: true, state: {} });
     }
-  }, [location.state, location.pathname, navigate]);
+  }, [justCreatedFlag, location.pathname, navigate]);
 
   useEffect(() => {
     if (!portalView || !selectedMemberId) {
