@@ -1,4 +1,3 @@
-// src/api/createMemberSelf.ts
 import { supabase } from '../lib/supabaseClient';
 import { createNotification } from './notificationsApi';
 import { checkAndFlagDuplicate } from './duplicateFlagsApi';
@@ -13,9 +12,33 @@ export interface SelfSignupInput {
   current_job_start_date: string | null;
   seniority_level: string | null;
   company_name: string | null;
-  country: string | null;
-  state_region: string | null;
+  team_size: number | null;
+  management_layers: string | null;
+  address: string | null;
   city: string | null;
+  state_region: string | null;
+  zip_code: string | null;
+  country: string | null;
+  tshirt_size: string | null;
+  dietary_restrictions: string | null;
+  oversees_solutions_engineering_consulting: boolean;
+  oversees_customer_success: boolean;
+  oversees_demo_engineering: boolean;
+  oversees_solutions_architecture: boolean;
+  oversees_partnerships_channel_se: boolean;
+  oversees_value_engineering: boolean;
+  oversees_forward_deployed_engineering: boolean;
+  oversees_enablement: boolean;
+  oversees_professional_services: boolean;
+  oversees_implementation_onboarding: boolean;
+  oversees_other: boolean;
+  oversees_other_text: string | null;
+  region_north_america: boolean;
+  region_regional_usa: boolean;
+  region_global: boolean;
+  region_emea: boolean;
+  region_apac: boolean;
+  region_latin_america: boolean;
 }
 
 async function findOrCreateCompany(companyName: string | null): Promise<string | null> {
@@ -116,9 +139,33 @@ export async function createMemberSelf(
 
   const profileFields = {
     seniority_level: input.seniority_level,
-    country: input.country,
-    state_region: input.state_region,
+    team_size: input.team_size,
+    management_layers: input.management_layers,
+    address: input.address,
     city: input.city,
+    state_region: input.state_region,
+    zip_code: input.zip_code,
+    country: input.country,
+    tshirt_size: input.tshirt_size,
+    dietary_restrictions: input.dietary_restrictions,
+    oversees_solutions_engineering_consulting: input.oversees_solutions_engineering_consulting,
+    oversees_customer_success: input.oversees_customer_success,
+    oversees_demo_engineering: input.oversees_demo_engineering,
+    oversees_solutions_architecture: input.oversees_solutions_architecture,
+    oversees_partnerships_channel_se: input.oversees_partnerships_channel_se,
+    oversees_value_engineering: input.oversees_value_engineering,
+    oversees_forward_deployed_engineering: input.oversees_forward_deployed_engineering,
+    oversees_enablement: input.oversees_enablement,
+    oversees_professional_services: input.oversees_professional_services,
+    oversees_implementation_onboarding: input.oversees_implementation_onboarding,
+    oversees_other: input.oversees_other,
+    oversees_other_text: input.oversees_other_text,
+    region_north_america: input.region_north_america,
+    region_regional_usa: input.region_regional_usa,
+    region_global: input.region_global,
+    region_emea: input.region_emea,
+    region_apac: input.region_apac,
+    region_latin_america: input.region_latin_america,
     company_id: companyId,
     signup_source: 'Website',
   };

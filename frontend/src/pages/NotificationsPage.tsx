@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { HeaderActions } from '../App';
-import { useAuth } from '../context/AuthContext';
+import { HeaderActions } from '../components/HeaderActions';
+import { useAuth } from '../context/authShared';
 import {
   fetchNotifications,
   markAllNotificationsAsRead,
@@ -81,8 +81,16 @@ const TYPE_META: Record<NotificationType, TypeMeta> = {
     badgeClass: 'bg-orange/10 text-orange-dark ring-orange/20',
     iconClass: 'bg-orange/10 text-orange-dark',
     iconPath:
-      'M8 9V6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-1M15 15v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2h1',
+      'M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 1-3-3V4.5a3 3 0 1 1 6 0v8.25a3 3 0 0 1-3 3Z',
   },
+};
+
+const DEFAULT_TYPE_META: TypeMeta = {
+  label: 'Notification',
+  badgeClass: 'bg-slate-50 text-slate-700 ring-slate-200',
+  iconClass: 'bg-slate-100 text-slate-700',
+  iconPath:
+    'M14.857 17.082a23.85 23.85 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 1 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0',
 };
 
 function matchesFilter(notification: Notification, filter: FilterId): boolean {
@@ -104,22 +112,27 @@ export function NotificationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<FilterId>('all');
 
-  const loadNotifications = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await fetchNotifications();
-      setNotifications(data);
-    } catch {
-      setError('Failed to load notifications.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    loadNotifications();
-  }, [loadNotifications]);
+    let cancelled = false;
+
+    async function run() {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await fetchNotifications();
+        if (!cancelled) setNotifications(data);
+      } catch {
+        if (!cancelled) setError('Failed to load notifications.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const visibleNotifications = useMemo(
     () => notifications.filter((n) => matchesFilter(n, activeFilter)),
@@ -129,10 +142,6 @@ export function NotificationsPage() {
     () => notifications.filter((n) => !n.is_read).length,
     [notifications],
   );
-
-  if (role !== 'admin') {
-    return <Navigate to="/unauthorized" replace />;
-  }
 
   const markAsRead = async (id: string) => {
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
@@ -152,6 +161,10 @@ export function NotificationsPage() {
       setNotifications(previous);
     }
   };
+
+  if (role !== 'admin') {
+    return <Navigate to="/unauthorized" replace />;
+  }
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -232,7 +245,7 @@ export function NotificationsPage() {
               </li>
             ) : (
               visibleNotifications.map((notification) => {
-                const meta = TYPE_META[notification.type];
+                const meta = TYPE_META[notification.type] ?? DEFAULT_TYPE_META;
                 return (
                   <li
                     key={notification.id}

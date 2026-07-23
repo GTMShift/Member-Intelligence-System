@@ -50,8 +50,24 @@ export function SubstackImportPage() {
   }, []);
 
   useEffect(() => {
-    loadHistory();
-  }, [loadHistory]);
+    let cancelled = false;
+
+    async function run() {
+      const { data, error: historyErr } = await supabase
+        .from('substack_import_runs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (cancelled) return;
+      setHistory(historyErr ? [] : data ?? []);
+      setIsLoadingHistory(false);
+    }
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setResult(null);

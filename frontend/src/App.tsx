@@ -1,20 +1,24 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { MemberProfileCard } from './components/MemberProfileCard';
 import { MemberSearchPanel } from './components/MemberSearchPanel';
 import { DuplicateFlagAlerts } from './components/DuplicateFlagAlerts';
+import { HeaderActions } from './components/HeaderActions';
+import { ProfileStalenessBanner } from './components/ProfileStalenessBanner';
 import { ProtectedRoute } from './components/ProtectedRoute';
-import { AuthContext, useAuth } from './context/AuthContext';
+import { AuthContext, useAuth } from './context/authShared';
+import { getMember } from './api/membersApi';
 import { CompanyDetailPage } from './pages/CompanyDetailPage';
 import { LoginPage } from './pages/LoginPage';
 import { UnauthorizedPage } from './pages/UnauthorizedPage';
 import { MemberEntryPage } from './pages/MemberEntryPage';
+import { SpeakerApplicationPage } from './pages/SpeakerApplicationPage';
+import { SpeakerApplicationsAdminPage } from './pages/SpeakerApplicationAdminPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { SubstackImportPage } from './pages/SubstackImportPage';
 import { CompleteProfilePage } from './pages/CompleteProfilePage';
 import { MyProfilePage } from './pages/MyProfilePage';
-import { fetchUnreadNotificationCount } from './api/notificationsApi';
-import type { UserRole } from './types/api';
+import type { MemberDetail, UserRole } from './types/api';
 
 interface DashboardLocationState {
   selectedMemberId?: string;
@@ -93,6 +97,14 @@ function App() {
           }
         />
         <Route
+          path="/admin/speaker-applications"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <SpeakerApplicationsAdminPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/companies/:id"
           element={
             <ProtectedRoute requiredRole="admin">
@@ -113,6 +125,14 @@ function App() {
           element={
             <ProtectedRoute requiredRole="member">
               <MemberPortalPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/portal/speaker-application"
+          element={
+            <ProtectedRoute requiredRole="member">
+              <SpeakerApplicationPage />
             </ProtectedRoute>
           }
         />
@@ -193,20 +213,71 @@ function MemberDirectoryLayout({
   const navigate = useNavigate();
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [portalMember, setPortalMember] = useState<MemberDetail | null>(null);
+
+  const incomingMemberId = (location.state as DashboardLocationState | null)?.selectedMemberId;
+  const [appliedIncomingId, setAppliedIncomingId] = useState<string | undefined>(undefined);
+  if (incomingMemberId && incomingMemberId !== appliedIncomingId) {
+    setAppliedIncomingId(incomingMemberId);
+    setSelectedMemberId(incomingMemberId);
+  }
+
+  if ((!portalView || !selectedMemberId) && portalMember !== null) {
+    setPortalMember(null);
+  }
 
   useEffect(() => {
     const state = location.state as DashboardLocationState | null;
-    if (state?.selectedMemberId) {
-      setSelectedMemberId(state.selectedMemberId);
-    }
     if (state?.justCreated) {
       setShowWelcome(true);
+      // Clear the flag from history state so refreshing the page (or coming
+      // back later) doesn't keep re-showing the welcome banner.
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.state, location.pathname, navigate]);
 
+  useEffect(() => {
+    if (!portalView || !selectedMemberId) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadPortalMember() {
+      try {
+        const data = await getMember(selectedMemberId!, 'member');
+        if (!cancelled) setPortalMember(data);
+      } catch {
+        if (!cancelled) setPortalMember(null);
+      }
+    }
+
+    void loadPortalMember();
+    return () => {
+      cancelled = true;
+    };
+  }, [portalView, selectedMemberId]);
+
   const handleViewExistingMember = (memberId: string) => {
     setSelectedMemberId(memberId);
+  };
+
+  const handleEnrich = async () => {
+    if (!selectedMemberId) return;
+
+    const response = await fetch(
+      `${import.meta.env.VITE_API_URL}/members/${selectedMemberId}/enrich`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ run_type: 'manual' }),
+      },
+    );
+    if (response.ok) {
+      alert('Profile enrichment started — your profile will be updated shortly');
+    } else {
+      alert('Enrichment failed — please try again later');
+    }
   };
 
   const directoryContent = (
@@ -222,7 +293,17 @@ function MemberDirectoryLayout({
 
       <section className="min-h-[24rem] flex-1 bg-slate-50 lg:min-h-[calc(100vh-4.5rem)]">
         {selectedMemberId ? (
-          <MemberProfileCard memberId={selectedMemberId} />
+          <div className="flex h-full flex-col">
+            {portalView && portalMember && (
+              <ProfileStalenessBanner
+                member={portalMember}
+                onEnrichClick={handleEnrich}
+              />
+            )}
+            <div className="min-h-0 flex-1">
+              <MemberProfileCard memberId={selectedMemberId} />
+            </div>
+          </div>
         ) : (
           <div className="flex h-full items-center justify-center p-8">
             <div className="text-center">
@@ -265,126 +346,6 @@ function MemberDirectoryLayout({
           directoryContent
         )}
       </main>
-    </div>
-  );
-}
-
-export function HeaderActions() {
-  const { user, signOut, role, memberId } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  const handleSignOut = async () => {
-    await signOut();
-    navigate('/login');
-  };
-
-  const isMemberView = location.pathname === '/portal';
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  useEffect(() => {
-    if (role !== 'admin') return;
-    fetchUnreadNotificationCount().then(setUnreadCount);
-  }, [role]);
-
-  return (
-    <div className="flex items-center gap-4">
-      {role === 'admin' && (
-        <Link
-          to="/notifications"
-          aria-label={
-            unreadCount > 0
-              ? `Notifications, ${unreadCount} unread`
-              : 'Notifications'
-          }
-          className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white"
-        >
-          <svg
-            className="h-5 w-5"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={1.8}
-            aria-hidden="true"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M14.857 17.082a23.85 23.85 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 1 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m6.714 0a3 3 0 1 1-6.714 0m6.714 0a24.255 24.255 0 0 1-6.714 0"
-            />
-          </svg>
-          {unreadCount > 0 && (
-            <span className="absolute -right-1 -top-1 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-orange px-1 text-[10px] font-semibold leading-none text-white">
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </span>
-          )}
-        </Link>
-      )}
-      {role === 'admin' && (
-        <button
-          type="button"
-          onClick={() => navigate('/admin/add-member')}
-          className="rounded-md bg-orange px-3 py-1.5 text-xs font-medium text-white hover:bg-orange-dark"
-        >
-          + Add member
-        </button>
-      )}
-      {role === 'admin' && (
-        <button
-          type="button"
-          onClick={() => navigate('/admin/substack-import')}
-          className="rounded-md border border-white/20 bg-transparent px-3 py-1.5 text-xs font-medium text-white/80 hover:bg-white/10 hover:text-white"
-        >
-          Import Substack CSV
-        </button>
-      )}
-      {isMemberView && (
-        <button
-          type="button"
-          onClick={() => navigate(memberId ? '/my-profile' : '/complete-profile')}
-          className="rounded-md border border-white/20 bg-transparent px-3 py-1.5 text-xs font-medium text-white/80 hover:bg-white/10 hover:text-white"
-        >
-          My Profile
-        </button>
-      )}
-      {role === 'admin' && (
-        <div className="relative flex rounded-lg border border-white/20 bg-white/5 p-0.5">
-          <span
-            aria-hidden="true"
-            className={`absolute inset-y-0.5 w-[calc(50%-0.125rem)] rounded-md bg-white shadow-sm transition-transform duration-200 ease-out ${
-              isMemberView ? 'translate-x-full' : 'translate-x-0'
-            }`}
-          />
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            className={`relative z-10 w-20 rounded-md px-3 py-1 text-xs font-medium transition-colors ${
-              isMemberView ? 'text-white/70 hover:text-white' : 'text-charcoal'
-            }`}
-          >
-            Admin
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/portal')}
-            className={`relative z-10 w-20 rounded-md px-3 py-1 text-xs font-medium transition-colors ${
-              isMemberView ? 'text-charcoal' : 'text-white/70 hover:text-white'
-            }`}
-          >
-            Member
-          </button>
-        </div>
-      )}
-      {user?.email && (
-        <span className="text-sm text-white/60">{user.email}</span>
-      )}
-      <button
-        type="button"
-        onClick={handleSignOut}
-        className="rounded-md border border-white/20 bg-transparent px-3 py-1.5 text-sm font-medium text-white/80 hover:bg-white/10 hover:text-white"
-      >
-        Sign out
-      </button>
     </div>
   );
 }

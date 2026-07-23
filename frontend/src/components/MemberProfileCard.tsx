@@ -2,30 +2,44 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getMember } from '../api/membersApi';
 import { updateMemberAsAdmin, type AdminUpdateMemberInput } from '../api/adminUpdateMember';
-import { useAuth } from '../context/AuthContext';
-import type { MemberDataEntry, MemberDetail } from '../types/api';
+import { calculateFitScore, suggestIcpBucket, type IcpBucketSuggestion } from '../api/icpScoring';
+import { useAuth } from '../context/authShared';
+import type { EnrichmentResult, MemberDataEntry, MemberDetail } from '../types/api';
 import { formatTimestamp, fullName } from '../utils/format';
+import { EnrichmentReviewPanel } from './EnrichmentReviewPanel';
 import { InteractionTimeline } from './InteractionTimeline';
-
+// NOTE: aligned to the icp_bucket enum from migration 021 / Meghan's taxonomy.
+// If these values drift from the DB enum, the bucket <select> will silently
+// fail to persist on save (Postgres will reject the enum value).
 const BUCKET_OPTIONS = [
   { value: '', label: 'Select a category' },
-  { value: 'icp_member', label: 'ICP Member' },
-  { value: 'between_roles', label: 'Between Roles' },
-  { value: 'adjacent_remit', label: 'Adjacent Remit' },
+  { value: 'primary_icp', label: 'Primary ICP' },
+  { value: 'secondary_icp', label: 'Secondary ICP' },
+  { value: 'watchlist', label: 'Watchlist' },
+  { value: 'between_jobs', label: 'Between Jobs' },
   { value: 'consultant', label: 'Consultant' },
-  { value: 'sponsor', label: 'Sponsor' },
-  { value: 'personal_connection', label: 'Personal Connection' },
+  { value: 'partner_sponsor', label: 'Partner / Sponsor' },
+  { value: 'icp_no', label: 'Not ICP' },
+  { value: 'manual_review', label: 'Manual Review' },
 ] as const;
-
+const BUCKET_LABELS: Record<string, string> = Object.fromEntries(
+  BUCKET_OPTIONS.filter((o) => o.value).map((o) => [o.value, o.label]),
+);
+// NOTE: aligned to the seniority tiers used by calculate_fit_score's scoring
+// table (Global VP/SVP=50, VP=45, Senior Director=35, Director=30). If the
+// member_profile.seniority_level column still stores the old labels
+// (C-Suite / Manager / Individual Contributor), this dropdown and the
+// scoring function will disagree — reconcile before shipping.
 const SENIORITY_OPTIONS = [
   { value: '', label: 'Select seniority' },
-  { value: 'C-Suite', label: 'C-Suite' },
+  { value: 'Global VP/SVP', label: 'Global VP / SVP' },
   { value: 'VP', label: 'VP' },
+  { value: 'Senior Director', label: 'Senior Director' },
   { value: 'Director', label: 'Director' },
+  { value: 'Senior Manager', label: 'Senior Manager' },
   { value: 'Manager', label: 'Manager' },
   { value: 'Individual Contributor', label: 'Individual Contributor' },
 ] as const;
-
 type EditFormState = {
   first_name: string;
   last_name: string;
@@ -42,7 +56,6 @@ type EditFormState = {
   fit_score: string;
   tag_note: string;
 };
-
 function normalizeLinkedInUrl(input: string): string {
   let url = input.trim();
   if (!url) return url;
@@ -52,20 +65,16 @@ function normalizeLinkedInUrl(input: string): string {
   }
   return `https://${url}`;
 }
-
 interface MemberProfileCardProps {
   memberId: string;
 }
-
 interface ProfileField {
   label: string;
   value: string | null | undefined;
 }
-
 // Values over this length stack (label above, left-aligned text below)
 // instead of sitting inline as a row — a right-aligned paragraph reads badly.
 const LONG_VALUE_THRESHOLD = 50;
-
 function FieldGrid({ fields }: { fields: ProfileField[] }) {
   const visible = fields.filter((f) => f.value);
   if (visible.length === 0) {
@@ -93,7 +102,6 @@ function FieldGrid({ fields }: { fields: ProfileField[] }) {
     </dl>
   );
 }
-
 function TierSection({
   title,
   description,
@@ -127,14 +135,12 @@ function TierSection({
     </section>
   );
 }
-
 const FEEDBACK_PROMPT_LABELS: Record<string, string> = {
   challenge: 'What are your top 3 challenges right now?',
   event_feedback: 'Event feedback',
   interest: 'Personal interests',
   mandate: 'Team dynamics / mandates',
 };
-
 function FeedbackPrompts({ entries }: { entries: MemberDataEntry[] }) {
   const feedbackEntries = entries.filter(
     (e) =>
@@ -142,11 +148,7 @@ function FeedbackPrompts({ entries }: { entries: MemberDataEntry[] }) {
       ['challenge', 'event_feedback', 'interest', 'mandate'].includes(e.category),
   );
   if (feedbackEntries.length === 0) {
-    return (
-      <p className="text-sm text-slate-500">
-        No member-submitted feedback yet.
-      </p>
-    );
+    return <p className="text-sm text-slate-500">No member-submitted feedback yet.</p>;
   }
   const grouped = feedbackEntries.reduce<Record<string, MemberDataEntry[]>>((acc, entry) => {
     if (!acc[entry.category]) acc[entry.category] = [];
@@ -165,10 +167,7 @@ function FeedbackPrompts({ entries }: { entries: MemberDataEntry[] }) {
           </h4>
           <ul className="mt-3 space-y-3">
             {items
-              .sort(
-                (a, b) =>
-                  new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-              )
+              .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
               .map((entry) => (
                 <li
                   key={entry.id}
@@ -188,7 +187,6 @@ function FeedbackPrompts({ entries }: { entries: MemberDataEntry[] }) {
     </div>
   );
 }
-
 function FeedbackEntryContent({ entry }: { entry: MemberDataEntry }) {
   const { data, category } = entry;
   if (category === 'event_feedback') {
@@ -196,9 +194,7 @@ function FeedbackEntryContent({ entry }: { entry: MemberDataEntry }) {
     const answer = typeof data.answer === 'string' ? data.answer : null;
     return (
       <div>
-        {question && (
-          <p className="text-xs font-medium text-slate-500">{question}</p>
-        )}
+        {question && <p className="text-xs font-medium text-slate-500">{question}</p>}
         {answer && <p className="mt-1 text-sm text-slate-900">{answer}</p>}
       </div>
     );
@@ -206,7 +202,6 @@ function FeedbackEntryContent({ entry }: { entry: MemberDataEntry }) {
   const text = typeof data.text === 'string' ? data.text : JSON.stringify(data);
   return <p className="text-sm text-slate-900">{text}</p>;
 }
-
 function AdminDataEntry({ entry }: { entry: MemberDataEntry }) {
   const { category } = entry;
   const categoryLabels: Record<string, string> = {
@@ -227,7 +222,6 @@ function AdminDataEntry({ entry }: { entry: MemberDataEntry }) {
     </div>
   );
 }
-
 function AdminEntryContent({ entry }: { entry: MemberDataEntry }) {
   const { data, category } = entry;
   if (category === 'transcript') {
@@ -247,7 +241,6 @@ function AdminEntryContent({ entry }: { entry: MemberDataEntry }) {
   const text = typeof data.text === 'string' ? data.text : JSON.stringify(data);
   return <p className="mt-1 text-sm text-slate-900">{text}</p>;
 }
-
 function AvatarCircle({
   avatarUrl,
   firstName,
@@ -267,18 +260,133 @@ function AvatarCircle({
     </div>
   );
 }
-
+// --- New: ICP Scoring Assistant -------------------------------------------------
+function IcpScoringAssistant({
+  memberId,
+  currentBucket,
+  currentFitScore,
+  onApplied,
+}: {
+  memberId: string;
+  currentBucket: string | null | undefined;
+  currentFitScore: number | null | undefined;
+  onApplied: () => Promise<void>;
+}) {
+  const { user } = useAuth();
+  const [isRunning, setIsRunning] = useState(false);
+  const [isApplying, setIsApplying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [suggestion, setSuggestion] = useState<IcpBucketSuggestion | null>(null);
+  const runScoring = async () => {
+    setIsRunning(true);
+    setError(null);
+    try {
+      const [score, bucketSuggestion] = await Promise.all([
+        calculateFitScore(memberId),
+        suggestIcpBucket(memberId),
+      ]);
+      setSuggestion({ ...bucketSuggestion, score });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to run ICP scoring.');
+    } finally {
+      setIsRunning(false);
+    }
+  };
+  const dismiss = () => {
+    setSuggestion(null);
+    setError(null);
+  };
+  const approve = async () => {
+    if (!suggestion || !user?.id) return;
+    setIsApplying(true);
+    setError(null);
+    try {
+      const input: Partial<AdminUpdateMemberInput> = {
+        bucket: suggestion.bucket,
+        fit_score: suggestion.score,
+      };
+      await updateMemberAsAdmin(memberId, input as AdminUpdateMemberInput, user.id);
+      await onApplied();
+      setSuggestion(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to apply suggestion.');
+    } finally {
+      setIsApplying(false);
+    }
+  };
+  return (
+    <div className="rounded-lg border border-amber-200 bg-amber-50/40 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+            ICP Scoring Assistant
+          </h4>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Current: {currentBucket ? (BUCKET_LABELS[currentBucket] ?? currentBucket) : 'Not classified'}
+            {currentFitScore !== null && currentFitScore !== undefined ? ` · Score ${currentFitScore}` : ''}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={runScoring}
+          disabled={isRunning}
+          className="shrink-0 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+        >
+          {isRunning ? 'Running…' : 'Run scoring'}
+        </button>
+      </div>
+      {error && (
+        <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </p>
+      )}
+      {suggestion && (
+        <div className="mt-3 rounded-md border border-amber-200 bg-white p-3">
+          <p className="text-sm text-slate-900">
+            Suggested bucket:{' '}
+            <span className="font-semibold">{BUCKET_LABELS[suggestion.bucket] ?? suggestion.bucket}</span>
+            {' · '}Score: <span className="font-semibold">{suggestion.score}</span>
+          </p>
+          {suggestion.reason && (
+            <p className="mt-1 text-xs text-slate-500">{suggestion.reason}</p>
+          )}
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={approve}
+              disabled={isApplying}
+              className="rounded-md bg-orange px-3 py-1.5 text-sm font-medium text-white hover:bg-orange-dark disabled:opacity-50"
+            >
+              {isApplying ? 'Applying…' : 'Approve & apply'}
+            </button>
+            <button
+              type="button"
+              onClick={dismiss}
+              disabled={isApplying}
+              className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+// --------------------------------------------------------------------------------
 export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
   const { role, isAdmin, user } = useAuth();
   const [member, setMember] = useState<MemberDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [enriching, setEnriching] = useState(false);
+  const [enrichError, setEnrichError] = useState<string | null>(null);
+  const [enrichmentResult, setEnrichmentResult] = useState<EnrichmentResult | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<EditFormState | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-
   const loadMember = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -297,24 +405,84 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
       setLoading(false);
     }
   }, [memberId, role]);
-
   useEffect(() => {
     let cancelled = false;
-    loadMember().then(() => {
+    async function run() {
+      // Yield so enrich resets / loadMember setState aren't sync inside the effect.
+      await Promise.resolve();
       if (cancelled) return;
-    });
+      setEnrichError(null);
+      setEnriching(false);
+      setEnrichmentResult(null);
+      await loadMember();
+    }
+    void run();
     return () => {
       cancelled = true;
     };
   }, [loadMember]);
-
+  const reloadMember = async () => {
+    await loadMember();
+  };
+  const handleEnrich = async () => {
+    setEnriching(true);
+    setEnrichError(null);
+    try {
+      const startResponse = await fetch(
+        `http://localhost:3000/members/${memberId}/enrich`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ run_type: 'manual' }),
+        },
+      );
+      if (!startResponse.ok) {
+        throw new Error('Failed to start enrichment');
+      }
+      const startData = await startResponse.json();
+      const enrichmentId = startData.enrichment_id as string | undefined;
+      if (!enrichmentId) {
+        throw new Error('No enrichment_id returned');
+      }
+      const pollIntervalMs = 5_000;
+      const maxAttempts = 36;
+      let finishedResult: EnrichmentResult | null = null;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+        const statusResponse = await fetch(
+          `http://localhost:3000/enrich/status/${enrichmentId}`,
+        );
+        if (!statusResponse.ok) {
+          throw new Error('Failed to fetch enrichment status');
+        }
+        const pollingResponse = await statusResponse.json();
+        if (pollingResponse.status === 'FINISHED') {
+          const contact = pollingResponse.datas?.[0]?.contact ?? null;
+          finishedResult = {
+            enrichment_id: enrichmentId,
+            status: pollingResponse.status,
+            contact,
+          };
+          break;
+        }
+      }
+      if (!finishedResult) {
+        setEnrichError('Enrichment is taking longer than expected — check back later');
+        return;
+      }
+      setEnrichmentResult(finishedResult);
+    } catch {
+      setEnrichError('Enrichment failed — please try again later');
+    } finally {
+      setEnriching(false);
+    }
+  };
   // Jump to the top of the card the moment a different member is selected,
   // rather than keeping whatever scroll position was left over from the
   // previously viewed member's (likely differently-sized) profile.
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0 });
   }, [memberId]);
-
   // Only show the full-page "Loading…" placeholder on a genuinely first
   // load, when there's no member data at all yet. When switching from one
   // already-loaded member to another, keep the previous member's content
@@ -329,7 +497,6 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
       </div>
     );
   }
-
   if (error || !member) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -337,13 +504,12 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
       </div>
     );
   }
-
   const { profile } = member;
   const userEditableEntries = member.member_data.filter((e) => e.tier === 'user_editable');
   const adminOnlyEntries = member.member_data.filter((e) => e.tier === 'admin_only');
   const currentRole =
     member.employment_history.find((entry) => entry.is_current)?.role ?? null;
-
+  const canEnrich = isAdmin || user?.email === member.email;
   const startEditing = () => {
     setSaveError(null);
     setEditForm({
@@ -359,25 +525,23 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
       state_region: profile.state_region ?? '',
       city: profile.city ?? '',
       bucket: profile.bucket ?? '',
-      fit_score: profile.fit_score !== null && profile.fit_score !== undefined ? String(profile.fit_score) : '',
+      fit_score:
+        profile.fit_score !== null && profile.fit_score !== undefined ? String(profile.fit_score) : '',
       tag_note: profile.tag_note ?? '',
     });
     setIsEditing(true);
   };
-
   const cancelEditing = () => {
     setIsEditing(false);
     setEditForm(null);
     setSaveError(null);
   };
-
   const handleEditChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = e.target;
     setEditForm((prev) => (prev ? { ...prev, [name]: value } : prev));
   };
-
   const handleSaveEdit = async () => {
     if (!editForm || !user?.id) return;
     setIsSaving(true);
@@ -409,7 +573,6 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
       setIsSaving(false);
     }
   };
-
   const identityFields: ProfileField[] = [
     { label: 'Email', value: member.email },
     { label: 'LinkedIn', value: member.linkedin_url },
@@ -438,84 +601,96 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
   const adminProfileFields: ProfileField[] = isAdmin
     ? [
         { label: 'ICP', value: profile.icp },
-        { label: 'Bucket', value: profile.bucket },
+        { label: 'Bucket', value: profile.bucket ? (BUCKET_LABELS[profile.bucket] ?? profile.bucket) : null },
         {
           label: 'Fit score',
-          value: profile.fit_score !== null && profile.fit_score !== undefined ? String(profile.fit_score) : null,
+          value:
+            profile.fit_score !== null && profile.fit_score !== undefined ? String(profile.fit_score) : null,
         },
         { label: 'Tag note', value: profile.tag_note },
       ]
     : [];
-
   return (
     <div ref={scrollRef} className={`h-full overflow-y-auto ${loading ? 'opacity-60 transition-opacity' : ''}`}>
       <div className="border-b border-slate-200 bg-white px-6 py-5">
         <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <AvatarCircle avatarUrl={profile.avatar_url} firstName={member.first_name} />
-          <div className="min-w-0 flex-1">
-            <h2 className="text-xl font-semibold text-slate-900">
-              {fullName(member.first_name, member.last_name)}
-            </h2>
-            <p className="mt-1 text-sm text-slate-600">
-              {currentRole ?? '—'}
-              {profile.company_name ? (
-                <>
-                  {' · '}
-                  {profile.company_id ? (
-                    <Link
-                      to={`/companies/${profile.company_id}`}
-                      state={{ fromMemberId: memberId }}
-                      className="font-medium text-orange-dark hover:text-orange hover:underline"
-                    >
-                      {profile.company_name}
-                    </Link>
-                  ) : (
-                    profile.company_name
-                  )}
-                </>
-              ) : null}
-            </p>
-            <p className="mt-2 text-xs text-slate-400">
-              Last updated {formatTimestamp(member.last_updated)}
-              {profile.updated_at !== member.last_updated && (
-                <> · Profile updated {formatTimestamp(profile.updated_at)}</>
+          <div className="flex items-start gap-4">
+            <AvatarCircle avatarUrl={profile.avatar_url} firstName={member.first_name} />
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xl font-semibold text-slate-900">
+                {fullName(member.first_name, member.last_name)}
+              </h2>
+              <p className="mt-1 text-sm text-slate-600">
+                {currentRole ?? '—'}
+                {profile.company_name ? (
+                  <>
+                    {' · '}
+                    {profile.company_id ? (
+                      <Link
+                        to={`/companies/${profile.company_id}`}
+                        state={{ fromMemberId: memberId }}
+                        className="font-medium text-orange-dark hover:text-orange hover:underline"
+                      >
+                        {profile.company_name}
+                      </Link>
+                    ) : (
+                      profile.company_name
+                    )}
+                  </>
+                ) : null}
+              </p>
+              <p className="mt-2 text-xs text-slate-400">
+                Last updated {formatTimestamp(member.last_updated)}
+                {profile.updated_at !== member.last_updated && (
+                  <> · Profile updated {formatTimestamp(profile.updated_at)}</>
+                )}
+              </p>
+              {enrichError && (
+                <p className="mt-2 text-xs text-red-600">{enrichError}</p>
               )}
-            </p>
+            </div>
           </div>
-        </div>
-        {isAdmin && (
           <div className="flex shrink-0 items-center gap-2">
-            {isEditing ? (
-              <>
-                <button
-                  type="button"
-                  onClick={cancelEditing}
-                  disabled={isSaving}
-                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveEdit}
-                  disabled={isSaving}
-                  className="rounded-md bg-orange px-3 py-1.5 text-sm font-medium text-white hover:bg-orange-dark disabled:opacity-50"
-                >
-                  {isSaving ? 'Saving…' : 'Save changes'}
-                </button>
-              </>
-            ) : (
+            {canEnrich && (
               <button
                 type="button"
-                onClick={startEditing}
-                className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                onClick={handleEnrich}
+                disabled={enriching}
+                className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Edit profile
+                {enriching ? 'Enriching…' : 'Enrich profile'}
               </button>
             )}
+            {isAdmin &&
+              (isEditing ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={cancelEditing}
+                    disabled={isSaving}
+                    className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveEdit}
+                    disabled={isSaving}
+                    className="rounded-md bg-orange px-3 py-1.5 text-sm font-medium text-white hover:bg-orange-dark disabled:opacity-50"
+                  >
+                    {isSaving ? 'Saving…' : 'Save changes'}
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={startEditing}
+                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Edit profile
+                </button>
+              ))}
           </div>
-        )}
         </div>
         {saveError && (
           <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -720,6 +895,14 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
             tierColor="orange"
           >
             <div className="space-y-4">
+              {!isEditing && (
+                <IcpScoringAssistant
+                  memberId={memberId}
+                  currentBucket={profile.bucket}
+                  currentFitScore={profile.fit_score}
+                  onApplied={loadMember}
+                />
+              )}
               {isEditing && editForm ? (
                 <div className="grid grid-cols-2 gap-4 rounded-lg border border-orange/20 bg-orange/5 p-4">
                   <div className="flex flex-col gap-1.5">
@@ -769,10 +952,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
               {adminOnlyEntries.length > 0 ? (
                 <div className="space-y-3">
                   {adminOnlyEntries
-                    .sort(
-                      (a, b) =>
-                        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-                    )
+                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                     .map((entry) => (
                       <AdminDataEntry key={entry.id} entry={entry} />
                     ))}
@@ -793,6 +973,22 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
           </section>
         )}
       </div>
+      {enrichmentResult && (
+        <EnrichmentReviewPanel
+          memberId={memberId}
+          existingMember={member}
+          enrichedData={enrichmentResult}
+          onClose={() => {
+            setEnrichmentResult(null);
+            setEnriching(false);
+          }}
+          onApplied={async () => {
+            setEnrichmentResult(null);
+            setEnriching(false);
+            await reloadMember();
+          }}
+        />
+      )}
     </div>
   );
 }

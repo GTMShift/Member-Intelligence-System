@@ -69,13 +69,11 @@ export function CompanyDetailPage() {
   const fromMemberId = (location.state as CompanyLocationState | null)?.fromMemberId;
 
   const [company, setCompany] = useState<CompanyDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(() => Boolean(id));
+  const [error, setError] = useState<string | null>(() => (id ? null : 'Company not found.'));
 
   useEffect(() => {
     if (!id) {
-      setError('Company not found.');
-      setLoading(false);
       return;
     }
 
@@ -112,6 +110,9 @@ export function CompanyDetailPage() {
     };
   }, [id]);
 
+  const displayLoading = !id ? false : loading;
+  const displayError = !id ? 'Company not found.' : error;
+
   const handleBack = () => {
     if (fromMemberId) {
       navigate('/', { state: { selectedMemberId: fromMemberId } });
@@ -120,7 +121,7 @@ export function CompanyDetailPage() {
     }
   };
 
-  if (loading) {
+  if (displayLoading) {
     return (
       <div className="flex h-full items-center justify-center">
         <p className="text-sm text-slate-500">Loading company…</p>
@@ -128,10 +129,10 @@ export function CompanyDetailPage() {
     );
   }
 
-  if (error || !company) {
+  if (displayError || !company) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4 p-8">
-        <p className="text-sm text-red-600">{error ?? 'Company not found.'}</p>
+        <p className="text-sm text-red-600">{displayError ?? 'Company not found.'}</p>
         <button
           type="button"
           onClick={handleBack}

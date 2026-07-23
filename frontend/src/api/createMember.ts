@@ -1,117 +1,117 @@
 // src/api/createMember.ts
 import { supabase } from '../lib/supabaseClient';
 
+export interface SocialEntry {
+  platform: 'Twitter/X' | 'Instagram' | 'TikTok' | 'YouTube' | 'Facebook';
+  username: string;
+  url?: string;
+}
+
 export interface CreateMemberInput {
-  // Core identity
   first_name: string;
   last_name: string;
   email: string;
   linkedin_url: string;
   phone: string | null;
 
-  // Profile
-  job_title: string | null;
-  current_job_start_date: string | null;
-  seniority_level: string | null;
+  team_size: number | null;
   company_name: string | null;
-  country: string | null;
-  state_region: string | null;
-  city: string | null;
-  signup_source: 'Website' | 'Luma' | 'Substack' | 'Manual';
+  current_role: string | null;
+  seniority_level: string | null;
+  current_start_date: string | null;
+  oversees_other: boolean;
+  oversees_other_text: string | null;
+  management_layers: string | null;
+  event_interest: string | null;
+  oversees_customer_success: boolean;
+  oversees_demo_engineering: boolean;
+  oversees_enablement: boolean;
+  oversees_forward_deployed_engineering: boolean;
+  oversees_implementation_onboarding: boolean;
+  oversees_partnerships_channel_se: boolean;
+  oversees_professional_services: boolean;
+  oversees_solutions_architecture: boolean;
+  oversees_solutions_engineering_consulting: boolean;
+  oversees_value_engineering: boolean;
+  region_north_america: boolean;
+  region_regional_usa: boolean;
+  region_global: boolean;
+  region_emea: boolean;
+  region_apac: boolean;
+  region_latin_america: boolean;
 
-  // ICP classification
-  bucket: 'icp_member' | 'between_roles' | 'adjacent_remit' | 'consultant' | 'sponsor' | 'personal_connection' | null;
+  address: string | null;
+  city: string | null;
+  state_region: string | null;
+  zip_code: string | null;
+  country: string | null;
+  tshirt_size: 'XS' | 'S' | 'M' | 'L' | 'XL' | 'XXL' | null;
+  dietary_restrictions: string | null;
+  socials: SocialEntry[];
+
+  bucket: 'primary_icp' | 'secondary_icp' | 'watchlist' | 'between_jobs' | 'consultant' | 'partner_sponsor' | 'icp_no' | 'manual_review' | null;
   fit_score: number | null;
   tag_note: string | null;
 }
 
-async function findOrCreateCompany(companyName: string | null): Promise<string | null> {
-  const name = companyName?.trim();
-  if (!name) return null;
-
-  // Uses .limit(1) + array check instead of .maybeSingle(), since .maybeSingle()
-  // throws an error (not just returns null) if more than one company happens to
-  // share a similar name — which would otherwise surface as a confusing failure.
-  const { data: matches, error: findErr } = await supabase
-    .from('companies')
-    .select('id')
-    .ilike('name', name)
-    .limit(1);
-  if (findErr) throw new Error(`Company lookup failed: ${findErr.message}`);
-  if (matches && matches.length > 0) return matches[0].id;
-
-  const { data: created, error: createErr } = await supabase
-    .from('companies')
-    .insert({ name })
-    .select('id')
-    .single();
-  if (createErr) throw new Error(`Failed to create company: ${createErr.message}`);
-  return created.id;
-}
-
 export async function createMember(input: CreateMemberInput): Promise<{ id: string } | null> {
-  // Step 1: Insert into members table
-  const { data: member, error: memberError } = await supabase
-    .from('members')
-    .insert({
-      first_name: input.first_name,
-      last_name: input.last_name,
-      email: input.email,
-      linkedin_url: input.linkedin_url,
-      phone: input.phone,
-    })
-    .select('id')
-    .single();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  if (memberError || !member) {
-    throw new Error(memberError?.message ?? 'Failed to create member');
+  const { data, error } = await supabase.rpc('create_member_full', {
+    p_first_name: input.first_name,
+    p_last_name: input.last_name,
+    p_email: input.email,
+    p_linkedin_url: input.linkedin_url,
+    p_phone: input.phone,
+    p_company_name: input.company_name,
+    p_current_role: input.current_role,
+    p_seniority_level: input.seniority_level,
+    p_current_start_date: input.current_start_date,
+    p_team_size: input.team_size,
+    p_management_layers: input.management_layers,
+    p_event_interest: input.event_interest,
+    p_address: input.address,
+    p_city: input.city,
+    p_state_region: input.state_region,
+    p_zip_code: input.zip_code,
+    p_country: input.country,
+    p_tshirt_size: input.tshirt_size,
+    p_dietary_restrictions: input.dietary_restrictions,
+    p_bucket: input.bucket,
+    p_fit_score: input.fit_score,
+    p_tag_note: input.tag_note,
+    p_tagged_by: user?.id ?? null,
+    p_oversees_customer_success: input.oversees_customer_success,
+    p_oversees_demo_engineering: input.oversees_demo_engineering,
+    p_oversees_enablement: input.oversees_enablement,
+    p_oversees_forward_deployed_engineering: input.oversees_forward_deployed_engineering,
+    p_oversees_implementation_onboarding: input.oversees_implementation_onboarding,
+    p_oversees_partnerships_channel_se: input.oversees_partnerships_channel_se,
+    p_oversees_professional_services: input.oversees_professional_services,
+    p_oversees_solutions_architecture: input.oversees_solutions_architecture,
+    p_oversees_solutions_engineering_consulting: input.oversees_solutions_engineering_consulting,
+    p_oversees_value_engineering: input.oversees_value_engineering,
+    p_oversees_other: input.oversees_other,
+    p_oversees_other_text: input.oversees_other_text,
+    p_region_north_america: input.region_north_america,
+    p_region_regional_usa: input.region_regional_usa,
+    p_region_global: input.region_global,
+    p_region_emea: input.region_emea,
+    p_region_apac: input.region_apac,
+    p_region_latin_america: input.region_latin_america,
+    p_socials: input.socials.length > 0
+    ? input.socials.map((s) => ({
+      platform: s.platform,
+      username: s.username,
+      url: s.url || null,
+    }))
+  : null,
+});
+
+  if (error) {
+    console.error('Error creating member:', error);
+    throw new Error(error.message);
   }
 
-  // Step 2: Resolve (or create) the company — this actually gets saved now,
-  // unlike before, where company_name was collected on the form but silently
-  // discarded.
-  const companyId = await findOrCreateCompany(input.company_name);
-
-  // Step 3: Insert into member_profile.
-  // bucket/fit_score/tag_note live directly on member_profile (added via
-  // migration), not a separate member_tags table — that table only ever
-  // existed in the sandbox schema, not public, so writing there previously
-  // errored out whenever an admin selected a bucket.
-  const { error: profileError } = await supabase.from('member_profile').insert({
-    member_id: member.id,
-    seniority_level: input.seniority_level,
-    country: input.country,
-    state_region: input.state_region,
-    city: input.city,
-    company_id: companyId,
-    signup_source: input.signup_source,
-    bucket: input.bucket,
-    fit_score: input.fit_score,
-    tag_note: input.tag_note,
-    tagged_manually: input.bucket ? true : null,
-    tagged_at: input.bucket ? new Date().toISOString() : null,
-  });
-
-  if (profileError) {
-    throw new Error(`Failed to create member profile: ${profileError.message}`);
-  }
-
-  // Step 4: Job title lives in employment_history, not member_profile
-  // (job_title was intentionally dropped from member_profile in the schema
-  // redesign — employment_history with is_current is the source of truth).
-  if (input.job_title) {
-    const { error: employmentError } = await supabase.from('employment_history').insert({
-      member_id: member.id,
-      company: input.company_name,
-      role: input.job_title,
-      start_date: input.current_job_start_date,
-      is_current: true,
-      source: 'Manual',
-    });
-    if (employmentError) {
-      throw new Error(`Failed to create employment history: ${employmentError.message}`);
-    }
-  }
-
-  return { id: member.id };
+  return { id: data as string };
 }
