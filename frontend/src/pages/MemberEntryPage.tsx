@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createMember, type CreateMemberInput, type SocialEntry } from '../api/createMember';
- 
+
 const BUCKET_OPTIONS = [
   { value: '', label: 'Select a category' },
   { value: 'primary_icp', label: 'Primary ICP' },
@@ -13,13 +13,13 @@ const BUCKET_OPTIONS = [
   { value: 'icp_no', label: 'ICP No' },
   { value: 'manual_review', label: 'Manual Review' },
 ];
- 
+
 const ICP_SCORE_BUCKETS = ['primary_icp', 'secondary_icp'];
- 
+
 const SOCIAL_PLATFORMS = ['Twitter/X', 'Instagram', 'TikTok', 'YouTube', 'Facebook'] as const;
- 
+
 const TSHIRT_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'] as const;
- 
+
 const MANAGEMENT_LAYER_OPTIONS = [
   { value: '', label: 'Select layers' },
   { value: '1', label: '1 layer' },
@@ -27,7 +27,7 @@ const MANAGEMENT_LAYER_OPTIONS = [
   { value: '3', label: '3 layers' },
   { value: '4+', label: '4+ layers' },
 ];
- 
+
 const TEAM_FIELDS = [
   { key: 'oversees_solutions_engineering_consulting', label: 'Solutions Engineering / Consulting' },
   { key: 'oversees_customer_success', label: 'Customer Success' },
@@ -41,7 +41,7 @@ const TEAM_FIELDS = [
   { key: 'oversees_implementation_onboarding', label: 'Implementation / Onboarding' },
   { key: 'oversees_other', label: 'Other' },
 ] as const;
- 
+
 const REGION_FIELDS = [
   { key: 'region_north_america', label: 'North America' },
   { key: 'region_regional_usa', label: 'Regional USA' },
@@ -50,10 +50,10 @@ const REGION_FIELDS = [
   { key: 'region_apac', label: 'APAC' },
   { key: 'region_latin_america', label: 'Latin America' },
 ] as const;
- 
+
 type TeamKey = typeof TEAM_FIELDS[number]['key'];
 type RegionKey = typeof REGION_FIELDS[number]['key'];
- 
+
 type FormState = {
   first_name: string;
   last_name: string;
@@ -96,7 +96,7 @@ type FormState = {
   fit_score: string;
   tag_note: string;
 };
- 
+
 const INITIAL_STATE: FormState = {
   first_name: '',
   last_name: '',
@@ -139,9 +139,9 @@ const INITIAL_STATE: FormState = {
   fit_score: '',
   tag_note: '',
 };
- 
+
 const EMPTY_SOCIAL: SocialEntry = { platform: 'Twitter/X', username: '', url: '' };
- 
+
 export function MemberEntryPage() {
   const navigate = useNavigate();
   const [form, setForm] = useState<FormState>(INITIAL_STATE);
@@ -149,9 +149,9 @@ export function MemberEntryPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
- 
+
   const showFitScore = ICP_SCORE_BUCKETS.includes(form.bucket);
- 
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
   ) => {
@@ -161,28 +161,28 @@ export function MemberEntryPage() {
       setForm((prev) => ({ ...prev, bucket: value, fit_score: '' }));
     }
   };
- 
+
   const toggleBoolean = (field: TeamKey | RegionKey) => {
     setForm((prev) => ({ ...prev, [field]: !prev[field] }));
   };
- 
+
   const addSocial = () => {
     setSocials((prev) => [...prev, { ...EMPTY_SOCIAL }]);
   };
- 
+
   const removeSocial = (index: number) => {
     setSocials((prev) => prev.filter((_, i) => i !== index));
   };
- 
+
   const updateSocial = (index: number, field: keyof SocialEntry, value: string) => {
     setSocials((prev) => prev.map((s, i) => i === index ? { ...s, [field]: value } : s));
   };
- 
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
- 
+
     try {
       const input: CreateMemberInput = {
         first_name: form.first_name.trim(),
@@ -227,9 +227,9 @@ export function MemberEntryPage() {
         fit_score: form.fit_score ? parseInt(form.fit_score, 10) : null,
         tag_note: form.tag_note.trim() || null,
       };
- 
+
       const created = await createMember(input);
- 
+
       if (created?.id) {
         setSuccess(true);
         setForm(INITIAL_STATE);
@@ -241,31 +241,32 @@ export function MemberEntryPage() {
       setLoading(false);
     }
   };
- 
+
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="border-b border-slate-200 bg-white">
+      {/* Header */}
+      <header className="bg-charcoal">
         <div className="mx-auto flex max-w-[90rem] items-center justify-between px-4 py-4 sm:px-6">
           <div>
-            <h1 className="text-lg font-semibold text-slate-900">
+            <h1 className="text-lg font-semibold text-white">
               SolutionExec Member Intelligence Platform
             </h1>
-            <p className="text-sm text-slate-500">Add new member</p>
+            <p className="text-sm text-white/60">Add new member</p>
           </div>
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="rounded-md border border-white/20 bg-transparent px-3 py-1.5 text-sm font-medium text-white/80 hover:bg-white/10 hover:text-white"
           >
-            Back to dashboard
+            ← Back to dashboard
           </button>
         </div>
       </header>
- 
-      <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 sm:px-6">
+
+      <main className="mx-auto w-full max-w-2xl flex-1 bg-surface px-4 py-8 sm:px-6">
         {success && (
-          <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3">
-            <p className="text-sm font-medium text-green-800">
+          <div className="mb-6 rounded-lg border border-sage bg-sage-tint px-4 py-3">
+            <p className="text-sm font-medium text-ink">
               Member added successfully.{' '}
               <button type="button" className="underline" onClick={() => setSuccess(false)}>
                 Add another
@@ -278,15 +279,15 @@ export function MemberEntryPage() {
             </p>
           </div>
         )}
- 
+
         {error && (
           <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
             <p className="text-sm text-red-700">{error}</p>
           </div>
         )}
- 
+
         <form onSubmit={handleSubmit} className="space-y-6">
- 
+
           {/* Section 1 — Profile Information */}
           <section className="rounded-xl border border-slate-200 bg-white p-6">
             <h2 className="mb-4 text-sm font-semibold text-slate-900">Profile Information</h2>
@@ -302,7 +303,7 @@ export function MemberEntryPage() {
                   onChange={handleChange}
                   required
                   placeholder="Jane"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -316,7 +317,7 @@ export function MemberEntryPage() {
                   onChange={handleChange}
                   required
                   placeholder="Smith"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -330,7 +331,7 @@ export function MemberEntryPage() {
                   onChange={handleChange}
                   required
                   placeholder="jane@company.com"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -346,7 +347,7 @@ export function MemberEntryPage() {
                   placeholder="+12025551234"
                   pattern="^\+[1-9]\d{1,14}$"
                   title="Phone number must be in E.164 format e.g. +12025551234"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
                 />
                 <span className="text-xs text-slate-400">Format: +12025551234</span>
               </div>
@@ -361,12 +362,12 @@ export function MemberEntryPage() {
                   onChange={handleChange}
                   required
                   placeholder="https://linkedin.com/in/janesmith"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
                 />
               </div>
             </div>
           </section>
- 
+
           {/* Section 2 — Organizational Details */}
           <section className="rounded-xl border border-slate-200 bg-white p-6">
             <h2 className="mb-4 text-sm font-semibold text-slate-900">Organizational Details</h2>
@@ -383,7 +384,7 @@ export function MemberEntryPage() {
                     onChange={handleChange}
                     required
                     placeholder="Acme Corp"
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -398,7 +399,7 @@ export function MemberEntryPage() {
                     required
                     min={0}
                     placeholder="e.g. 25"
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -412,7 +413,7 @@ export function MemberEntryPage() {
                     onChange={handleChange}
                     required
                     placeholder="Director of Solutions Engineering"
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -424,7 +425,7 @@ export function MemberEntryPage() {
                     value={form.seniority_level}
                     onChange={handleChange}
                     required
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                   >
                     <option value="">Select seniority</option>
                     <option value="Global VP">Global VP</option>
@@ -449,7 +450,7 @@ export function MemberEntryPage() {
                     value={form.current_start_date}
                     onChange={handleChange}
                     required
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -461,7 +462,7 @@ export function MemberEntryPage() {
                     value={form.management_layers}
                     onChange={handleChange}
                     required
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                   >
                     {MANAGEMENT_LAYER_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>
@@ -478,11 +479,11 @@ export function MemberEntryPage() {
                     value={form.event_interest}
                     onChange={handleChange}
                     placeholder="What do you want to get out of this event?"
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
                   />
                 </div>
               </div>
- 
+
               {/* Teams */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-slate-600">
@@ -496,7 +497,7 @@ export function MemberEntryPage() {
                       onClick={() => toggleBoolean(team.key)}
                       className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                         form[team.key]
-                          ? 'border-slate-900 bg-slate-900 text-white'
+                          ? 'border-orange bg-orange text-white'
                           : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'
                       }`}
                     >
@@ -511,11 +512,11 @@ export function MemberEntryPage() {
                     value={form.oversees_other_text}
                     onChange={handleChange}
                     placeholder="Describe the team..."
-                    className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                    className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
                   />
                 )}
               </div>
- 
+
               {/* Regions */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-slate-600">
@@ -529,7 +530,7 @@ export function MemberEntryPage() {
                       onClick={() => toggleBoolean(region.key)}
                       className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                         form[region.key]
-                          ? 'border-slate-900 bg-slate-900 text-white'
+                          ? 'border-orange bg-orange text-white'
                           : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'
                       }`}
                     >
@@ -540,7 +541,7 @@ export function MemberEntryPage() {
               </div>
             </div>
           </section>
- 
+
           {/* Section 3 — Personal Details */}
           <section className="rounded-xl border border-slate-200 bg-white p-6">
             <h2 className="mb-4 text-sm font-semibold text-slate-900">Personal Details</h2>
@@ -557,7 +558,7 @@ export function MemberEntryPage() {
                     onChange={handleChange}
                     required
                     placeholder="123 Main St"
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -571,7 +572,7 @@ export function MemberEntryPage() {
                     onChange={handleChange}
                     required
                     placeholder="Chicago"
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -585,7 +586,7 @@ export function MemberEntryPage() {
                     onChange={handleChange}
                     required
                     placeholder="Illinois"
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -599,7 +600,7 @@ export function MemberEntryPage() {
                     onChange={handleChange}
                     required
                     placeholder="60601"
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -613,7 +614,7 @@ export function MemberEntryPage() {
                     onChange={handleChange}
                     required
                     placeholder="United States"
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -625,7 +626,7 @@ export function MemberEntryPage() {
                     value={form.tshirt_size}
                     onChange={handleChange}
                     required
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                   >
                     <option value="">Select size</option>
                     {TSHIRT_SIZES.map((size) => (
@@ -641,11 +642,11 @@ export function MemberEntryPage() {
                     value={form.dietary_restrictions}
                     onChange={handleChange}
                     placeholder="e.g. Vegetarian, Gluten free"
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
                   />
                 </div>
               </div>
- 
+
               {/* Social media */}
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-medium text-slate-600">Social media</label>
@@ -654,7 +655,7 @@ export function MemberEntryPage() {
                     <select
                       value={social.platform}
                       onChange={(e) => updateSocial(index, 'platform', e.target.value)}
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                     >
                       {SOCIAL_PLATFORMS.map((p) => (
                         <option key={p} value={p}>{p}</option>
@@ -665,14 +666,14 @@ export function MemberEntryPage() {
                       value={social.username}
                       onChange={(e) => updateSocial(index, 'username', e.target.value)}
                       placeholder="Username"
-                      className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                      className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
                     />
                     <input
                       type="url"
                       value={social.url ?? ''}
                       onChange={(e) => updateSocial(index, 'url', e.target.value)}
                       placeholder="URL (optional)"
-                      className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                      className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
                     />
                     <button
                       type="button"
@@ -693,11 +694,11 @@ export function MemberEntryPage() {
               </div>
             </div>
           </section>
- 
+
           {/* Section 4 — ICP Classification */}
-          <section className="rounded-xl border border-slate-200 bg-white p-6">
+          <section className="rounded-xl border border-orange/25 bg-orange/5 p-6">
             <h2 className="mb-1 text-sm font-semibold text-slate-900">ICP Classification</h2>
-            <p className="mb-4 text-xs text-slate-500">Internal only — members never see this</p>
+            <p className="mb-4 text-xs text-orange-dark">Internal only — members never see this</p>
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-slate-600">
@@ -708,7 +709,7 @@ export function MemberEntryPage() {
                   value={form.bucket}
                   onChange={handleChange}
                   required
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 >
                   {BUCKET_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -728,7 +729,7 @@ export function MemberEntryPage() {
                     min={0}
                     max={100}
                     placeholder="e.g. 85"
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
                   />
                 </div>
               )}
@@ -740,12 +741,12 @@ export function MemberEntryPage() {
                   onChange={handleChange}
                   rows={2}
                   placeholder="Optional context, e.g. how this person was connected"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
                 />
               </div>
             </div>
           </section>
- 
+
           {/* Actions */}
           <div className="flex items-center justify-between pb-8">
             <button
@@ -758,7 +759,7 @@ export function MemberEntryPage() {
             <button
               type="submit"
               disabled={loading}
-              className="rounded-md bg-slate-900 px-6 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+              className="rounded-md bg-orange px-6 py-2 text-sm font-medium text-white hover:bg-orange-dark disabled:opacity-50"
             >
               {loading ? 'Adding member...' : 'Add member'}
             </button>

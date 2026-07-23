@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getMember } from '../api/membersApi';
 import { updateMemberAsAdmin, type AdminUpdateMemberInput } from '../api/adminUpdateMember';
@@ -8,7 +8,6 @@ import type { EnrichmentResult, MemberDataEntry, MemberDetail } from '../types/a
 import { formatTimestamp, fullName } from '../utils/format';
 import { EnrichmentReviewPanel } from './EnrichmentReviewPanel';
 import { InteractionTimeline } from './InteractionTimeline';
-
 // NOTE: aligned to the icp_bucket enum from migration 021 / Meghan's taxonomy.
 // If these values drift from the DB enum, the bucket <select> will silently
 // fail to persist on save (Postgres will reject the enum value).
@@ -23,11 +22,9 @@ const BUCKET_OPTIONS = [
   { value: 'icp_no', label: 'Not ICP' },
   { value: 'manual_review', label: 'Manual Review' },
 ] as const;
-
 const BUCKET_LABELS: Record<string, string> = Object.fromEntries(
   BUCKET_OPTIONS.filter((o) => o.value).map((o) => [o.value, o.label]),
 );
-
 // NOTE: aligned to the seniority tiers used by calculate_fit_score's scoring
 // table (Global VP/SVP=50, VP=45, Senior Director=35, Director=30). If the
 // member_profile.seniority_level column still stores the old labels
@@ -43,7 +40,6 @@ const SENIORITY_OPTIONS = [
   { value: 'Manager', label: 'Manager' },
   { value: 'Individual Contributor', label: 'Individual Contributor' },
 ] as const;
-
 type EditFormState = {
   first_name: string;
   last_name: string;
@@ -60,7 +56,6 @@ type EditFormState = {
   fit_score: string;
   tag_note: string;
 };
-
 function normalizeLinkedInUrl(input: string): string {
   let url = input.trim();
   if (!url) return url;
@@ -70,35 +65,43 @@ function normalizeLinkedInUrl(input: string): string {
   }
   return `https://${url}`;
 }
-
 interface MemberProfileCardProps {
   memberId: string;
 }
-
 interface ProfileField {
   label: string;
   value: string | null | undefined;
 }
-
+// Values over this length stack (label above, left-aligned text below)
+// instead of sitting inline as a row — a right-aligned paragraph reads badly.
+const LONG_VALUE_THRESHOLD = 50;
 function FieldGrid({ fields }: { fields: ProfileField[] }) {
   const visible = fields.filter((f) => f.value);
   if (visible.length === 0) {
     return <p className="text-sm text-slate-500">No data available.</p>;
   }
   return (
-    <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-      {visible.map((field) => (
-        <div key={field.label}>
-          <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-            {field.label}
-          </dt>
-          <dd className="mt-0.5 text-sm text-slate-900">{field.value}</dd>
-        </div>
-      ))}
+    <dl className="divide-y divide-slate-100">
+      {visible.map((field) => {
+        const isLong = (field.value?.length ?? 0) > LONG_VALUE_THRESHOLD;
+        if (isLong) {
+          return (
+            <div key={field.label} className="py-1.5">
+              <dt className="text-sm text-slate-500">{field.label}</dt>
+              <dd className="mt-0.5 text-sm text-slate-900">{field.value}</dd>
+            </div>
+          );
+        }
+        return (
+          <div key={field.label} className="flex items-baseline justify-between gap-4 py-1.5">
+            <dt className="shrink-0 text-sm text-slate-500">{field.label}</dt>
+            <dd className="text-right text-sm text-slate-900">{field.value}</dd>
+          </div>
+        );
+      })}
     </dl>
   );
 }
-
 function TierSection({
   title,
   description,
@@ -107,18 +110,18 @@ function TierSection({
 }: {
   title: string;
   description: string;
-  tierColor: 'blue' | 'violet' | 'amber';
+  tierColor: 'neutral' | 'sage' | 'orange';
   children: React.ReactNode;
 }) {
   const borderColors = {
-    blue: 'border-blue-200',
-    violet: 'border-violet-200',
-    amber: 'border-amber-200',
+    neutral: 'border-charcoal/15',
+    sage: 'border-sage/30',
+    orange: 'border-orange/25',
   };
   const badgeColors = {
-    blue: 'bg-blue-100 text-blue-800',
-    violet: 'bg-violet-100 text-violet-800',
-    amber: 'bg-amber-100 text-amber-800',
+    neutral: 'bg-charcoal/5 text-charcoal',
+    sage: 'bg-sage-tint text-sage',
+    orange: 'bg-orange/10 text-orange-dark',
   };
   return (
     <section className={`rounded-xl border ${borderColors[tierColor]} bg-white p-5`}>
@@ -132,14 +135,12 @@ function TierSection({
     </section>
   );
 }
-
 const FEEDBACK_PROMPT_LABELS: Record<string, string> = {
   challenge: 'What are your top 3 challenges right now?',
   event_feedback: 'Event feedback',
   interest: 'Personal interests',
   mandate: 'Team dynamics / mandates',
 };
-
 function FeedbackPrompts({ entries }: { entries: MemberDataEntry[] }) {
   const feedbackEntries = entries.filter(
     (e) =>
@@ -157,15 +158,22 @@ function FeedbackPrompts({ entries }: { entries: MemberDataEntry[] }) {
   return (
     <div className="space-y-4">
       {Object.entries(grouped).map(([category, items]) => (
-        <div key={category} className="rounded-lg border-2 border-violet-200 bg-violet-50/50 p-4">
-          <h4 className="text-sm font-semibold text-violet-900">
+        <div
+          key={category}
+          className="rounded-lg border-2 border-sage/30 bg-sage-tint/50 p-4"
+        >
+          <h4 className="text-sm font-semibold text-sage">
             {FEEDBACK_PROMPT_LABELS[category] ?? category}
           </h4>
           <ul className="mt-3 space-y-3">
             {items
               .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
               .map((entry) => (
-                <li key={entry.id} className="rounded-md border border-violet-100 bg-white p-3">
+                <li
+                  key={entry.id}
+                  className="border-l-2 border-sage/50 py-0.5 pl-3"
+                  style={{ borderRadius: 0 }}
+                >
                   <FeedbackEntryContent entry={entry} />
                   <p className="mt-2 text-xs text-slate-400">
                     Submitted {formatTimestamp(entry.created_at)}
@@ -179,7 +187,6 @@ function FeedbackPrompts({ entries }: { entries: MemberDataEntry[] }) {
     </div>
   );
 }
-
 function FeedbackEntryContent({ entry }: { entry: MemberDataEntry }) {
   const { data, category } = entry;
   if (category === 'event_feedback') {
@@ -195,7 +202,6 @@ function FeedbackEntryContent({ entry }: { entry: MemberDataEntry }) {
   const text = typeof data.text === 'string' ? data.text : JSON.stringify(data);
   return <p className="text-sm text-slate-900">{text}</p>;
 }
-
 function AdminDataEntry({ entry }: { entry: MemberDataEntry }) {
   const { category } = entry;
   const categoryLabels: Record<string, string> = {
@@ -204,8 +210,8 @@ function AdminDataEntry({ entry }: { entry: MemberDataEntry }) {
     flag: 'Flag',
   };
   return (
-    <div className="rounded-md border border-amber-100 bg-amber-50/30 p-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">
+    <div className="border-l-2 border-orange/40 py-0.5 pl-3" style={{ borderRadius: 0 }}>
+      <p className="text-xs font-semibold text-orange-dark">
         {categoryLabels[category] ?? category}
       </p>
       <AdminEntryContent entry={entry} />
@@ -216,7 +222,6 @@ function AdminDataEntry({ entry }: { entry: MemberDataEntry }) {
     </div>
   );
 }
-
 function AdminEntryContent({ entry }: { entry: MemberDataEntry }) {
   const { data, category } = entry;
   if (category === 'transcript') {
@@ -236,7 +241,6 @@ function AdminEntryContent({ entry }: { entry: MemberDataEntry }) {
   const text = typeof data.text === 'string' ? data.text : JSON.stringify(data);
   return <p className="mt-1 text-sm text-slate-900">{text}</p>;
 }
-
 function AvatarCircle({
   avatarUrl,
   firstName,
@@ -256,9 +260,7 @@ function AvatarCircle({
     </div>
   );
 }
-
 // --- New: ICP Scoring Assistant -------------------------------------------------
-
 function IcpScoringAssistant({
   memberId,
   currentBucket,
@@ -275,7 +277,6 @@ function IcpScoringAssistant({
   const [isApplying, setIsApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [suggestion, setSuggestion] = useState<IcpBucketSuggestion | null>(null);
-
   const runScoring = async () => {
     setIsRunning(true);
     setError(null);
@@ -291,12 +292,10 @@ function IcpScoringAssistant({
       setIsRunning(false);
     }
   };
-
   const dismiss = () => {
     setSuggestion(null);
     setError(null);
   };
-
   const approve = async () => {
     if (!suggestion || !user?.id) return;
     setIsApplying(true);
@@ -315,7 +314,6 @@ function IcpScoringAssistant({
       setIsApplying(false);
     }
   };
-
   return (
     <div className="rounded-lg border border-amber-200 bg-amber-50/40 p-4">
       <div className="flex items-center justify-between gap-3">
@@ -337,13 +335,11 @@ function IcpScoringAssistant({
           {isRunning ? 'Running…' : 'Run scoring'}
         </button>
       </div>
-
       {error && (
         <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
         </p>
       )}
-
       {suggestion && (
         <div className="mt-3 rounded-md border border-amber-200 bg-white p-3">
           <p className="text-sm text-slate-900">
@@ -359,7 +355,7 @@ function IcpScoringAssistant({
               type="button"
               onClick={approve}
               disabled={isApplying}
-              className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+              className="rounded-md bg-orange px-3 py-1.5 text-sm font-medium text-white hover:bg-orange-dark disabled:opacity-50"
             >
               {isApplying ? 'Applying…' : 'Approve & apply'}
             </button>
@@ -377,9 +373,7 @@ function IcpScoringAssistant({
     </div>
   );
 }
-
 // --------------------------------------------------------------------------------
-
 export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
   const { role, isAdmin, user } = useAuth();
   const [member, setMember] = useState<MemberDetail | null>(null);
@@ -392,7 +386,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
   const [editForm, setEditForm] = useState<EditFormState | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-
+  const scrollRef = useRef<HTMLDivElement>(null);
   const loadMember = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -411,10 +405,8 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
       setLoading(false);
     }
   }, [memberId, role]);
-
   useEffect(() => {
     let cancelled = false;
-
     async function run() {
       // Yield so enrich resets / loadMember setState aren't sync inside the effect.
       await Promise.resolve();
@@ -424,21 +416,17 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
       setEnrichmentResult(null);
       await loadMember();
     }
-
     void run();
     return () => {
       cancelled = true;
     };
   }, [loadMember]);
-
   const reloadMember = async () => {
     await loadMember();
   };
-
   const handleEnrich = async () => {
     setEnriching(true);
     setEnrichError(null);
-
     try {
       const startResponse = await fetch(
         `http://localhost:3000/members/${memberId}/enrich`,
@@ -448,35 +436,26 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
           body: JSON.stringify({ run_type: 'manual' }),
         },
       );
-
       if (!startResponse.ok) {
         throw new Error('Failed to start enrichment');
       }
-
       const startData = await startResponse.json();
       const enrichmentId = startData.enrichment_id as string | undefined;
-
       if (!enrichmentId) {
         throw new Error('No enrichment_id returned');
       }
-
       const pollIntervalMs = 5_000;
       const maxAttempts = 36;
       let finishedResult: EnrichmentResult | null = null;
-
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
-
         const statusResponse = await fetch(
           `http://localhost:3000/enrich/status/${enrichmentId}`,
         );
-
         if (!statusResponse.ok) {
           throw new Error('Failed to fetch enrichment status');
         }
-
         const pollingResponse = await statusResponse.json();
-
         if (pollingResponse.status === 'FINISHED') {
           const contact = pollingResponse.datas?.[0]?.contact ?? null;
           finishedResult = {
@@ -487,12 +466,10 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
           break;
         }
       }
-
       if (!finishedResult) {
         setEnrichError('Enrichment is taking longer than expected — check back later');
         return;
       }
-
       setEnrichmentResult(finishedResult);
     } catch {
       setEnrichError('Enrichment failed — please try again later');
@@ -500,15 +477,26 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
       setEnriching(false);
     }
   };
-
-  if (loading) {
+  // Jump to the top of the card the moment a different member is selected,
+  // rather than keeping whatever scroll position was left over from the
+  // previously viewed member's (likely differently-sized) profile.
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 });
+  }, [memberId]);
+  // Only show the full-page "Loading…" placeholder on a genuinely first
+  // load, when there's no member data at all yet. When switching from one
+  // already-loaded member to another, keep the previous member's content
+  // visible (slightly dimmed) while the new one loads in the background —
+  // this avoids the content area suddenly collapsing to a tiny placeholder
+  // and then snapping back to full height, which is what caused the
+  // scroll-jump bug.
+  if (loading && !member) {
     return (
       <div className="flex h-full items-center justify-center">
         <p className="text-sm text-slate-500">Loading profile…</p>
       </div>
     );
   }
-
   if (error || !member) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -516,14 +504,12 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
       </div>
     );
   }
-
   const { profile } = member;
   const userEditableEntries = member.member_data.filter((e) => e.tier === 'user_editable');
   const adminOnlyEntries = member.member_data.filter((e) => e.tier === 'admin_only');
   const currentRole =
     member.employment_history.find((entry) => entry.is_current)?.role ?? null;
   const canEnrich = isAdmin || user?.email === member.email;
-
   const startEditing = () => {
     setSaveError(null);
     setEditForm({
@@ -545,20 +531,17 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
     });
     setIsEditing(true);
   };
-
   const cancelEditing = () => {
     setIsEditing(false);
     setEditForm(null);
     setSaveError(null);
   };
-
   const handleEditChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = e.target;
     setEditForm((prev) => (prev ? { ...prev, [name]: value } : prev));
   };
-
   const handleSaveEdit = async () => {
     if (!editForm || !user?.id) return;
     setIsSaving(true);
@@ -590,7 +573,6 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
       setIsSaving(false);
     }
   };
-
   const identityFields: ProfileField[] = [
     { label: 'Email', value: member.email },
     { label: 'LinkedIn', value: member.linkedin_url },
@@ -628,9 +610,8 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
         { label: 'Tag note', value: profile.tag_note },
       ]
     : [];
-
   return (
-    <div className="h-full overflow-y-auto">
+    <div ref={scrollRef} className={`h-full overflow-y-auto ${loading ? 'opacity-60 transition-opacity' : ''}`}>
       <div className="border-b border-slate-200 bg-white px-6 py-5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-4">
@@ -648,7 +629,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                       <Link
                         to={`/companies/${profile.company_id}`}
                         state={{ fromMemberId: memberId }}
-                        className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                        className="font-medium text-orange-dark hover:text-orange hover:underline"
                       >
                         {profile.company_name}
                       </Link>
@@ -695,9 +676,9 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                     type="button"
                     onClick={handleSaveEdit}
                     disabled={isSaving}
-                    className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+                    className="rounded-md bg-orange px-3 py-1.5 text-sm font-medium text-white hover:bg-orange-dark disabled:opacity-50"
                   >
-                    {isSaving ? 'Saving…' : 'Save'}
+                    {isSaving ? 'Saving…' : 'Save changes'}
                   </button>
                 </>
               ) : (
@@ -706,7 +687,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                   onClick={startEditing}
                   className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
                 >
-                  Edit
+                  Edit profile
                 </button>
               ))}
           </div>
@@ -718,10 +699,16 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
         )}
       </div>
       <div className="space-y-5 p-6">
-        <TierSection title="Public Profile" description="Tier 1 · Visible to all" tierColor="blue">
+        <TierSection
+          title="Public Profile"
+          description="Tier 1 · Visible to all"
+          tierColor="neutral"
+        >
           <div className="space-y-5">
             <div>
-              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Identity</h4>
+              <h4 className="mb-2 text-sm font-semibold text-slate-700">
+                Identity
+              </h4>
               {isEditing && editForm ? (
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-1.5">
@@ -731,7 +718,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                       name="first_name"
                       value={editForm.first_name}
                       onChange={handleEditChange}
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
@@ -741,7 +728,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                       name="last_name"
                       value={editForm.last_name}
                       onChange={handleEditChange}
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
@@ -751,7 +738,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                       name="phone"
                       value={editForm.phone}
                       onChange={handleEditChange}
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
@@ -762,7 +749,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                       value={editForm.linkedin_url}
                       onChange={handleEditChange}
                       placeholder="linkedin.com/in/name"
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                     />
                   </div>
                   <p className="col-span-2 text-xs text-slate-400">
@@ -774,7 +761,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
               )}
             </div>
             <div>
-              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <h4 className="mb-2 text-sm font-semibold text-slate-700">
                 Current role
               </h4>
               {isEditing && editForm ? (
@@ -786,7 +773,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                       name="job_title"
                       value={editForm.job_title}
                       onChange={handleEditChange}
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
@@ -795,7 +782,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                       name="seniority_level"
                       value={editForm.seniority_level}
                       onChange={handleEditChange}
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                     >
                       {SENIORITY_OPTIONS.map((opt) => (
                         <option key={opt.value} value={opt.value}>
@@ -811,7 +798,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                       name="current_job_start_date"
                       value={editForm.current_job_start_date}
                       onChange={handleEditChange}
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                     />
                   </div>
                 </div>
@@ -821,7 +808,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
             </div>
             {(profile.company_name || isEditing) && (
               <div>
-                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <h4 className="mb-2 text-sm font-semibold text-slate-700">
                   Company
                 </h4>
                 {isEditing && editForm ? (
@@ -830,13 +817,13 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                     name="company_name"
                     value={editForm.company_name}
                     onChange={handleEditChange}
-                    className="w-full max-w-sm rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                    className="w-full max-w-sm rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                   />
                 ) : profile.company_id ? (
                   <Link
                     to={`/companies/${profile.company_id}`}
                     state={{ fromMemberId: memberId }}
-                    className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                    className="text-sm font-medium text-orange-dark hover:text-orange hover:underline"
                   >
                     {profile.company_name}
                   </Link>
@@ -846,7 +833,9 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
               </div>
             )}
             <div>
-              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Location</h4>
+              <h4 className="mb-2 text-sm font-semibold text-slate-700">
+                Location
+              </h4>
               {isEditing && editForm ? (
                 <div className="grid grid-cols-3 gap-4">
                   <div className="flex flex-col gap-1.5">
@@ -856,7 +845,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                       name="city"
                       value={editForm.city}
                       onChange={handleEditChange}
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
@@ -866,7 +855,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                       name="state_region"
                       value={editForm.state_region}
                       onChange={handleEditChange}
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
@@ -876,7 +865,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                       name="country"
                       value={editForm.country}
                       onChange={handleEditChange}
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                     />
                   </div>
                 </div>
@@ -885,18 +874,26 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
               )}
             </div>
             <div>
-              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <h4 className="mb-2 text-sm font-semibold text-slate-700">
                 History & source
               </h4>
               <FieldGrid fields={historyFields} />
             </div>
           </div>
         </TierSection>
-        <TierSection title="Member Feedback" description="Tier 2 · User-editable" tierColor="violet">
+        <TierSection
+          title="Member Feedback"
+          description="Tier 2 · User-editable"
+          tierColor="sage"
+        >
           <FeedbackPrompts entries={userEditableEntries} />
         </TierSection>
         {isAdmin && (
-          <TierSection title="Admin Intelligence" description="Tier 3 · Admin only" tierColor="amber">
+          <TierSection
+            title="Admin Intelligence"
+            description="Tier 3 · Admin only"
+            tierColor="orange"
+          >
             <div className="space-y-4">
               {!isEditing && (
                 <IcpScoringAssistant
@@ -907,14 +904,14 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                 />
               )}
               {isEditing && editForm ? (
-                <div className="grid grid-cols-2 gap-4 rounded-lg border border-amber-100 bg-amber-50/30 p-4">
+                <div className="grid grid-cols-2 gap-4 rounded-lg border border-orange/20 bg-orange/5 p-4">
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-medium text-slate-600">Bucket</label>
                     <select
                       name="bucket"
                       value={editForm.bucket}
                       onChange={handleEditChange}
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                     >
                       {BUCKET_OPTIONS.map((opt) => (
                         <option key={opt.value} value={opt.value}>
@@ -932,7 +929,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                       max={100}
                       value={editForm.fit_score}
                       onChange={handleEditChange}
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                     />
                   </div>
                   <div className="col-span-2 flex flex-col gap-1.5">
@@ -942,7 +939,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                       rows={2}
                       value={editForm.tag_note}
                       onChange={handleEditChange}
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                     />
                   </div>
                   <p className="col-span-2 text-xs text-slate-400">
@@ -976,7 +973,6 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
           </section>
         )}
       </div>
-
       {enrichmentResult && (
         <EnrichmentReviewPanel
           memberId={memberId}

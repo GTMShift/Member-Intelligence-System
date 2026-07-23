@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getFilterOptions, getMetroAreas, searchMembers } from '../api/membersApi';
-import type { FilterOptions, MemberSearchParams, MemberSearchResult } from '../types/api';
+import type { FilterOptions, MemberSearchParams, MemberSearchResult, MemberSortOption } from '../types/api';
 import { formatTimestamp, fullName } from '../utils/format';
 
 const EMPTY_FILTER_OPTIONS: FilterOptions = {
@@ -12,6 +12,17 @@ const EMPTY_FILTER_OPTIONS: FilterOptions = {
   teamSizes: [],
 };
 
+const SORT_OPTIONS: { value: MemberSortOption; label: string }[] = [
+  { value: 'last_name_asc', label: 'Last name (A-Z)' },
+  { value: 'last_name_desc', label: 'Last name (Z-A)' },
+  { value: 'first_name_asc', label: 'First name (A-Z)' },
+  { value: 'first_name_desc', label: 'First name (Z-A)' },
+  { value: 'signup_newest', label: 'Newest signup' },
+  { value: 'signup_oldest', label: 'Oldest signup' },
+  { value: 'updated_newest', label: 'Recently updated' },
+  { value: 'updated_oldest', label: 'Least recently updated' },
+];
+
 interface MemberSearchPanelProps {
   selectedMemberId: string | null;
   onSelectMember: (id: string) => void;
@@ -22,7 +33,7 @@ const EMPTY_FILTERS: MemberSearchParams = {};
 function IcpBadge({ icp }: { icp: MemberSearchResult['icp'] }) {
   if (icp === 'YES') {
     return (
-      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
+      <span className="rounded-full bg-sage-tint px-2 py-0.5 text-xs font-medium text-sage">
         ICP
       </span>
     );
@@ -191,8 +202,26 @@ export function MemberSearchPanel({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by name, company, role, or email…"
-            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-600 focus:border-orange focus:outline-none focus:ring-2 focus:ring-orange/20"
           />
+        </div>
+
+        <div className="mt-4">
+          <label htmlFor="sort-by" className="mb-1 block text-xs font-medium text-slate-600">
+            Sort by
+          </label>
+          <select
+            id="sort-by"
+            value={filters.sort ?? 'last_name_asc'}
+            onChange={(e) => updateFilter('sort', e.target.value as MemberSortOption)}
+            className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 focus:border-orange focus:outline-none focus:ring-2 focus:ring-orange/20"
+          >
+            {SORT_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -255,7 +284,7 @@ export function MemberSearchPanel({
           <button
             type="button"
             onClick={clearFilters}
-            className="mt-3 text-sm font-medium text-blue-600 hover:text-blue-800"
+            className="mt-3 text-sm font-medium text-orange-dark hover:text-orange"
           >
             Clear all filters
           </button>
@@ -264,7 +293,7 @@ export function MemberSearchPanel({
 
       <div className="flex-1 overflow-y-auto p-2">
         <div className="mb-2 flex items-center justify-between px-2">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          <p className="text-xs font-medium text-slate-500">
             {loading ? 'Searching…' : `${total} member${total === 1 ? '' : 's'}`}
           </p>
         </div>
@@ -289,7 +318,7 @@ export function MemberSearchPanel({
                   onClick={() => onSelectMember(member.id)}
                   className={`w-full rounded-lg px-3 py-3 text-left transition-colors ${
                     isSelected
-                      ? 'bg-blue-50 ring-1 ring-blue-200'
+                      ? 'bg-sage-tint ring-1 ring-sage/40'
                       : 'hover:bg-slate-50'
                   }`}
                 >
@@ -353,7 +382,7 @@ function FilterSelect({ label, value, onChange, options }: FilterSelectProps) {
         id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+        className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 focus:border-orange focus:outline-none focus:ring-2 focus:ring-orange/20"
       >
         <option value="">All</option>
         {options.map((opt) => (
