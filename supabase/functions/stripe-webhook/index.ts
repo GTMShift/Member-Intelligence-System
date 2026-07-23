@@ -9,6 +9,27 @@ const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, {
 });
 const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET")!;
 
+// Maps Stripe's auto-generated dropdown option values to clean, readable
+// values for storage — "yesiwillbethere" reads a lot worse in the database
+// than "yes".
+const WELCOME_RECEPTION_MAP: Record<string, string> = {
+  yesiwillbethere: "yes",
+  iwontbeabletoattend: "no",
+  notsureyet: "unsure",
+};
+
+function getCustomFieldValue(
+  customFields: Stripe.Checkout.Session.CustomField[],
+  key: string,
+): string | null {
+  const field = customFields.find((f) => f.key === key);
+  if (!field) return null;
+  if (field.type === "text") return field.text?.value ?? null;
+  if (field.type === "dropdown") return field.dropdown?.value ?? null;
+  if (field.type === "numeric") return field.numeric?.value ?? null;
+  return null;
+}
+
 // This function is called directly by Stripe, which cannot send Supabase
 // credentials — so we use auth: 'none' (public endpoint) and verify the
 // caller ourselves via Stripe's own webhook signature instead.
@@ -46,13 +67,32 @@ export default {
         });
       }
 
+      const customFields = session.custom_fields ?? [];
+      const dietaryRestrictions = getCustomFieldValue(customFields, "dietaryrestrictions");
+      const sponsorIntroRequests = getCustomFieldValue(
+        customFields,
+        "wouldyoulikeanintroductiontooursponsors",
+      );
+      const welcomeReceptionRaw = getCustomFieldValue(
+        customFields,
+        "willyoujoinisatourwelcomeparty",
+      );
+      const welcomeReception = welcomeReceptionRaw
+        ? WELCOME_RECEPTION_MAP[welcomeReceptionRaw] ?? welcomeReceptionRaw
+        : null;
+
+      const updatePayload: Record<string, unknown> = { status: "Seat Confirmed" };
+      if (dietaryRestrictions) updatePayload.dietary_restrictions = dietaryRestrictions;
+      if (sponsorIntroRequests) updatePayload.sponsor_intro_requests = sponsorIntroRequests;
+      if (welcomeReception) updatePayload.welcome_reception = welcomeReception;
+
       const { error } = await ctx.supabaseAdmin
         .from("otr_applications")
-        .update({ status: "Seat Confirmed" })
+        .update(updatePayload)
         .eq("id", applicationId);
 
       if (error) {
-        console.error("Failed to update application status:", error.message);
+        console.error("Failed to update application:", error.message);
         return new Response("Database update failed", { status: 500 });
       }
     }
