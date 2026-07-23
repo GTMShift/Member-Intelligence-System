@@ -7,7 +7,6 @@ import type {
   MemberSearchParams,
   MemberSearchResponse,
   MemberSearchResult,
-  MemberSortOption,
   UserRole,
 } from '../types/api';
 
@@ -128,96 +127,6 @@ function toSearchResult(member: MemberDetail): MemberSearchResult {
   };
 }
 
-function matchesQuery(member: MemberDetail, q: string): boolean {
-  const normalized = q.trim().toLowerCase();
-  if (!normalized) return true;
-
-  const haystack = [
-    member.first_name,
-    member.last_name,
-    `${member.first_name} ${member.last_name}`,
-    member.email,
-    member.profile.company_name,
-    getCurrentRole(member),
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
-
-  return haystack.includes(normalized);
-}
-
-function filterMembers(all: MemberDetail[], params: MemberSearchParams): MemberDetail[] {
-  return all.filter((member) => {
-    if (params.q && !matchesQuery(member, params.q)) return false;
-    if (params.icp === 'NONE' && member.profile.icp !== null) return false;
-    if (params.icp && params.icp !== 'NONE' && member.profile.icp !== params.icp) return false;
-    if (params.metro_area_name && member.profile.metro_area_name !== params.metro_area_name) {
-      return false;
-    }
-    if (params.state && member.profile.state_region !== params.state) return false;
-    if (params.industry && industryByMemberId.get(member.id) !== params.industry) return false;
-    if (params.seniority && member.profile.seniority_level !== params.seniority) return false;
-    if (params.source && member.profile.signup_source !== params.source) return false;
-    if (params.team_size) {
-      const range = TEAM_SIZE_RANGES.find((r) => r.value === params.team_size);
-      const size = member.profile.team_size;
-      if (!range || size === null || size === undefined || size < range.min || size > range.max) return false;
-    }
-    if (params.tag && !member.profile.company_tags.includes(params.tag)) return false;
-    return true;
-  });
-}
-
-// Defaults to alphabetical by last name (then first name as a tie-breaker)
-// when no sort option is specified — i.e. the same default ordering the
-// underlying DB query already uses, just made explicit here so it stays true
-// even as more sort options are added.
-function sortMembers(members: MemberDetail[], sort: MemberSortOption | undefined): MemberDetail[] {
-  const sorted = [...members];
-
-  switch (sort) {
-    case 'last_name_desc':
-      sorted.sort((a, b) => {
-        const cmp = b.last_name.localeCompare(a.last_name);
-        return cmp !== 0 ? cmp : b.first_name.localeCompare(a.first_name);
-      });
-      break;
-    case 'first_name_asc':
-      sorted.sort((a, b) => {
-        const cmp = a.first_name.localeCompare(b.first_name);
-        return cmp !== 0 ? cmp : a.last_name.localeCompare(b.last_name);
-      });
-      break;
-    case 'first_name_desc':
-      sorted.sort((a, b) => {
-        const cmp = b.first_name.localeCompare(a.first_name);
-        return cmp !== 0 ? cmp : b.last_name.localeCompare(a.last_name);
-      });
-      break;
-    case 'signup_newest':
-      sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      break;
-    case 'signup_oldest':
-      sorted.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-      break;
-    case 'updated_newest':
-      sorted.sort((a, b) => new Date(b.last_updated).getTime() - new Date(a.last_updated).getTime());
-      break;
-    case 'updated_oldest':
-      sorted.sort((a, b) => new Date(a.last_updated).getTime() - new Date(b.last_updated).getTime());
-      break;
-    case 'last_name_asc':
-    default:
-      sorted.sort((a, b) => {
-        const cmp = a.last_name.localeCompare(b.last_name);
-        return cmp !== 0 ? cmp : a.first_name.localeCompare(b.first_name);
-      });
-      break;
-  }
-  return sorted;
-}
-
 function applyRoleFilter(member: MemberDetail, role: UserRole): MemberDetail {
   if (role === 'admin') return member;
 
@@ -243,24 +152,51 @@ async function fetchAllMemberDetails(): Promise<MemberDetail[]> {
   return (data ?? []).map(toMemberDetail);
 }
 
+// Delegates filtering, sorting, and pagination entirely to the search_members
+// Postgres function (see migration 026), rather than fetching every member
+// and doing this work in JS. Each call now returns only the one page of
+// lightweight result rows actually needed, plus the total matching count.
 export async function searchMembers(
   params: MemberSearchParams,
 ): Promise<MemberSearchResponse> {
-  const all = await fetchAllMemberDetails();
-
   const page = params.page ?? 1;
   const limit = params.limit ?? 50;
-  const filtered = filterMembers(all, params);
-  const sorted = sortMembers(filtered, params.sort);
-  const start = (page - 1) * limit;
-  const pageResults = sorted.slice(start, start + limit);
 
-  return {
-    total: sorted.length,
-    page,
-    limit,
-    results: pageResults.map(toSearchResult),
-  };
+  const { data, error } = await supabase.rpc('search_members', {
+    p_q: params.q ?? null,
+    p_icp: params.icp ?? null,
+    p_metro_area_name: params.metro_area_name ?? null,
+    p_state: params.state ?? null,
+    p_industry: params.industry ?? null,
+    p_seniority: params.seniority ?? null,
+    p_source: params.source ?? null,
+    p_team_size: params.team_size ?? null,
+    p_tag: params.tag ?? null,
+    p_sort: params.sort ?? 'last_name_asc',
+    p_page: page,
+    p_limit: limit,
+  });
+
+  if (error) throw new Error(`Failed to search members: ${error.message}`);
+
+  const rows = data ?? [];
+  const total = rows.length > 0 ? Number(rows[0].total) : 0;
+
+  const results: MemberSearchResult[] = rows.map((row: any) => ({
+    id: row.id,
+    first_name: row.first_name,
+    last_name: row.last_name,
+    email: row.email,
+    company_id: row.company_id,
+    company_name: row.company_name,
+    current_role: row.current_role_title,
+    metro_area_name: row.metro_area_name,
+    state_region: row.state_region,
+    icp: row.icp,
+    last_updated: row.last_updated,
+  }));
+
+  return { total, page, limit, results };
 }
 
 export async function getMember(id: string, role: UserRole): Promise<MemberDetail | null> {
