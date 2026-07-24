@@ -973,6 +973,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                 memberId={memberId}
                 memberCreatedAt={member.created_at}
                 interactions={member.interactions}
+                onInteractionAdded={loadMember}
               />
             )}
             </div>
