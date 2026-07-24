@@ -897,6 +897,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
             <div className="space-y-4">
               {!isEditing && (
                 <IcpScoringAssistant
+                  key={memberId}
                   memberId={memberId}
                   currentBucket={profile.bucket}
                   currentFitScore={profile.fit_score}
