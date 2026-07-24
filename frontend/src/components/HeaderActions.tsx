@@ -65,6 +65,14 @@ export function HeaderActions() {
       )}
       {role === 'admin' && (
         <button
+          onClick={() => navigate('/analytics')}
+          className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          Analytics
+        </button>
+      )}
+      {role === 'admin' && (
+        <button
           type="button"
           onClick={() => navigate('/admin/substack-import')}
           className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
@@ -87,7 +95,7 @@ export function HeaderActions() {
           onClick={() => navigate('/portal/speaker-application')}
           className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700"
         >
-        Apply to speak
+          Apply to speak
         </button>
       )}
       {role === 'admin' && (

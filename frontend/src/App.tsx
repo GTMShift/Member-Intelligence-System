@@ -19,6 +19,7 @@ import { SubstackImportPage } from './pages/SubstackImportPage';
 import { CompleteProfilePage } from './pages/CompleteProfilePage';
 import { MyProfilePage } from './pages/MyProfilePage';
 import type { MemberDetail, UserRole } from './types/api';
+import AnalyticsDashboard from './components/AnalyticsDashboard';
 
 interface DashboardLocationState {
   selectedMemberId?: string;
@@ -120,6 +121,14 @@ function App() {
           }
         />
         <Route
+          path="/analytics"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <AnalyticsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/portal"
           element={
             <ProtectedRoute requiredRole="member">
@@ -142,6 +151,26 @@ function App() {
  
 function DashboardPage() {
   return <MemberDirectoryLayout subtitle="Admin dashboard" showDuplicateAlerts />;
+}
+function AnalyticsPage() {
+  return (
+    <div className="flex min-h-screen flex-col">
+      <header className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-[90rem] items-center justify-between px-4 py-4 sm:px-6">
+          <div>
+            <h1 className="text-lg font-semibold text-slate-900">
+              SolutionExec Member Intelligence Platform
+            </h1>
+            <p className="text-sm text-slate-500">Analytics</p>
+          </div>
+          <HeaderActions />
+        </div>
+      </header>
+      <main className="mx-auto w-full max-w-[90rem] flex-1 bg-slate-50">
+        <AnalyticsDashboard />
+      </main>
+    </div>
+  );
 }
  
 function CompanyPageLayout() {

@@ -1,426 +1,399 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-  Bar,
   BarChart,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
+  Bar,
   XAxis,
   YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  PieChart,
+  Pie,
 } from 'recharts';
 import { supabase } from '../lib/supabaseClient';
 
-const BUCKET_LABELS = {
-  icp_member: 'ICP Member',
-  adjacent_remit: 'Adjacent Remit',
-  between_roles: 'Between Roles',
-  consultant: 'Consultant',
-  sponsor: 'Sponsor',
-  personal_connection: 'Personal Connection',
-  Unclassified: 'Unclassified',
+// ============================================================================
+// GTMShift Analytics Dashboard
+// Light theme matching the member directory design language.
+// ============================================================================
+
+const BUCKET_STYLES = {
+  icp_member: {
+    label: 'ICP',
+    className: 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200',
+    color: '#10b981',
+  },
+  adjacent_remit: {
+    label: 'Adjacent',
+    className: 'bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-200',
+    color: '#0ea5e9',
+  },
+  between_roles: {
+    label: 'Between Roles',
+    className: 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200',
+    color: '#f59e0b',
+  },
+  consultant: {
+    label: 'Consultant',
+    className: 'bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-200',
+    color: '#f97316',
+  },
+  sponsor: {
+    label: 'Sponsor',
+    className: 'bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-200',
+    color: '#8b5cf6',
+  },
+  personal_connection: {
+    label: 'Personal',
+    className: 'bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200',
+    color: '#64748b',
+  },
+  unclassified: {
+    label: 'Unclassified',
+    className: 'bg-slate-50 text-slate-500 ring-1 ring-inset ring-slate-200',
+    color: '#cbd5e1',
+  },
 };
 
-const BUCKET_BADGE = {
-  icp_member: 'bg-emerald-950/60 text-emerald-400 border-emerald-800',
-  adjacent_remit: 'bg-blue-950/60 text-blue-400 border-blue-800',
-  between_roles: 'bg-yellow-950/60 text-yellow-400 border-yellow-800',
-  consultant: 'bg-orange-950/60 text-orange-400 border-orange-800',
-  sponsor: 'bg-purple-950/60 text-purple-400 border-purple-800',
-  personal_connection: 'bg-slate-700/60 text-slate-300 border-slate-600',
-  Unclassified: 'bg-slate-800/60 text-slate-400 border-slate-700',
-};
-
-const BUCKET_CHART_COLORS = {
-  icp_member: '#34d399',
-  adjacent_remit: '#60a5fa',
-  between_roles: '#facc15',
-  consultant: '#fb923c',
-  sponsor: '#c084fc',
-  personal_connection: '#9ca3af',
-  Unclassified: '#64748b',
-};
-
-const SCORE_RANGE_ORDER = ['No Score', '1–20', '21–40', '41–60', '61–80', '81–100', '100+'];
-
-function daysAgoIso(days) {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return d.toISOString();
+function scoreColor(score) {
+  if (score == null || score === 0) return 'text-slate-400';
+  if (score >= 80) return 'text-emerald-600 font-semibold';
+  if (score >= 50) return 'text-amber-600 font-semibold';
+  if (score >= 20) return 'text-orange-600 font-medium';
+  return 'text-slate-500';
 }
 
 function formatDate(value) {
   if (!value) return '—';
   return new Date(value).toLocaleDateString('en-US', {
-    year: 'numeric',
     month: 'short',
     day: 'numeric',
+    year: 'numeric',
   });
 }
 
-function scoreTextClass(score) {
-  if (score == null) return 'text-slate-400';
-  if (score >= 80) return 'text-emerald-400';
-  if (score >= 50) return 'text-yellow-400';
-  if (score >= 20) return 'text-orange-400';
-  return 'text-red-400';
+function daysAgo(value) {
+  if (!value) return null;
+  const then = new Date(value).getTime();
+  const now = Date.now();
+  const days = Math.floor((now - then) / (1000 * 60 * 60 * 24));
+  return days;
 }
 
-function attendanceRateClass(rate) {
-  if (rate == null) return 'text-slate-400';
-  if (rate > 70) return 'text-emerald-400';
-  if (rate >= 40) return 'text-yellow-400';
-  return 'text-red-400';
-}
-
-function bucketKey(bucket) {
-  return bucket ?? 'Unclassified';
-}
-
-function bucketLabel(bucket) {
-  return BUCKET_LABELS[bucketKey(bucket)] ?? bucketKey(bucket);
-}
-
-function normalizeProfile(profile) {
-  if (Array.isArray(profile)) return profile[0] ?? null;
-  return profile ?? null;
-}
-
-function getCompanyName(profile) {
-  const p = normalizeProfile(profile);
-  if (!p) return '—';
-  const company = p.company ?? p.companies;
-  if (Array.isArray(company)) return company[0]?.name ?? '—';
-  return company?.name ?? '—';
-}
-
-function scoreRange(score) {
-  if (score == null || score === 0) return 'No Score';
-  if (score < 20) return '1–20';
-  if (score < 40) return '21–40';
-  if (score < 60) return '41–60';
-  if (score < 80) return '61–80';
-  if (score < 100) return '81–100';
-  return '100+';
-}
-
-async function fetchStats() {
-  const thirtyDaysAgo = daysAgoIso(30);
-
-  const [activeRes, engagedRes, scoresRes, eventsRes] = await Promise.all([
-    supabase
-      .from('members')
-      .select('*', { count: 'exact', head: true })
-      .eq('subscription_status', 'active'),
-    supabase
-      .from('members')
-      .select('*', { count: 'exact', head: true })
-      .gte('last_engagement_date', thirtyDaysAgo),
-    supabase.from('members').select('engagement_score').gt('engagement_score', 0),
-    supabase.from('events').select('*', { count: 'exact', head: true }),
-  ]);
-
-  if (activeRes.error) throw activeRes.error;
-  if (engagedRes.error) throw engagedRes.error;
-  if (scoresRes.error) throw scoresRes.error;
-  if (eventsRes.error) throw eventsRes.error;
-
-  const scores = scoresRes.data ?? [];
-  const avgScore =
-    scores.length > 0
-      ? Math.round((scores.reduce((sum, r) => sum + Number(r.engagement_score), 0) / scores.length) * 10) / 10
-      : 0;
-
-  return {
-    totalActive: activeRes.count ?? 0,
-    engagedLast30: engagedRes.count ?? 0,
-    avgEngagementScore: avgScore,
-    totalEvents: eventsRes.count ?? 0,
-  };
-}
-
-async function fetchTopMembers() {
-  const { data, error } = await supabase
-    .from('members')
-    .select(
-      `first_name, last_name, email, engagement_score, events_attended_count,
-       last_engagement_date, last_newsletter_open_at, subscription_status,
-       member_profile ( seniority_level, bucket, company:companies ( name ) )`,
-    )
-    .gt('engagement_score', 0)
-    .order('engagement_score', { ascending: false })
-    .limit(25);
-
-  if (error) throw error;
-
-  return (data ?? []).map((row) => {
-    const profile = normalizeProfile(row.member_profile);
-    return {
-      first_name: row.first_name,
-      last_name: row.last_name,
-      email: row.email,
-      seniority_level: profile?.seniority_level ?? null,
-      bucket: profile?.bucket ?? null,
-      company: getCompanyName(row.member_profile),
-      engagement_score: Number(row.engagement_score),
-      events_attended_count: row.events_attended_count ?? 0,
-      last_engagement_date: row.last_engagement_date,
-      last_newsletter_open_at: row.last_newsletter_open_at,
-      subscription_status: row.subscription_status,
-    };
-  });
-}
-
-async function fetchIcpBreakdown() {
-  const { data, error } = await supabase.from('member_profile').select('bucket');
-  if (error) throw error;
-
-  const counts = {};
-  for (const row of data ?? []) {
-    const key = bucketKey(row.bucket);
-    counts[key] = (counts[key] ?? 0) + 1;
-  }
-
-  return Object.entries(counts)
-    .map(([bucket, count]) => ({
-      bucket,
-      label: bucketLabel(bucket),
-      count,
-    }))
-    .sort((a, b) => b.count - a.count);
-}
-
-async function fetchScoreDistribution() {
-  const { data, error } = await supabase.from('members').select('engagement_score');
-  if (error) throw error;
-
-  const counts = Object.fromEntries(SCORE_RANGE_ORDER.map((r) => [r, 0]));
-  for (const row of data ?? []) {
-    const range = scoreRange(row.engagement_score == null ? null : Number(row.engagement_score));
-    counts[range] = (counts[range] ?? 0) + 1;
-  }
-
-  return SCORE_RANGE_ORDER.map((score_range) => ({
-    score_range,
-    member_count: counts[score_range] ?? 0,
-  }));
-}
-
-async function fetchNewsletterStats() {
-  const sevenDaysAgo = daysAgoIso(7);
-  const thirtyDaysAgo = daysAgoIso(30);
-  const ninetyDaysAgo = daysAgoIso(90);
-
-  const { data, error } = await supabase
-    .from('members')
-    .select('last_newsletter_open_at')
-    .eq('subscription_status', 'active');
-
-  if (error) throw error;
-
-  const rows = data ?? [];
-  let opened7d = 0;
-  let opened30d = 0;
-  let opened90d = 0;
-  let neverOpened = 0;
-
-  for (const row of rows) {
-    const openedAt = row.last_newsletter_open_at;
-    if (!openedAt) {
-      neverOpened += 1;
-      continue;
-    }
-    if (openedAt >= sevenDaysAgo) opened7d += 1;
-    if (openedAt >= thirtyDaysAgo) opened30d += 1;
-    if (openedAt >= ninetyDaysAgo) opened90d += 1;
-  }
-
-  return {
-    total_active: rows.length,
-    opened_7d: opened7d,
-    opened_30d: opened30d,
-    opened_90d: opened90d,
-    never_opened: neverOpened,
-    chartData: [
-      { label: 'Last 7 Days', value: opened7d },
-      { label: 'Last 30 Days', value: opened30d },
-      { label: 'Last 90 Days', value: opened90d },
-      { label: 'Never Opened', value: neverOpened },
-    ],
-  };
-}
-
-async function fetchEventHistory() {
-  const { data, error } = await supabase
-    .from('events')
-    .select(
-      `id, event_name, event_date, event_type, location,
-       event_signups ( id, rsvp_status )`,
-    )
-    .order('event_date', { ascending: false });
-
-  if (error) throw error;
-
-  return (data ?? []).map((event) => {
-    const signups = event.event_signups ?? [];
-    const attended = signups.filter((s) => s.rsvp_status === 'attended').length;
-    const noShow = signups.filter((s) => s.rsvp_status === 'no_show').length;
-    const canceled = signups.filter((s) => s.rsvp_status === 'canceled').length;
-    const registered = signups.filter((s) => s.rsvp_status === 'registered').length;
-    const denominator = attended + noShow;
-    const attendanceRate =
-      denominator > 0 ? Math.round((attended / denominator) * 1000) / 10 : null;
-
-    return {
-      event_name: event.event_name,
-      event_date: event.event_date,
-      event_type: event.event_type,
-      location: event.location,
-      total_signups: signups.length,
-      attended,
-      no_show: noShow,
-      canceled,
-      registered,
-      attendance_rate_pct: attendanceRate,
-    };
-  });
-}
-
-async function fetchColdMembers() {
-  const ninetyDaysAgo = daysAgoIso(90);
-  const targetBuckets = new Set(['icp_member', 'adjacent_remit', 'between_roles']);
-
-  const { data, error } = await supabase
-    .from('members')
-    .select(
-      `first_name, last_name, email, engagement_score, last_engagement_date, events_attended_count,
-       member_profile ( bucket, seniority_level )`,
-    )
-    .eq('subscription_status', 'active')
-    .gt('engagement_score', 20)
-    .order('engagement_score', { ascending: false });
-
-  if (error) throw error;
-
-  return (data ?? [])
-    .filter((row) => {
-      const profile = normalizeProfile(row.member_profile);
-      const bucket = profile?.bucket ?? null;
-      const bucketOk = bucket == null || targetBuckets.has(bucket);
-      const lastEngaged = row.last_engagement_date;
-      const isCold = !lastEngaged || lastEngaged < ninetyDaysAgo;
-      return bucketOk && isCold;
-    })
-    .slice(0, 10)
-    .map((row) => {
-      const profile = normalizeProfile(row.member_profile);
-      return {
-        first_name: row.first_name,
-        last_name: row.last_name,
-        email: row.email,
-        bucket: profile?.bucket ?? null,
-        seniority_level: profile?.seniority_level ?? null,
-        engagement_score: Number(row.engagement_score),
-        last_engagement_date: row.last_engagement_date,
-        events_attended_count: row.events_attended_count ?? 0,
-      };
-    });
-}
-
-async function fetchTopClickers() {
-  const { data: snapshots, error: snapError } = await supabase
-    .from('substack_engagement_snapshots')
-    .select(
-      `member_id, links_clicked, emails_opened_6mo, emails_received_6mo,
-       last_clicked_at, snapshot_at`,
-    )
-    .gt('links_clicked', 0)
-    .order('snapshot_at', { ascending: false });
-
-  if (snapError) throw snapError;
-
-  const latestByMember = new Map();
-  for (const row of snapshots ?? []) {
-    if (!latestByMember.has(row.member_id)) {
-      latestByMember.set(row.member_id, row);
-    }
-  }
-
-  const topSnapshots = [...latestByMember.values()]
-    .sort((a, b) => b.links_clicked - a.links_clicked)
-    .slice(0, 15);
-
-  if (topSnapshots.length === 0) return [];
-
-  const memberIds = topSnapshots.map((s) => s.member_id);
-
-  const { data: members, error: memberError } = await supabase
-    .from('members')
-    .select(
-      `id, first_name, last_name, email, engagement_score,
-       member_profile ( bucket )`,
-    )
-    .in('id', memberIds);
-
-  if (memberError) throw memberError;
-
-  const memberMap = Object.fromEntries((members ?? []).map((m) => [m.id, m]));
-
-  return topSnapshots.map((snap) => {
-    const member = memberMap[snap.member_id];
-    const profile = normalizeProfile(member?.member_profile);
-    return {
-      first_name: member?.first_name ?? '—',
-      last_name: member?.last_name ?? '—',
-      email: member?.email ?? '—',
-      bucket: profile?.bucket ?? null,
-      links_clicked: snap.links_clicked,
-      emails_opened_6mo: snap.emails_opened_6mo,
-      emails_received_6mo: snap.emails_received_6mo,
-      last_clicked_at: snap.last_clicked_at,
-      engagement_score: member?.engagement_score != null ? Number(member.engagement_score) : null,
-    };
-  });
-}
-
-function SectionHeader({ title, subtitle }) {
-  return (
-    <div className="mb-4 border-b border-slate-800 pb-3">
-      <h2 className="text-lg font-semibold text-slate-100">{title}</h2>
-      {subtitle && <p className="mt-1 text-sm text-slate-500">{subtitle}</p>}
-    </div>
-  );
-}
-
-function StatCard({ label, value }) {
-  return (
-    <div className="rounded-lg border border-slate-800 bg-slate-900/80 p-5">
-      <p className="text-sm font-medium uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-2 text-3xl font-bold text-slate-50">{value}</p>
-    </div>
-  );
+function relativeDate(value) {
+  const d = daysAgo(value);
+  if (d == null) return 'Never';
+  if (d === 0) return 'Today';
+  if (d === 1) return 'Yesterday';
+  if (d < 7) return `${d}d ago`;
+  if (d < 30) return `${Math.floor(d / 7)}w ago`;
+  if (d < 365) return `${Math.floor(d / 30)}mo ago`;
+  return `${Math.floor(d / 365)}y ago`;
 }
 
 function BucketBadge({ bucket }) {
-  const key = bucketKey(bucket);
-  const classes = BUCKET_BADGE[key] ?? BUCKET_BADGE.Unclassified;
+  const key = bucket || 'unclassified';
+  const style = BUCKET_STYLES[key] || BUCKET_STYLES.unclassified;
   return (
-    <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${classes}`}>
-      {bucketLabel(bucket)}
+    <span
+      className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${style.className}`}
+    >
+      {style.label}
     </span>
   );
 }
 
-function DarkTooltip({ active, payload, label }) {
-  if (!active || !payload?.length) return null;
+// ============================================================================
+// Metric Card
+// ============================================================================
+
+function MetricCard({ label, value, sublabel, trend }) {
   return (
-    <div className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm shadow-lg">
-      <p className="font-medium text-slate-200">{label ?? payload[0]?.payload?.label}</p>
-      <p className="text-slate-400">{payload[0].value} members</p>
+    <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+      <div className="mt-2 flex items-baseline gap-2">
+        <p className="text-3xl font-semibold text-slate-900">{value}</p>
+        {trend && (
+          <span className="text-xs font-medium text-emerald-600">{trend}</span>
+        )}
+      </div>
+      {sublabel && (
+        <p className="mt-1 text-xs text-slate-500">{sublabel}</p>
+      )}
     </div>
   );
 }
 
+// ============================================================================
+// Section Wrapper
+// ============================================================================
+
+function Section({ title, subtitle, action, children }) {
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white shadow-sm h-full flex flex-col">
+      <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
+        <div>
+          <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+          {subtitle && (
+            <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>
+          )}
+        </div>
+        {action}
+      </div>
+      <div className="p-5 flex-1">{children}</div>
+    </section>
+  );
+}
+
+// ============================================================================
+// Event History Section (with show all toggle)
+// ============================================================================
+
+// ============================================================================
+// Cold Members Section (compact sidebar, paginated)
+// ============================================================================
+
+function ColdMembersSection({ coldMembers }) {
+  const PAGE_SIZE = 10;
+  const [page, setPage] = useState(0);
+  const totalPages = Math.ceil(coldMembers.length / PAGE_SIZE);
+  const displayed = coldMembers.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  return (
+    <Section
+      title="Going Cold"
+      subtitle={`${coldMembers.length} members to re-engage`}
+    >
+      {coldMembers.length === 0 ? (
+        <p className="text-sm text-slate-500">No members flagged. Network is warm.</p>
+      ) : (
+        <>
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="pb-3 pr-3">Member</th>
+                <th className="pb-3 pr-3 text-right">Events</th>
+                <th className="pb-3 text-right">Last Seen</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {displayed.map((m) => (
+                <tr key={m.id} className="hover:bg-slate-50">
+                  <td className="py-3 pr-3">
+                    <div className="text-sm font-medium text-slate-900">
+                      {m.first_name} {m.last_name}
+                    </div>
+                    <div className="text-xs text-slate-500">{m.email}</div>
+                  </td>
+                  <td className="py-3 pr-3 text-right text-slate-700 align-top pt-3.5">
+                    {m.events_attended_count}
+                  </td>
+                  <td className="py-3 text-right text-slate-600 align-top pt-3.5 whitespace-nowrap">
+                    {relativeDate(m.last_engagement_date || m.last_event_date)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {totalPages > 1 && (
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              onPrev={() => setPage((p) => Math.max(0, p - 1))}
+              onNext={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+            />
+          )}
+        </>
+      )}
+    </Section>
+  );
+}
+
+// ============================================================================
+// Top Members Section (paginated)
+// ============================================================================
+
+function TopMembersSection({ topMembers }) {
+  const PAGE_SIZE = 10;
+  const [page, setPage] = useState(0);
+  const totalPages = Math.ceil(topMembers.length / PAGE_SIZE);
+  const displayed = topMembers.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const startRank = page * PAGE_SIZE + 1;
+
+  return (
+    <Section
+      title="Top Engaged Members"
+      subtitle={`Top ${topMembers.length} by engagement score`}
+    >
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <th className="pb-3 pr-3 w-8">#</th>
+              <th className="pb-3 pr-4">Member</th>
+              <th className="pb-3 pr-4">Bucket</th>
+              <th className="pb-3 pr-4 text-right">Score</th>
+              <th className="pb-3 pr-4 text-right">Events</th>
+              <th className="pb-3">Last Engaged</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {displayed.map((m, i) => (
+              <tr key={m.id} className="hover:bg-slate-50">
+                <td className="py-3 pr-3 text-xs text-slate-400 tabular-nums">
+                  {startRank + i}
+                </td>
+                <td className="py-3 pr-4">
+                  <div className="font-medium text-slate-900">
+                    {m.first_name} {m.last_name}
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    {m.current_company || m.seniority_level || m.email}
+                  </div>
+                </td>
+                <td className="py-3 pr-4">
+                  <BucketBadge bucket={m.bucket} />
+                </td>
+                <td className={`py-3 pr-4 text-right ${scoreColor(m.engagement_score)}`}>
+                  {m.engagement_score.toFixed(1)}
+                </td>
+                <td className="py-3 pr-4 text-right text-slate-700">
+                  {m.events_attended_count}
+                </td>
+                <td className="py-3 text-slate-600">
+                  {relativeDate(m.last_engagement_date)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {totalPages > 1 && (
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          onPrev={() => setPage((p) => Math.max(0, p - 1))}
+          onNext={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+        />
+      )}
+    </Section>
+  );
+}
+
+// ============================================================================
+// Pagination Controls
+// ============================================================================
+
+function Pagination({ page, totalPages, onPrev, onNext }) {
+  return (
+    <div className="flex items-center justify-between border-t border-slate-100 pt-4 mt-2">
+      <button
+        onClick={onPrev}
+        disabled={page === 0}
+        className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
+        </svg>
+        Previous
+      </button>
+      <span className="text-xs text-slate-500">
+        Page {page + 1} of {totalPages}
+      </span>
+      <button
+        onClick={onNext}
+        disabled={page >= totalPages - 1}
+        className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        Next
+        <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+// ============================================================================
+// Event History Section (paginated)
+// ============================================================================
+
+function EventHistorySection({ eventHistory }) {
+  const PAGE_SIZE = 10;
+  const [page, setPage] = useState(0);
+  const totalPages = Math.ceil(eventHistory.length / PAGE_SIZE);
+  const displayed = eventHistory.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  return (
+    <Section
+      title="Event History"
+      subtitle={`${eventHistory.length} events total`}
+    >
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <th className="pb-3 pr-4">Event</th>
+              <th className="pb-3 pr-4">Date</th>
+              <th className="pb-3 pr-4 text-right">Signups</th>
+              <th className="pb-3 pr-4 text-right">Attended</th>
+              <th className="pb-3 pr-4 text-right">No-show</th>
+              <th className="pb-3 text-right">Rate</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {displayed.map((e) => {
+              const rate = e.attendanceRate;
+              const rateColor =
+                rate == null
+                  ? 'text-slate-400'
+                  : rate >= 70
+                  ? 'text-emerald-600'
+                  : rate >= 40
+                  ? 'text-amber-600'
+                  : 'text-orange-600';
+              return (
+                <tr key={e.id} className="hover:bg-slate-50">
+                  <td className="py-3 pr-4">
+                    <div className="font-medium text-slate-900">{e.event_name}</div>
+                    {e.location && (
+                      <div className="text-xs text-slate-500">{e.location}</div>
+                    )}
+                  </td>
+                  <td className="py-3 pr-4 text-slate-600">{formatDate(e.event_date)}</td>
+                  <td className="py-3 pr-4 text-right text-slate-700">{e.total}</td>
+                  <td className="py-3 pr-4 text-right text-slate-700">{e.attended}</td>
+                  <td className="py-3 pr-4 text-right text-slate-700">{e.noShow}</td>
+                  <td className={`py-3 text-right font-medium ${rateColor}`}>
+                    {rate == null ? '—' : `${rate.toFixed(0)}%`}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {totalPages > 1 && (
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          onPrev={() => setPage((p) => Math.max(0, p - 1))}
+          onNext={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+        />
+      )}
+    </Section>
+  );
+}
+
+// ============================================================================
+// Main Component
+// ============================================================================
+
 export default function AnalyticsDashboard() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [topMembers, setTopMembers] = useState([]);
   const [icpBreakdown, setIcpBreakdown] = useState([]);
@@ -431,24 +404,22 @@ export default function AnalyticsDashboard() {
   const [topClickers, setTopClickers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [expandedRow, setExpandedRow] = useState(null);
-  const [sortConfig, setSortConfig] = useState({ key: 'engagement_score', direction: 'desc' });
 
   useEffect(() => {
-    async function fetchAllData() {
+    async function fetchAll() {
       try {
         setLoading(true);
         setError(null);
 
         const [
-          statsData,
-          topMembersData,
-          icpData,
-          scoreDistData,
-          newsletterData,
-          eventsData,
-          coldData,
-          clickersData,
+          statsRes,
+          topRes,
+          icpRes,
+          scoreRes,
+          newsRes,
+          eventsRes,
+          coldRes,
+          clickersRes,
         ] = await Promise.all([
           fetchStats(),
           fetchTopMembers(),
@@ -460,407 +431,580 @@ export default function AnalyticsDashboard() {
           fetchTopClickers(),
         ]);
 
-        setStats(statsData);
-        setTopMembers(topMembersData);
-        setIcpBreakdown(icpData);
-        setScoreDistribution(scoreDistData);
-        setNewsletterStats(newsletterData);
-        setEventHistory(eventsData);
-        setColdMembers(coldData);
-        setTopClickers(clickersData);
+        setStats(statsRes);
+        setTopMembers(topRes);
+        setIcpBreakdown(icpRes);
+        setScoreDistribution(scoreRes);
+        setNewsletterStats(newsRes);
+        setEventHistory(eventsRes);
+        setColdMembers(coldRes);
+        setTopClickers(clickersRes);
       } catch (err) {
-        setError(err?.message ?? 'Failed to load analytics data');
+        console.error(err);
+        setError(err.message || 'Failed to load analytics');
       } finally {
         setLoading(false);
       }
     }
-
-    fetchAllData();
+    fetchAll();
   }, []);
 
-  const sortedTopMembers = useMemo(() => {
-    const sorted = [...topMembers];
-    const { key, direction } = sortConfig;
-    sorted.sort((a, b) => {
-      let aVal = a[key];
-      let bVal = b[key];
-      if (key === 'name') {
-        aVal = `${a.last_name} ${a.first_name}`.toLowerCase();
-        bVal = `${b.last_name} ${b.first_name}`.toLowerCase();
-      }
-      if (aVal == null) return 1;
-      if (bVal == null) return -1;
-      if (typeof aVal === 'string') {
-        return direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
-      }
-      return direction === 'asc' ? aVal - bVal : bVal - aVal;
+  // --------------------------------------------------------------------------
+  // Data fetchers
+  // --------------------------------------------------------------------------
+
+  async function fetchStats() {
+    const [activeRes, engagedRes, avgRes, eventsRes] = await Promise.all([
+      supabase
+        .from('members')
+        .select('id', { count: 'exact', head: true })
+        .eq('subscription_status', 'active'),
+      supabase
+        .from('members')
+        .select('id', { count: 'exact', head: true })
+        .gte(
+          'last_engagement_date',
+          new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+        ),
+      supabase
+        .from('members')
+        .select('engagement_score')
+        .gt('engagement_score', 0),
+      supabase.from('events').select('id', { count: 'exact', head: true }),
+    ]);
+
+    const scores = (avgRes.data || []).map((r) => Number(r.engagement_score));
+    const avg = scores.length
+      ? scores.reduce((a, b) => a + b, 0) / scores.length
+      : 0;
+
+    return {
+      totalActive: activeRes.count || 0,
+      engaged30d: engagedRes.count || 0,
+      avgScore: Math.round(avg * 10) / 10,
+      totalEvents: eventsRes.count || 0,
+    };
+  }
+
+  async function fetchTopMembers() {
+    const { data, error } = await supabase
+      .from('members')
+      .select(
+        `
+          id,
+          first_name,
+          last_name,
+          email,
+          engagement_score,
+          events_attended_count,
+          last_engagement_date,
+          last_newsletter_open_at,
+          subscription_status,
+          member_profile ( bucket, seniority_level )
+        `,
+      )
+      .gt('engagement_score', 0)
+      .order('engagement_score', { ascending: false })
+      .limit(30);
+
+    if (error) throw error;
+    return (data || []).map((row) => {
+      const profile = Array.isArray(row.member_profile)
+        ? row.member_profile[0]
+        : row.member_profile;
+      return {
+        id: row.id,
+        first_name: row.first_name,
+        last_name: row.last_name,
+        email: row.email,
+        engagement_score: Number(row.engagement_score),
+        events_attended_count: row.events_attended_count ?? 0,
+        last_engagement_date: row.last_engagement_date,
+        last_newsletter_open_at: row.last_newsletter_open_at,
+        subscription_status: row.subscription_status,
+        bucket: profile?.bucket ?? null,
+        seniority_level: profile?.seniority_level ?? null,
+        current_company: null,
+      };
     });
-    return sorted;
-  }, [topMembers, sortConfig]);
-
-  function handleSort(key) {
-    setSortConfig((prev) => ({
-      key,
-      direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc',
-    }));
   }
 
-  function sortIndicator(key) {
-    if (sortConfig.key !== key) return '';
-    return sortConfig.direction === 'asc' ? ' ↑' : ' ↓';
+  async function fetchIcpBreakdown() {
+    const { data, error } = await supabase
+      .from('member_profile')
+      .select('bucket');
+    if (error) throw error;
+
+    const counts = {};
+    (data || []).forEach((r) => {
+      const key = r.bucket || 'unclassified';
+      counts[key] = (counts[key] || 0) + 1;
+    });
+
+    return Object.entries(counts)
+      .map(([bucket, count]) => ({
+        bucket,
+        label: BUCKET_STYLES[bucket]?.label || bucket,
+        count,
+        color: BUCKET_STYLES[bucket]?.color || '#cbd5e1',
+      }))
+      .sort((a, b) => b.count - a.count);
   }
+
+  async function fetchScoreDistribution() {
+    const { data, error } = await supabase
+      .from('members')
+      .select('engagement_score');
+    if (error) throw error;
+
+    const buckets = [
+      { range: 'No score', min: -1, max: 0.001, count: 0 },
+      { range: '1–20', min: 0.001, max: 20, count: 0 },
+      { range: '21–40', min: 20, max: 40, count: 0 },
+      { range: '41–60', min: 40, max: 60, count: 0 },
+      { range: '61–80', min: 60, max: 80, count: 0 },
+      { range: '81–100', min: 80, max: 100, count: 0 },
+      { range: '100+', min: 100, max: Infinity, count: 0 },
+    ];
+
+    (data || []).forEach((r) => {
+      const s = Number(r.engagement_score ?? 0);
+      const bucket = buckets.find((b) => s >= b.min && s < b.max);
+      if (bucket) bucket.count += 1;
+    });
+
+    return buckets.map(({ range, count }) => ({ range, count }));
+  }
+
+  async function fetchNewsletterStats() {
+    const { data, error } = await supabase
+      .from('members')
+      .select('last_newsletter_open_at, subscription_status')
+      .eq('subscription_status', 'active');
+    if (error) throw error;
+
+    const now = Date.now();
+    const day = 24 * 60 * 60 * 1000;
+    const total = (data || []).length;
+
+    let opened7 = 0;
+    let opened30 = 0;
+    let opened90 = 0;
+    let neverOpened = 0;
+
+    (data || []).forEach((r) => {
+      if (!r.last_newsletter_open_at) {
+        neverOpened += 1;
+        return;
+      }
+      const daysAgo = (now - new Date(r.last_newsletter_open_at).getTime()) / day;
+      if (daysAgo <= 7) opened7 += 1;
+      if (daysAgo <= 30) opened30 += 1;
+      if (daysAgo <= 90) opened90 += 1;
+    });
+
+    return {
+      total,
+      opened7,
+      opened30,
+      opened90,
+      neverOpened,
+      chart: [
+        { window: 'Last 7d', members: opened7 },
+        { window: 'Last 30d', members: opened30 },
+        { window: 'Last 90d', members: opened90 },
+        { window: 'Never', members: neverOpened },
+      ],
+    };
+  }
+
+  async function fetchEventHistory() {
+    const { data: events, error: eventsErr } = await supabase
+      .from('events')
+      .select('id, event_name, event_date, event_type, location')
+      .order('event_date', { ascending: false });
+    if (eventsErr) throw eventsErr;
+
+    const { data: signups, error: signupsErr } = await supabase
+      .from('event_signups')
+      .select('event_id, rsvp_status');
+    if (signupsErr) throw signupsErr;
+
+    return (events || []).map((e) => {
+      const forEvent = (signups || []).filter((s) => s.event_id === e.id);
+      const attended = forEvent.filter((s) => s.rsvp_status === 'attended').length;
+      const noShow = forEvent.filter((s) => s.rsvp_status === 'no_show').length;
+      const canceled = forEvent.filter((s) => s.rsvp_status === 'canceled').length;
+      const registered = forEvent.filter((s) => s.rsvp_status === 'registered').length;
+      const responded = attended + noShow;
+      const attendanceRate = responded > 0 ? (attended / responded) * 100 : null;
+      return {
+        id: e.id,
+        event_name: e.event_name,
+        event_date: e.event_date,
+        event_type: e.event_type,
+        location: e.location,
+        total: forEvent.length,
+        attended,
+        noShow,
+        canceled,
+        registered,
+        attendanceRate,
+      };
+    });
+  }
+
+  async function fetchColdMembers() {
+    const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase
+      .from('members')
+      .select(
+        `
+          id,
+          first_name,
+          last_name,
+          email,
+          engagement_score,
+          last_engagement_date,
+          last_event_date,
+          events_attended_count,
+          subscription_status,
+          member_profile ( bucket, seniority_level )
+        `,
+      )
+      .eq('subscription_status', 'active')
+      .gte('events_attended_count', 1)
+      .order('events_attended_count', { ascending: false });
+
+    if (error) throw error;
+
+    const cutoffMs = Date.now() - 90 * 24 * 60 * 60 * 1000;
+
+    return (data || [])
+      .filter((row) => {
+        // Both last_engagement_date and last_event_date must be older than 90 days (or null)
+        const engagementOld = !row.last_engagement_date || new Date(row.last_engagement_date).getTime() < cutoffMs;
+        const eventOld = !row.last_event_date || new Date(row.last_event_date).getTime() < cutoffMs;
+        return engagementOld && eventOld;
+      }).map((row) => {
+      const profile = Array.isArray(row.member_profile)
+        ? row.member_profile[0]
+        : row.member_profile;
+      return {
+        id: row.id,
+        first_name: row.first_name,
+        last_name: row.last_name,
+        email: row.email,
+        engagement_score: Number(row.engagement_score),
+        last_engagement_date: row.last_engagement_date,
+        last_event_date: row.last_event_date,
+        events_attended_count: row.events_attended_count ?? 0,
+        bucket: profile?.bucket ?? null,
+        seniority_level: profile?.seniority_level ?? null,
+      };
+    });
+  }
+
+  async function fetchTopClickers() {
+    const { data: snaps, error: snapsErr } = await supabase
+      .from('substack_engagement_snapshots')
+      .select(
+        'member_id, links_clicked, emails_opened_6mo, emails_received_6mo, last_clicked_at, snapshot_at',
+      )
+      .not('member_id', 'is', null)
+      .gt('links_clicked', 0)
+      .order('snapshot_at', { ascending: false })
+      .limit(500);
+    if (snapsErr) throw snapsErr;
+
+    // reduce to most recent snapshot per member
+    const latestByMember = new Map();
+    (snaps || []).forEach((s) => {
+      if (!latestByMember.has(s.member_id)) latestByMember.set(s.member_id, s);
+    });
+    const sorted = Array.from(latestByMember.values())
+      .sort((a, b) => (b.links_clicked || 0) - (a.links_clicked || 0))
+      .slice(0, 10);
+
+    if (sorted.length === 0) return [];
+
+    const ids = sorted.map((s) => s.member_id);
+    const { data: members, error: membersErr } = await supabase
+      .from('members')
+      .select(
+        `
+          id, first_name, last_name, email, engagement_score,
+          member_profile ( bucket )
+        `,
+      )
+      .in('id', ids);
+    if (membersErr) throw membersErr;
+
+    const map = new Map((members || []).map((m) => [m.id, m]));
+    return sorted.map((s) => {
+      const m = map.get(s.member_id) || {};
+      const profile = Array.isArray(m.member_profile)
+        ? m.member_profile[0]
+        : m.member_profile;
+      return {
+        id: s.member_id,
+        first_name: m.first_name,
+        last_name: m.last_name,
+        email: m.email,
+        engagement_score: Number(m.engagement_score) || 0,
+        bucket: profile?.bucket ?? null,
+        links_clicked: s.links_clicked,
+        emails_opened_6mo: s.emails_opened_6mo,
+        emails_received_6mo: s.emails_received_6mo,
+        last_clicked_at: s.last_clicked_at,
+      };
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // Render
+  // --------------------------------------------------------------------------
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950">
-        <p className="text-slate-400">Loading dashboard...</p>
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <p className="text-sm text-slate-500">Loading analytics…</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 p-8">
-        <div className="max-w-lg rounded-lg border border-red-800 bg-red-950/40 px-6 py-4 text-red-300">
-          {error}
+      <div className="mx-auto max-w-2xl p-6">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+          <p className="text-sm font-medium text-red-800">
+            Failed to load analytics
+          </p>
+          <p className="mt-1 text-sm text-red-700">{error}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 px-8 py-8 text-slate-100">
-      <header className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-50">GTMShift Analytics</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Internal community health dashboard — engagement, events, and outreach priorities
-        </p>
-      </header>
+    <div className="mx-auto w-full max-w-[90rem] space-y-6 px-4 py-6 sm:px-6">
+      {/* Back to dashboard */}
+      <button
+        type="button"
+        onClick={() => navigate('/')}
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-900"
+      >
+        <svg
+          className="h-4 w-4"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          aria-hidden="true"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+        Back to dashboard
+      </button>
 
-      {/* Section 1 — Top Stats */}
-      <section className="mb-10">
-        <SectionHeader title="Community Overview" />
-        <div className="grid grid-cols-4 gap-4">
-          <StatCard label="Total Active Members" value={stats?.totalActive ?? 0} />
-          <StatCard label="Engaged Last 30 Days" value={stats?.engagedLast30 ?? 0} />
-          <StatCard label="Avg Engagement Score" value={stats?.avgEngagementScore ?? 0} />
-          <StatCard label="Total Events Hosted" value={stats?.totalEvents ?? 0} />
+      {/* Overview stats */}
+      <div>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+          Community Overview
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <MetricCard
+            label="Total Active Members"
+            value={stats?.totalActive?.toLocaleString() ?? '—'}
+            sublabel="Subscribed and reachable"
+          />
+          <MetricCard
+            label="Engaged Last 30 Days"
+            value={stats?.engaged30d?.toLocaleString() ?? '—'}
+            sublabel={
+              stats?.totalActive
+                ? `${Math.round((stats.engaged30d / stats.totalActive) * 100)}% of active`
+                : ''
+            }
+          />
+          <MetricCard
+            label="Avg Engagement Score"
+            value={stats?.avgScore ?? '—'}
+            sublabel="Across scored members"
+          />
+          <MetricCard
+            label="Total Events Hosted"
+            value={stats?.totalEvents ?? '—'}
+            sublabel="All time"
+          />
         </div>
-      </section>
+      </div>
 
-      {/* Section 2 — Top Engaged Members */}
-      <section className="mb-10">
-        <SectionHeader
-          title="Top Engaged Members"
-          subtitle="Top 25 members by engagement score — click a row for details"
-        />
-        <div className="overflow-hidden rounded-lg border border-slate-800">
-          <table className="w-full text-left text-sm">
-            <thead className="sticky top-0 bg-slate-900 text-xs uppercase tracking-wide text-slate-400">
-              <tr>
-                <th className="cursor-pointer px-4 py-3" onClick={() => handleSort('name')}>
-                  Name{sortIndicator('name')}
-                </th>
-                <th className="px-4 py-3">Company</th>
-                <th className="cursor-pointer px-4 py-3" onClick={() => handleSort('bucket')}>
-                  ICP Bucket{sortIndicator('bucket')}
-                </th>
-                <th
-                  className="cursor-pointer px-4 py-3"
-                  onClick={() => handleSort('engagement_score')}
-                >
-                  Score{sortIndicator('engagement_score')}
-                </th>
-                <th
-                  className="cursor-pointer px-4 py-3"
-                  onClick={() => handleSort('events_attended_count')}
-                >
-                  Events{sortIndicator('events_attended_count')}
-                </th>
-                <th
-                  className="cursor-pointer px-4 py-3"
-                  onClick={() => handleSort('last_engagement_date')}
-                >
-                  Last Engaged{sortIndicator('last_engagement_date')}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedTopMembers.map((member, idx) => {
-                const rowKey = `${member.email}-${idx}`;
-                const isExpanded = expandedRow === rowKey;
-                return (
-                  <Fragment key={rowKey}>
-                    <tr
-                      onClick={() => setExpandedRow(isExpanded ? null : rowKey)}
-                      className={`cursor-pointer border-t border-slate-800 ${
-                        idx % 2 === 0 ? 'bg-slate-900/40' : 'bg-slate-900/20'
-                      } hover:bg-slate-800/50`}
-                    >
-                      <td className="px-4 py-3 font-medium text-slate-100">
-                        {member.first_name} {member.last_name}
-                      </td>
-                      <td className="px-4 py-3 text-slate-300">{member.company}</td>
-                      <td className="px-4 py-3">
-                        <BucketBadge bucket={member.bucket} />
-                      </td>
-                      <td className={`px-4 py-3 font-semibold ${scoreTextClass(member.engagement_score)}`}>
-                        {member.engagement_score}
-                      </td>
-                      <td className="px-4 py-3 text-slate-300">{member.events_attended_count}</td>
-                      <td className="px-4 py-3 text-slate-300">
-                        {formatDate(member.last_engagement_date)}
-                      </td>
-                    </tr>
-                    {isExpanded && (
-                      <tr className="border-t border-slate-800 bg-slate-900/60">
-                        <td colSpan={6} className="px-4 py-3 text-sm text-slate-400">
-                          <span className="text-slate-300">Email:</span> {member.email}
-                          <span className="mx-3 text-slate-700">|</span>
-                          <span className="text-slate-300">Last engaged:</span>{' '}
-                          {member.last_engagement_date
-                            ? new Date(member.last_engagement_date).toLocaleString('en-US')
-                            : '—'}
-                          <span className="mx-3 text-slate-700">|</span>
-                          <span className="text-slate-300">Last newsletter open:</span>{' '}
-                          {formatDate(member.last_newsletter_open_at)}
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
-                );
-              })}
-            </tbody>
-          </table>
+      {/* Two-column: Top Members + Going Cold */}
+      <div className="grid gap-6 lg:grid-cols-3 items-stretch">
+        <div className="lg:col-span-2 flex flex-col">
+          <TopMembersSection topMembers={topMembers} />
         </div>
-      </section>
+        <div className="flex flex-col">
+          <ColdMembersSection coldMembers={coldMembers} />
+        </div>
+      </div>
 
-      {/* Section 3 — Charts */}
-      <section className="mb-10">
-        <SectionHeader title="Engagement & ICP Insights" />
-        <div className="grid grid-cols-3 gap-4">
-          <div className="rounded-lg border border-slate-800 bg-slate-900/80 p-4">
-            <h3 className="mb-3 text-sm font-medium text-slate-300">ICP Breakdown</h3>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={icpBreakdown} layout="vertical" margin={{ left: 20, right: 16 }}>
-                <XAxis type="number" stroke="#64748b" tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                <YAxis
-                  type="category"
-                  dataKey="label"
-                  width={110}
-                  stroke="#64748b"
-                  tick={{ fill: '#94a3b8', fontSize: 11 }}
-                />
-                <Tooltip content={<DarkTooltip />} />
-                <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                  {icpBreakdown.map((entry) => (
-                    <Cell
-                      key={entry.bucket}
-                      fill={BUCKET_CHART_COLORS[entry.bucket] ?? BUCKET_CHART_COLORS.Unclassified}
-                    />
+      {/* Charts row */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Section title="ICP Breakdown" subtitle="How members are classified">
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={icpBreakdown}
+                  dataKey="count"
+                  nameKey="label"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={80}
+                  innerRadius={45}
+                  paddingAngle={2}
+                >
+                  {icpBreakdown.map((entry, i) => (
+                    <Cell key={i} fill={entry.color} />
                   ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="rounded-lg border border-slate-800 bg-slate-900/80 p-4">
-            <h3 className="mb-3 text-sm font-medium text-slate-300">Engagement Score Distribution</h3>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={scoreDistribution} margin={{ bottom: 8 }}>
-                <XAxis
-                  dataKey="score_range"
-                  stroke="#64748b"
-                  tick={{ fill: '#94a3b8', fontSize: 10 }}
-                  interval={0}
-                  angle={-25}
-                  textAnchor="end"
-                  height={60}
+                </Pie>
+                <Tooltip
+                  contentStyle={{
+                    background: 'white',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: 8,
+                    fontSize: 12,
+                  }}
                 />
-                <YAxis stroke="#64748b" tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                <Tooltip content={<DarkTooltip />} />
-                <Bar dataKey="member_count" fill="#6366f1" radius={[4, 4, 0, 0]} />
-              </BarChart>
+              </PieChart>
             </ResponsiveContainer>
           </div>
-
-          <div className="rounded-lg border border-slate-800 bg-slate-900/80 p-4">
-            <h3 className="mb-3 text-sm font-medium text-slate-300">Newsletter Engagement</h3>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={newsletterStats?.chartData ?? []} margin={{ bottom: 8 }}>
-                <XAxis
-                  dataKey="label"
-                  stroke="#64748b"
-                  tick={{ fill: '#94a3b8', fontSize: 10 }}
-                  interval={0}
-                  angle={-15}
-                  textAnchor="end"
-                  height={50}
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            {icpBreakdown.map((row) => (
+              <div key={row.bucket} className="flex items-center gap-2 text-xs">
+                <span
+                  className="h-2.5 w-2.5 rounded-sm"
+                  style={{ background: row.color }}
                 />
-                <YAxis stroke="#64748b" tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                <Tooltip content={<DarkTooltip />} />
-                <Bar dataKey="value" fill="#38bdf8" radius={[4, 4, 0, 0]} />
+                <span className="text-slate-700">{row.label}</span>
+                <span className="ml-auto font-medium text-slate-900">
+                  {row.count}
+                </span>
+              </div>
+            ))}
+          </div>
+        </Section>
+
+        <Section title="Engagement Score" subtitle="How members are distributed">
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={scoreDistribution} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+                <XAxis
+                  dataKey="range"
+                  tick={{ fontSize: 11, fill: '#64748b' }}
+                  axisLine={{ stroke: '#e2e8f0' }}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: '#64748b' }}
+                  axisLine={{ stroke: '#e2e8f0' }}
+                  tickLine={false}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: 'white',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: 8,
+                    fontSize: 12,
+                  }}
+                />
+                <Bar dataKey="count" fill="#10b981" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
-      </section>
+        </Section>
 
-      {/* Section 4 — Event History */}
-      <section className="mb-10">
-        <SectionHeader title="Event History" subtitle="Attendance breakdown by event" />
-        <div className="overflow-hidden rounded-lg border border-slate-800">
-          <table className="w-full text-left text-sm">
-            <thead className="sticky top-0 bg-slate-900 text-xs uppercase tracking-wide text-slate-400">
-              <tr>
-                <th className="px-4 py-3">Event</th>
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3">Type</th>
-                <th className="px-4 py-3">Location</th>
-                <th className="px-4 py-3">Signups</th>
-                <th className="px-4 py-3">Attended</th>
-                <th className="px-4 py-3">No Show</th>
-                <th className="px-4 py-3">Canceled</th>
-                <th className="px-4 py-3">Registered</th>
-                <th className="px-4 py-3">Rate</th>
+        <Section title="Newsletter Engagement" subtitle="Active subscribers by time window">
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={newsletterStats?.chart || []}
+                margin={{ top: 8, right: 8, left: -12, bottom: 0 }}
+              >
+                <XAxis
+                  dataKey="window"
+                  tick={{ fontSize: 11, fill: '#64748b' }}
+                  axisLine={{ stroke: '#e2e8f0' }}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: '#64748b' }}
+                  axisLine={{ stroke: '#e2e8f0' }}
+                  tickLine={false}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: 'white',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: 8,
+                    fontSize: 12,
+                  }}
+                />
+                <Bar dataKey="members" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Section>
+      </div>
+
+      {/* Event history */}
+      <EventHistorySection eventHistory={eventHistory} />
+
+      {/* Top clickers */}
+      <Section
+        title="Top Newsletter Clickers"
+        subtitle="Members clicking links in newsletters"
+      >
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="pb-3 pr-4">Member</th>
+                <th className="pb-3 pr-4">Bucket</th>
+                <th className="pb-3 pr-4 text-right">Clicks</th>
+                <th className="pb-3 pr-4 text-right">Score</th>
+                <th className="pb-3">Last Click</th>
               </tr>
             </thead>
-            <tbody>
-              {eventHistory.map((event, idx) => (
-                <tr
-                  key={`${event.event_name}-${event.event_date}`}
-                  className={`border-t border-slate-800 ${
-                    idx % 2 === 0 ? 'bg-slate-900/40' : 'bg-slate-900/20'
-                  }`}
-                >
-                  <td className="px-4 py-3 font-medium text-slate-100">{event.event_name}</td>
-                  <td className="px-4 py-3 text-slate-300">{formatDate(event.event_date)}</td>
-                  <td className="px-4 py-3 text-slate-300">{event.event_type ?? '—'}</td>
-                  <td className="px-4 py-3 text-slate-300">{event.location ?? '—'}</td>
-                  <td className="px-4 py-3 text-slate-300">{event.total_signups}</td>
-                  <td className="px-4 py-3 text-emerald-400">{event.attended}</td>
-                  <td className="px-4 py-3 text-orange-400">{event.no_show}</td>
-                  <td className="px-4 py-3 text-slate-400">{event.canceled}</td>
-                  <td className="px-4 py-3 text-slate-300">{event.registered}</td>
-                  <td
-                    className={`px-4 py-3 font-semibold ${attendanceRateClass(event.attendance_rate_pct)}`}
-                  >
-                    {event.attendance_rate_pct != null ? `${event.attendance_rate_pct}%` : '—'}
+            <tbody className="divide-y divide-slate-100">
+              {topClickers.map((m) => (
+                <tr key={m.id} className="hover:bg-slate-50">
+                  <td className="py-3 pr-4">
+                    <div className="font-medium text-slate-900">
+                      {m.first_name} {m.last_name}
+                    </div>
+                    <div className="text-xs text-slate-500">{m.email}</div>
+                  </td>
+                  <td className="py-3 pr-4">
+                    <BucketBadge bucket={m.bucket} />
+                  </td>
+                  <td className="py-3 pr-4 text-right font-semibold text-slate-900">
+                    {m.links_clicked}
+                  </td>
+                  <td className={`py-3 pr-4 text-right ${scoreColor(m.engagement_score)}`}>
+                    {m.engagement_score.toFixed(1)}
+                  </td>
+                  <td className="py-3 text-slate-600">
+                    {relativeDate(m.last_clicked_at)}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      </section>
-
-      {/* Section 5 — Cold Members */}
-      <section className="mb-10">
-        <div className="rounded-lg border-2 border-amber-700/60 bg-amber-950/20 p-6">
-          <SectionHeader
-            title="Members Going Cold — Consider Outreach"
-            subtitle="Active ICP-adjacent members with strong scores but no engagement in 90+ days"
-          />
-          <div className="overflow-hidden rounded-lg border border-amber-900/40">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-900/80 text-xs uppercase tracking-wide text-slate-400">
-                <tr>
-                  <th className="px-4 py-3">Name</th>
-                  <th className="px-4 py-3">ICP Bucket</th>
-                  <th className="px-4 py-3">Last Engaged</th>
-                  <th className="px-4 py-3">Score</th>
-                </tr>
-              </thead>
-              <tbody>
-                {coldMembers.length === 0 ? (
-                  <tr className="border-t border-slate-800">
-                    <td colSpan={4} className="px-4 py-6 text-center text-slate-500">
-                      No cold members matching criteria
-                    </td>
-                  </tr>
-                ) : (
-                  coldMembers.map((member, idx) => (
-                    <tr
-                      key={`${member.email}-${idx}`}
-                      className={`border-t border-slate-800 ${
-                        idx % 2 === 0 ? 'bg-slate-900/40' : 'bg-slate-900/20'
-                      }`}
-                    >
-                      <td className="px-4 py-3 font-medium text-slate-100">
-                        {member.first_name} {member.last_name}
-                      </td>
-                      <td className="px-4 py-3">
-                        <BucketBadge bucket={member.bucket} />
-                      </td>
-                      <td className="px-4 py-3 text-slate-300">
-                        {formatDate(member.last_engagement_date)}
-                      </td>
-                      <td className={`px-4 py-3 font-semibold ${scoreTextClass(member.engagement_score)}`}>
-                        {member.engagement_score}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      {/* Section 6 — Link Clickers */}
-      <section>
-        <SectionHeader
-          title="Top Link Clickers"
-          subtitle="Warmest newsletter leads by lifetime link clicks (latest snapshot)"
-        />
-        <div className="overflow-hidden rounded-lg border border-slate-800">
-          <table className="w-full text-left text-sm">
-            <thead className="sticky top-0 bg-slate-900 text-xs uppercase tracking-wide text-slate-400">
-              <tr>
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">ICP Bucket</th>
-                <th className="px-4 py-3">Links Clicked</th>
-                <th className="px-4 py-3">Opens (6mo)</th>
-                <th className="px-4 py-3">Received (6mo)</th>
-                <th className="px-4 py-3">Last Clicked</th>
-                <th className="px-4 py-3">Score</th>
-              </tr>
-            </thead>
-            <tbody>
-              {topClickers.length === 0 ? (
-                <tr className="border-t border-slate-800">
-                  <td colSpan={7} className="px-4 py-6 text-center text-slate-500">
-                    No link clickers found
-                  </td>
-                </tr>
-              ) : (
-                topClickers.map((member, idx) => (
-                  <tr
-                    key={`${member.email}-${idx}`}
-                    className={`border-t border-slate-800 ${
-                      idx % 2 === 0 ? 'bg-slate-900/40' : 'bg-slate-900/20'
-                    }`}
-                  >
-                    <td className="px-4 py-3 font-medium text-slate-100">
-                      {member.first_name} {member.last_name}
-                    </td>
-                    <td className="px-4 py-3">
-                      <BucketBadge bucket={member.bucket} />
-                    </td>
-                    <td className="px-4 py-3 font-semibold text-sky-400">{member.links_clicked}</td>
-                    <td className="px-4 py-3 text-slate-300">{member.emails_opened_6mo ?? '—'}</td>
-                    <td className="px-4 py-3 text-slate-300">{member.emails_received_6mo ?? '—'}</td>
-                    <td className="px-4 py-3 text-slate-300">{formatDate(member.last_clicked_at)}</td>
-                    <td className={`px-4 py-3 font-semibold ${scoreTextClass(member.engagement_score)}`}>
-                      {member.engagement_score ?? '—'}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      </Section>
     </div>
   );
 }
