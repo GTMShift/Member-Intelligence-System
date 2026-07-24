@@ -9,23 +9,37 @@ import { renderWithProviders } from './testHelpers';
 // Mock Supabase so InteractionTimeline's DB fetches don't fail in the test
 // environment. Returns empty arrays for all tables — the timeline still
 // renders, it just shows only the interactions passed in as props.
-vi.mock('../lib/supabaseClient', () => ({
-  supabase: {
-    from: vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      in: vi.fn().mockReturnThis(),
-      order: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({ data: null, error: null }),
-      then: vi.fn().mockResolvedValue({ data: [], error: null }),
-    }),
-    auth: {
-      getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
+vi.mock('../lib/supabaseClient', () => {
+  const emptyResult = { data: [] as unknown[], error: null };
+ 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const builder: any = {
+    select: vi.fn(),
+    eq: vi.fn(),
+    in: vi.fn(),
+    order: vi.fn(),
+    limit: vi.fn(),
+    single: vi.fn().mockResolvedValue({ data: null, error: null }),
+    then: (resolveFn: (v: typeof emptyResult) => void) =>
+      Promise.resolve(emptyResult).then(resolveFn),
+  };
+ 
+  builder.select.mockReturnValue(builder);
+  builder.eq.mockReturnValue(builder);
+  builder.in.mockReturnValue(builder);
+  builder.order.mockReturnValue(builder);
+  builder.limit.mockReturnValue(builder);
+ 
+  return {
+    supabase: {
+      from: vi.fn().mockReturnValue(builder),
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
+      },
+      rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
     },
-    rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
-  },
-}));
+  };
+});
  
 vi.mock('../context/authShared', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../context/authShared')>();
@@ -134,9 +148,16 @@ describe('MemberProfileCard', () => {
     const emailInteraction = sarah.interactions.find(
       (i) => i.interaction_type === 'email',
     )!;
+ 
     const timelineSection = screen
       .getByRole('heading', { name: 'Interaction Timeline' })
       .closest('section')!;
+ 
+    // Wait for the loading state to resolve before looking for the list
+    await waitFor(() => {
+      expect(within(timelineSection).queryByText('Loading timeline…')).not.toBeInTheDocument();
+    });
+ 
     const timeline = within(timelineSection).getByRole('list');
     expect(within(timeline).getByText('Email')).toBeInTheDocument();
     expect(within(timeline).getByText(emailInteraction.summary)).toBeInTheDocument();
