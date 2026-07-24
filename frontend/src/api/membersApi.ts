@@ -13,6 +13,62 @@ import type {
   UserRole,
 } from '../types/api';
 
+// Shapes returned directly by the MEMBER_SELECT query below, before being
+// normalized into the app's MemberDetail type by toMemberDetail. Supabase
+// returns a to-one relation as either an object or a single-item array
+// depending on whether it detects a unique constraint, hence the `| X[]`
+// unions here — firstOrSelf() normalizes this before use.
+interface RawCompany {
+  name: string | null;
+  size: string | null;
+  tags: string[] | null;
+  industry: string | null;
+}
+
+interface RawMetroArea {
+  name: string;
+}
+
+interface RawProfile {
+  current_job_start_date: string | null;
+  seniority_level: string | null;
+  company_id: string | null;
+  country: string | null;
+  state_region: string | null;
+  city: string | null;
+  team_size: number | null;
+  bucket: string | null;
+  fit_score: number | null;
+  tag_note: string | null;
+  tags: string[] | null;
+  work_email_enriched: string | null;
+  icp: IcpStatus;
+  signup_source: string | null;
+  updated_at: string;
+  company: RawCompany | RawCompany[] | null;
+  metro_area: RawMetroArea | RawMetroArea[] | null;
+}
+
+interface RawLinkedProfile {
+  avatar_url: string | null;
+}
+
+interface RawMemberRow {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  linkedin_url: string;
+  phone: string | null;
+  created_at: string;
+  last_updated: string;
+  profile: RawProfile | RawProfile[] | null;
+  employment_history: EmploymentHistoryEntry[] | null;
+  member_data: MemberDataEntry[] | null;
+  interactions: Interaction[] | null;
+  linked_profile: RawLinkedProfile | RawLinkedProfile[] | null;
+}
+
 // Fetches every member with all related data joined in.
 // NOTE: intentionally fetches everything and filters/paginates in JS, matching
 // the previous mock-data implementation's behavior. Fine at current scale
@@ -47,58 +103,6 @@ const TEAM_SIZE_RANGES = [
   { value: '1000+', min: 1001, max: Infinity },
 ];
 
-type CompanyJoin = {
-  name?: string | null;
-  size?: string | null;
-  tags?: string | null;
-  industry?: string | null;
-};
-
-type MetroAreaJoin = {
-  name?: string | null;
-};
-
-type ProfileJoin = {
-  current_job_start_date?: string | null;
-  seniority_level?: string | null;
-  company_id?: string | null;
-  country?: string | null;
-  state_region?: string | null;
-  city?: string | null;
-  work_email_enriched?: string | null;
-  icp?: string | null;
-  signup_source?: string | null;
-  updated_at?: string;
-  team_size?: number | null;
-  tags?: string[];
-  bucket?: string | null;
-  fit_score?: number | null;
-  tag_note?: string | null;
-  company?: CompanyJoin | CompanyJoin[] | null;
-  metro_area?: MetroAreaJoin | MetroAreaJoin[] | null;
-};
-
-type LinkedProfileJoin = {
-  avatar_url?: string | null;
-};
-
-/** Shape returned by the members select join before normalization. */
-type MemberRow = {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  linkedin_url: string;
-  phone: string | null;
-  created_at: string;
-  last_updated: string;
-  profile?: ProfileJoin | ProfileJoin[] | null;
-  linked_profile?: LinkedProfileJoin | LinkedProfileJoin[] | null;
-  employment_history?: EmploymentHistoryEntry[] | null;
-  member_data?: MemberDataEntry[] | null;
-  interactions?: Interaction[] | null;
-};
-
 // Supabase returns a to-one relation as an object if a unique constraint is
 // detected, but as an array otherwise — this normalizes either shape.
 function firstOrSelf<T>(value: T | T[] | null | undefined): T | null {
@@ -106,17 +110,19 @@ function firstOrSelf<T>(value: T | T[] | null | undefined): T | null {
   return Array.isArray(value) ? value[0] ?? null : value;
 }
 
-function toMemberDetail(row: MemberRow): MemberDetail {
+function toMemberDetail(row: RawMemberRow): MemberDetail {
   const profileRaw = firstOrSelf(row.profile);
   const linkedProfile = firstOrSelf(row.linked_profile);
   const company = firstOrSelf(profileRaw?.company);
   const metroArea = firstOrSelf(profileRaw?.metro_area);
   const employment = row.employment_history ?? [];
 
-  const currentEntry = employment.find((e) => e.is_current);
+  const currentEntry = employment.find((e: EmploymentHistoryEntry) => e.is_current);
   const prevEntries = [...employment]
-    .filter((e) => !e.is_current)
-    .sort((a, b) => (b.start_date ?? '').localeCompare(a.start_date ?? ''));
+    .filter((e: EmploymentHistoryEntry) => !e.is_current)
+    .sort((a: EmploymentHistoryEntry, b: EmploymentHistoryEntry) =>
+      (b.start_date ?? '').localeCompare(a.start_date ?? ''),
+    );
 
   industryByMemberId.set(row.id, company?.industry ?? null);
 
@@ -162,66 +168,6 @@ function toMemberDetail(row: MemberRow): MemberDetail {
   };
 }
 
-function getCurrentRole(member: MemberDetail): string | null {
-  return member.employment_history.find((entry) => entry.is_current)?.role ?? null;
-}
-
-function toSearchResult(member: MemberDetail): MemberSearchResult {
-  return {
-    id: member.id,
-    first_name: member.first_name,
-    last_name: member.last_name,
-    email: member.email,
-    company_id: member.profile.company_id,
-    company_name: member.profile.company_name,
-    current_role: getCurrentRole(member),
-    metro_area_name: member.profile.metro_area_name,
-    state_region: member.profile.state_region,
-    icp: member.profile.icp,
-    last_updated: member.last_updated,
-  };
-}
-
-function matchesQuery(member: MemberDetail, q: string): boolean {
-  const normalized = q.trim().toLowerCase();
-  if (!normalized) return true;
-
-  const haystack = [
-    member.first_name,
-    member.last_name,
-    `${member.first_name} ${member.last_name}`,
-    member.email,
-    member.profile.company_name,
-    getCurrentRole(member),
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
-
-  return haystack.includes(normalized);
-}
-
-function filterMembers(all: MemberDetail[], params: MemberSearchParams): MemberDetail[] {
-  return all.filter((member) => {
-    if (params.q && !matchesQuery(member, params.q)) return false;
-    if (params.icp === 'NONE' && member.profile.icp !== null) return false;
-    if (params.icp && params.icp !== 'NONE' && member.profile.icp !== params.icp) return false;
-    if (params.metro_area_name && member.profile.metro_area_name !== params.metro_area_name) {
-      return false;
-    }
-    if (params.state && member.profile.state_region !== params.state) return false;
-    if (params.industry && industryByMemberId.get(member.id) !== params.industry) return false;
-    if (params.seniority && member.profile.seniority_level !== params.seniority) return false;
-    if (params.source && member.profile.signup_source !== params.source) return false;
-    if (params.team_size) {
-      const range = TEAM_SIZE_RANGES.find((r) => r.value === params.team_size);
-      const size = member.profile.team_size;
-      if (!range || size === null || size === undefined || size < range.min || size > range.max) return false;
-    }
-    if (params.tag && !member.profile.company_tags.includes(params.tag)) return false;
-    return true;
-  });
-}
 
 function applyRoleFilter(member: MemberDetail, role: UserRole): MemberDetail {
   if (role === 'admin') return member;
@@ -245,26 +191,69 @@ async function fetchAllMemberDetails(): Promise<MemberDetail[]> {
     .order('first_name', { ascending: true })
     .order('id', { ascending: true }); // final tie-breaker for fully stable ordering
   if (error) throw new Error(`Failed to fetch members: ${error.message}`);
-  return (data ?? []).map((row) => toMemberDetail(row as MemberRow));
+  return (data ?? []).map(toMemberDetail);
 }
 
+// Delegates filtering, sorting, and pagination entirely to the search_members
+// Postgres function (see migration 026), rather than fetching every member
+// and doing this work in JS. Each call now returns only the one page of
+// lightweight result rows actually needed, plus the total matching count.
 export async function searchMembers(
   params: MemberSearchParams,
 ): Promise<MemberSearchResponse> {
-  const all = await fetchAllMemberDetails();
-
   const page = params.page ?? 1;
   const limit = params.limit ?? 50;
-  const filtered = filterMembers(all, params);
-  const start = (page - 1) * limit;
-  const pageResults = filtered.slice(start, start + limit);
 
-  return {
-    total: filtered.length,
-    page,
-    limit,
-    results: pageResults.map(toSearchResult),
-  };
+  const { data, error } = await supabase.rpc('search_members', {
+    p_q: params.q ?? null,
+    p_icp: params.icp ?? null,
+    p_metro_area_name: params.metro_area_name ?? null,
+    p_state: params.state ?? null,
+    p_industry: params.industry ?? null,
+    p_seniority: params.seniority ?? null,
+    p_source: params.source ?? null,
+    p_team_size: params.team_size ?? null,
+    p_tag: params.tag ?? null,
+    p_sort: params.sort ?? 'last_name_asc',
+    p_page: page,
+    p_limit: limit,
+  });
+
+  if (error) throw new Error(`Failed to search members: ${error.message}`);
+
+  const rows = data ?? [];
+  const total = rows.length > 0 ? Number(rows[0].total) : 0;
+
+  interface SearchMembersRow {
+    total: number;
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    company_id: string | null;
+    company_name: string | null;
+    current_role_title: string | null;
+    metro_area_name: string | null;
+    state_region: string | null;
+    icp: IcpStatus;
+    last_updated: string;
+  }
+
+  const results: MemberSearchResult[] = (rows as SearchMembersRow[]).map((row) => ({
+    id: row.id,
+    first_name: row.first_name,
+    last_name: row.last_name,
+    email: row.email,
+    company_id: row.company_id,
+    company_name: row.company_name,
+    current_role: row.current_role_title,
+    metro_area_name: row.metro_area_name,
+    state_region: row.state_region,
+    icp: row.icp,
+    last_updated: row.last_updated,
+  }));
+
+  return { total, page, limit, results };
 }
 
 export async function getMember(id: string, role: UserRole): Promise<MemberDetail | null> {
@@ -272,7 +261,7 @@ export async function getMember(id: string, role: UserRole): Promise<MemberDetai
   if (error) throw new Error(`Failed to fetch member ${id}: ${error.message}`);
   if (!data) return null;
 
-  return applyRoleFilter(toMemberDetail(data as MemberRow), role);
+  return applyRoleFilter(toMemberDetail(data), role);
 }
 
 export async function getMetroAreas(): Promise<{ id: string; name: string }[]> {

@@ -1,20 +1,19 @@
+// src/api/createMember.ts
 import { supabase } from '../lib/supabaseClient';
- 
+
 export interface SocialEntry {
   platform: 'Twitter/X' | 'Instagram' | 'TikTok' | 'YouTube' | 'Facebook';
   username: string;
   url?: string;
 }
- 
+
 export interface CreateMemberInput {
-  
   first_name: string;
   last_name: string;
   email: string;
   linkedin_url: string;
   phone: string | null;
- 
-  
+
   team_size: number | null;
   company_name: string | null;
   current_role: string | null;
@@ -40,8 +39,7 @@ export interface CreateMemberInput {
   region_emea: boolean;
   region_apac: boolean;
   region_latin_america: boolean;
- 
-  
+
   address: string | null;
   city: string | null;
   state_region: string | null;
@@ -50,18 +48,15 @@ export interface CreateMemberInput {
   tshirt_size: 'XS' | 'S' | 'M' | 'L' | 'XL' | 'XXL' | null;
   dietary_restrictions: string | null;
   socials: SocialEntry[];
- 
-  
+
   bucket: 'primary_icp' | 'secondary_icp' | 'watchlist' | 'between_jobs' | 'consultant' | 'partner_sponsor' | 'icp_no' | 'manual_review' | null;
   fit_score: number | null;
   tag_note: string | null;
 }
- 
+
 export async function createMember(input: CreateMemberInput): Promise<{ id: string } | null> {
-  
   const { data: { user } } = await supabase.auth.getUser();
- 
-  
+
   const { data, error } = await supabase.rpc('create_member_full', {
     p_first_name: input.first_name,
     p_last_name: input.last_name,
@@ -112,12 +107,11 @@ export async function createMember(input: CreateMemberInput): Promise<{ id: stri
     }))
   : null,
 });
- 
+
   if (error) {
     console.error('Error creating member:', error);
     throw new Error(error.message);
   }
- 
+
   return { id: data as string };
 }
- 

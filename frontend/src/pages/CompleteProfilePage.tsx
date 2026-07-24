@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/authShared';
 import { createMemberSelf, type SelfSignupInput } from '../api/createMemberSelf';
- 
+
 const SENIORITY_OPTIONS = [
   { value: '', label: 'Select seniority' },
   { value: 'Global VP', label: 'Global VP' },
@@ -16,7 +16,7 @@ const SENIORITY_OPTIONS = [
   { value: 'Senior Individual Contributor', label: 'Senior Individual Contributor' },
   { value: 'Individual Contributor', label: 'Individual Contributor' },
 ] as const;
- 
+
 const MANAGEMENT_LAYER_OPTIONS = [
   { value: '', label: 'Select layers' },
   { value: '1', label: '1 layer' },
@@ -24,9 +24,9 @@ const MANAGEMENT_LAYER_OPTIONS = [
   { value: '3', label: '3 layers' },
   { value: '4+', label: '4+ layers' },
 ];
- 
+
 const TSHIRT_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'] as const;
- 
+
 const TEAM_FIELDS = [
   { key: 'oversees_solutions_engineering_consulting', label: 'Solutions Engineering / Consulting' },
   { key: 'oversees_customer_success', label: 'Customer Success' },
@@ -40,7 +40,7 @@ const TEAM_FIELDS = [
   { key: 'oversees_implementation_onboarding', label: 'Implementation / Onboarding' },
   { key: 'oversees_other', label: 'Other' },
 ] as const;
- 
+
 const REGION_FIELDS = [
   { key: 'region_north_america', label: 'North America' },
   { key: 'region_regional_usa', label: 'Regional USA' },
@@ -49,10 +49,10 @@ const REGION_FIELDS = [
   { key: 'region_apac', label: 'APAC' },
   { key: 'region_latin_america', label: 'Latin America' },
 ] as const;
- 
+
 type TeamKey = typeof TEAM_FIELDS[number]['key'];
 type RegionKey = typeof REGION_FIELDS[number]['key'];
- 
+
 type FormState = {
   first_name: string;
   last_name: string;
@@ -90,7 +90,7 @@ type FormState = {
   region_apac: boolean;
   region_latin_america: boolean;
 };
- 
+
 const INITIAL_STATE: FormState = {
   first_name: '',
   last_name: '',
@@ -128,7 +128,7 @@ const INITIAL_STATE: FormState = {
   region_apac: false,
   region_latin_america: false,
 };
- 
+
 function normalizeLinkedInUrl(input: string): string {
   let url = input.trim();
   if (!url) return url;
@@ -138,21 +138,21 @@ function normalizeLinkedInUrl(input: string): string {
   }
   return `https://${url}`;
 }
- 
+
 export function CompleteProfilePage() {
   const navigate = useNavigate();
   const { user, refreshMemberId } = useAuth();
   const [form, setForm] = useState<FormState>(INITIAL_STATE);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
- 
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   };
- 
+
   const toggleBoolean = (field: TeamKey | RegionKey) => {
     setForm((prev) => ({
       ...prev,
@@ -162,17 +162,17 @@ export function CompleteProfilePage() {
         : {}),
     }));
   };
- 
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user?.id || !user?.email) {
       setError('Something went wrong identifying your account. Try signing out and back in.');
       return;
     }
- 
+
     setLoading(true);
     setError(null);
- 
+
     try {
       const input: SelfSignupInput = {
         first_name: form.first_name.trim(),
@@ -212,42 +212,42 @@ export function CompleteProfilePage() {
         region_apac: form.region_apac,
         region_latin_america: form.region_latin_america,
       };
- 
+
       await createMemberSelf(input, user.id);
       await refreshMemberId();
-      navigate('/portal');
+      navigate('/portal', { state: { justCreated: true } });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
       setLoading(false);
     }
   };
- 
+
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
+    <div className="flex min-h-screen flex-col bg-surface">
+      <header className="bg-charcoal">
         <div className="mx-auto max-w-2xl px-4 py-4 sm:px-6">
-          <h1 className="text-lg font-semibold text-slate-900">
+          <h1 className="text-lg font-semibold text-white">
             SolutionExec Member Intelligence Platform
           </h1>
-          <p className="text-sm text-slate-500">Complete your profile</p>
+          <p className="text-sm text-white/60">Complete your profile</p>
         </div>
       </header>
- 
+
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 sm:px-6">
         <p className="mb-6 text-sm text-slate-600">
           We couldn't find an existing member record for <strong>{user?.email}</strong>.
           Fill in a few details to get set up.
         </p>
- 
+
         {error && (
           <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
             <p className="text-sm text-red-700">{error}</p>
           </div>
         )}
- 
+
         <form onSubmit={handleSubmit} className="space-y-6">
- 
+
           {/* Section 1 — Personal info */}
           <section className="rounded-xl border border-slate-200 bg-white p-6">
             <h2 className="mb-4 text-sm font-semibold text-slate-900">Personal info</h2>
@@ -262,7 +262,7 @@ export function CompleteProfilePage() {
                   value={form.first_name}
                   onChange={handleChange}
                   required
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -275,7 +275,7 @@ export function CompleteProfilePage() {
                   value={form.last_name}
                   onChange={handleChange}
                   required
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -295,7 +295,7 @@ export function CompleteProfilePage() {
                   value={form.phone}
                   onChange={handleChange}
                   placeholder="+12025551234"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="col-span-2 flex flex-col gap-1.5">
@@ -309,12 +309,12 @@ export function CompleteProfilePage() {
                   onChange={handleChange}
                   required
                   placeholder="linkedin.com/in/yourname"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
             </div>
           </section>
- 
+
           {/* Section 2 — Role & company */}
           <section className="rounded-xl border border-slate-200 bg-white p-6">
             <h2 className="mb-4 text-sm font-semibold text-slate-900">Role & company</h2>
@@ -327,7 +327,7 @@ export function CompleteProfilePage() {
                   value={form.job_title}
                   onChange={handleChange}
                   placeholder="Director of Solutions Engineering"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -336,7 +336,7 @@ export function CompleteProfilePage() {
                   name="seniority_level"
                   value={form.seniority_level}
                   onChange={handleChange}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 >
                   {SENIORITY_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -351,7 +351,7 @@ export function CompleteProfilePage() {
                   value={form.company_name}
                   onChange={handleChange}
                   placeholder="Acme Corp"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -361,7 +361,7 @@ export function CompleteProfilePage() {
                   name="current_job_start_date"
                   value={form.current_job_start_date}
                   onChange={handleChange}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -373,7 +373,7 @@ export function CompleteProfilePage() {
                   onChange={handleChange}
                   min={0}
                   placeholder="e.g. 25"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -382,7 +382,7 @@ export function CompleteProfilePage() {
                   name="management_layers"
                   value={form.management_layers}
                   onChange={handleChange}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 >
                   {MANAGEMENT_LAYER_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -390,7 +390,7 @@ export function CompleteProfilePage() {
                 </select>
               </div>
             </div>
- 
+
             {/* Teams */}
             <div className="mt-4 flex flex-col gap-1.5">
               <label className="text-xs font-medium text-slate-600">Teams you oversee</label>
@@ -402,7 +402,7 @@ export function CompleteProfilePage() {
                     onClick={() => toggleBoolean(team.key)}
                     className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                       form[team.key]
-                        ? 'border-slate-900 bg-slate-900 text-white'
+                        ? 'border-orange bg-orange text-white'
                         : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'
                     }`}
                   >
@@ -417,11 +417,11 @@ export function CompleteProfilePage() {
                   value={form.oversees_other_text}
                   onChange={handleChange}
                   placeholder="Describe the team..."
-                  className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
                 />
               )}
             </div>
- 
+
             {/* Regions */}
             <div className="mt-4 flex flex-col gap-1.5">
               <label className="text-xs font-medium text-slate-600">Regions</label>
@@ -433,7 +433,7 @@ export function CompleteProfilePage() {
                     onClick={() => toggleBoolean(region.key)}
                     className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                       form[region.key]
-                        ? 'border-slate-900 bg-slate-900 text-white'
+                        ? 'border-orange bg-orange text-white'
                         : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'
                     }`}
                   >
@@ -443,7 +443,7 @@ export function CompleteProfilePage() {
               </div>
             </div>
           </section>
- 
+
           {/* Section 3 — Personal details */}
           <section className="rounded-xl border border-slate-200 bg-white p-6">
             <h2 className="mb-4 text-sm font-semibold text-slate-900">Personal details</h2>
@@ -456,7 +456,7 @@ export function CompleteProfilePage() {
                   value={form.address}
                   onChange={handleChange}
                   placeholder="123 Main St"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -467,7 +467,7 @@ export function CompleteProfilePage() {
                   value={form.city}
                   onChange={handleChange}
                   placeholder="Chicago"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -478,7 +478,7 @@ export function CompleteProfilePage() {
                   value={form.state_region}
                   onChange={handleChange}
                   placeholder="Illinois"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -489,7 +489,7 @@ export function CompleteProfilePage() {
                   value={form.zip_code}
                   onChange={handleChange}
                   placeholder="60601"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -500,7 +500,7 @@ export function CompleteProfilePage() {
                   value={form.country}
                   onChange={handleChange}
                   placeholder="United States"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -509,7 +509,7 @@ export function CompleteProfilePage() {
                   name="tshirt_size"
                   value={form.tshirt_size}
                   onChange={handleChange}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 >
                   <option value="">Select size</option>
                   {TSHIRT_SIZES.map((size) => (
@@ -525,17 +525,17 @@ export function CompleteProfilePage() {
                   value={form.dietary_restrictions}
                   onChange={handleChange}
                   placeholder="e.g. Vegetarian, Gluten free"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                 />
               </div>
             </div>
           </section>
- 
+
           <div className="flex justify-end pb-8">
             <button
               type="submit"
               disabled={loading}
-              className="rounded-md bg-slate-900 px-6 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+              className="rounded-md bg-orange px-6 py-2 text-sm font-medium text-white hover:bg-orange-dark disabled:opacity-50"
             >
               {loading ? 'Saving…' : 'Complete profile'}
             </button>
@@ -545,4 +545,3 @@ export function CompleteProfilePage() {
     </div>
   );
 }
- 

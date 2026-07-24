@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { MemberProfileCard } from './components/MemberProfileCard';
 import { MemberSearchPanel } from './components/MemberSearchPanel';
 import { DuplicateFlagAlerts } from './components/DuplicateFlagAlerts';
@@ -23,8 +23,9 @@ import AnalyticsDashboard from './components/AnalyticsDashboard';
 
 interface DashboardLocationState {
   selectedMemberId?: string;
+  justCreated?: boolean;
 }
- 
+
 function PortalRoleOverride({ children }: { children: ReactNode }) {
   const auth = useAuth();
   const overriddenAuth = { ...auth, role: 'member' as UserRole, isAdmin: false };
@@ -32,23 +33,23 @@ function PortalRoleOverride({ children }: { children: ReactNode }) {
     <AuthContext.Provider value={overriddenAuth}>{children}</AuthContext.Provider>
   );
 }
- 
+
 function RoleBasedRedirect() {
   const { role, loading } = useAuth();
- 
+
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+      <div className="flex min-h-screen items-center justify-center bg-surface">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-charcoal/20 border-t-charcoal" />
       </div>
     );
   }
- 
+
   if (role === 'admin') return <Navigate to="/" replace />;
   if (role === 'member') return <Navigate to="/portal" replace />;
   return <Navigate to="/unauthorized" replace />;
 }
- 
+
 function App() {
   return (
     <BrowserRouter>
@@ -148,7 +149,7 @@ function App() {
     </BrowserRouter>
   );
 }
- 
+
 function DashboardPage() {
   return <MemberDirectoryLayout subtitle="Admin dashboard" showDuplicateAlerts />;
 }
@@ -173,32 +174,62 @@ function AnalyticsPage() {
   );
 }
  
+
 function CompanyPageLayout() {
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="border-b border-slate-200 bg-white">
+      <header className="bg-charcoal">
         <div className="mx-auto flex max-w-[90rem] items-center justify-between px-4 py-4 sm:px-6">
           <div>
-            <h1 className="text-lg font-semibold text-slate-900">
+            <h1 className="text-lg font-semibold text-white">
               SolutionExec Member Intelligence Platform
             </h1>
-            <p className="text-sm text-slate-500">Company details</p>
+            <p className="text-sm text-white/60">Company details</p>
           </div>
           <HeaderActions />
         </div>
       </header>
- 
-      <main className="mx-auto w-full max-w-[90rem] flex-1 bg-slate-50 lg:min-h-[calc(100vh-4.5rem)]">
+
+      <main className="mx-auto w-full max-w-[90rem] flex-1 bg-surface lg:min-h-[calc(100vh-4.5rem)]">
         <CompanyDetailPage />
       </main>
     </div>
   );
 }
- 
+
 function MemberPortalPage() {
   return <MemberDirectoryLayout subtitle="Member portal" portalView />;
 }
- 
+
+function WelcomeToast() {
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setVisible(false), 5000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!visible) return null;
+
+  return (
+    <div className="fixed left-1/2 top-4 z-[var(--z-toast)] w-[90%] max-w-md -translate-x-1/2 rounded-lg border border-sage bg-sage-tint px-4 py-3 shadow-lg">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-medium text-ink">
+          Welcome! Your profile has been created.
+        </p>
+        <button
+          type="button"
+          onClick={() => setVisible(false)}
+          className="shrink-0 text-sage hover:text-ink"
+          aria-label="Dismiss"
+        >
+          ×
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function MemberDirectoryLayout({
   subtitle,
   showDuplicateAlerts = false,
@@ -209,7 +240,9 @@ function MemberDirectoryLayout({
   portalView?: boolean;
 }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const [showWelcome, setShowWelcome] = useState(false);
   const [portalMember, setPortalMember] = useState<MemberDetail | null>(null);
 
   const incomingMemberId = (location.state as DashboardLocationState | null)?.selectedMemberId;
@@ -222,6 +255,24 @@ function MemberDirectoryLayout({
   if ((!portalView || !selectedMemberId) && portalMember !== null) {
     setPortalMember(null);
   }
+
+  const justCreatedFlag = (location.state as DashboardLocationState | null)?.justCreated;
+  const [appliedJustCreated, setAppliedJustCreated] = useState(false);
+  if (justCreatedFlag && !appliedJustCreated) {
+    setAppliedJustCreated(true);
+    setShowWelcome(true);
+  }
+
+  // Clearing the flag from history state (so refreshing the page, or coming
+  // back later, doesn't keep re-showing the welcome banner) is a genuine side
+  // effect on the browser's history — that part belongs in an effect. Setting
+  // showWelcome itself happens above, directly during render, matching the
+  // same pattern already used for incomingMemberId in this file.
+  useEffect(() => {
+    if (justCreatedFlag) {
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [justCreatedFlag, location.pathname, navigate]);
 
   useEffect(() => {
     if (!portalView || !selectedMemberId) {
@@ -277,7 +328,7 @@ function MemberDirectoryLayout({
           />
         </div>
       </aside>
- 
+
       <section className="min-h-[24rem] flex-1 bg-slate-50 lg:min-h-[calc(100vh-4.5rem)]">
         {selectedMemberId ? (
           <div className="flex h-full flex-col">
@@ -306,25 +357,26 @@ function MemberDirectoryLayout({
       </section>
     </>
   );
- 
+
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="border-b border-slate-200 bg-white">
+      {showWelcome && <WelcomeToast />}
+      <header className="bg-charcoal">
         <div className="mx-auto flex max-w-[90rem] items-center justify-between px-4 py-4 sm:px-6">
           <div>
-            <h1 className="text-lg font-semibold text-slate-900">
+            <h1 className="text-lg font-semibold text-white">
               SolutionExec Member Intelligence Platform
             </h1>
-            <p className="text-sm text-slate-500">{subtitle}</p>
+            <p className="text-sm text-white/60">{subtitle}</p>
           </div>
           <HeaderActions />
         </div>
       </header>
- 
+
       {showDuplicateAlerts && (
         <DuplicateFlagAlerts onViewExistingMember={handleViewExistingMember} />
       )}
- 
+
       <main className="mx-auto flex w-full max-w-[90rem] flex-1 flex-col lg:flex-row">
         {portalView ? (
           <PortalRoleOverride>{directoryContent}</PortalRoleOverride>

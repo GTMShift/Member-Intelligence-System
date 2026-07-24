@@ -56,35 +56,29 @@ function DuplicateFlagCard({
             Potential duplicate detected
           </h3>
 
-          <dl className="mt-3 space-y-2 text-sm">
-            <div>
-              <dt className="text-xs font-medium uppercase tracking-wide text-amber-800/70">
-                Incoming member
-              </dt>
-              <dd className="mt-0.5 text-slate-900">
+          <dl className="mt-3 divide-y divide-amber-200/60 text-sm">
+            <div className="flex items-baseline justify-between gap-4 py-1.5">
+              <dt className="shrink-0 text-amber-800/80">Incoming member</dt>
+              <dd className="text-right text-slate-900">
                 {incomingName}
                 <span className="text-slate-600"> · {incoming.email}</span>
               </dd>
             </div>
-            <div>
-              <dt className="text-xs font-medium uppercase tracking-wide text-amber-800/70">
-                Existing member
-              </dt>
-              <dd className="mt-0.5">
+            <div className="flex items-baseline justify-between gap-4 py-1.5">
+              <dt className="shrink-0 text-amber-800/80">Existing member</dt>
+              <dd className="text-right">
                 <button
                   type="button"
                   onClick={() => onViewExistingMember(check.existing_member_id)}
-                  className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                  className="font-medium text-orange-dark hover:text-orange hover:underline"
                 >
                   {existingMemberName}
                 </button>
               </dd>
             </div>
-            <div>
-              <dt className="text-xs font-medium uppercase tracking-wide text-amber-800/70">
-                Matched on
-              </dt>
-              <dd className="mt-0.5 text-slate-900">
+            <div className="flex items-baseline justify-between gap-4 py-1.5">
+              <dt className="shrink-0 text-amber-800/80">Matched on</dt>
+              <dd className="text-right text-slate-900">
                 {MATCHED_ON_LABELS[check.matched_on]}
               </dd>
             </div>
@@ -94,7 +88,7 @@ function DuplicateFlagCard({
             <button
               type="button"
               onClick={() => onViewExistingMember(check.existing_member_id)}
-              className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+              className="rounded-md bg-orange px-3 py-1.5 text-sm font-medium text-white hover:bg-orange-dark"
             >
               View Existing Member
             </button>

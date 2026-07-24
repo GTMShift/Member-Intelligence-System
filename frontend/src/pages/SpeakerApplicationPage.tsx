@@ -106,7 +106,7 @@ export function SpeakerApplicationPage() {
         setError('Failed to load your profile.');
       } finally {
         setProfileLoading(false);
-        }
+      }
     }
 
     void loadProfile();
@@ -136,7 +136,6 @@ export function SpeakerApplicationPage() {
         teams_that_benefit: isSelected
           ? prev.teams_that_benefit.filter((v) => v !== value)
           : [...prev.teams_that_benefit, value],
-        // Clear other text if deselecting Other
         teams_that_benefit_other_text:
           value === 'Other' && isSelected ? '' : prev.teams_that_benefit_other_text,
       };
@@ -150,8 +149,6 @@ export function SpeakerApplicationPage() {
     setLoading(true);
     setError(null);
 
-    // Build the final teams array — if Other is selected and they typed
-    // something, replace the plain 'Other' entry with 'Other: <their text>'
     const teamsWithOther = form.teams_that_benefit.map((t) => {
       if (t === 'Other' && form.teams_that_benefit_other_text.trim()) {
         return `Other: ${form.teams_that_benefit_other_text.trim()}`;
@@ -176,7 +173,7 @@ export function SpeakerApplicationPage() {
         });
 
       if (submitError) throw new Error(submitError.message);
-      
+
       await createNotification({
         type: 'speaker_application',
         title: 'New speaker application',
@@ -196,26 +193,26 @@ export function SpeakerApplicationPage() {
 
   if (profileLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <p className="text-sm text-slate-500">Loading your profile...</p>
+      <div className="flex min-h-screen items-center justify-center bg-surface">
+        <p className="text-sm text-ink/50">Loading your profile...</p>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="border-b border-slate-200 bg-white">
+    <div className="flex min-h-screen flex-col bg-surface">
+      <header className="border-b border-charcoal/80 bg-charcoal">
         <div className="mx-auto flex max-w-[90rem] items-center justify-between px-4 py-4 sm:px-6">
           <div>
-            <h1 className="text-lg font-semibold text-slate-900">
+            <h1 className="text-lg font-semibold text-white">
               SolutionExec Member Intelligence Platform
             </h1>
-            <p className="text-sm text-slate-500">Speaker application</p>
+            <p className="text-sm text-white/60">Speaker application</p>
           </div>
           <button
             type="button"
             onClick={() => navigate('/portal')}
-            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="rounded-md border border-white/20 bg-white/10 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/20"
           >
             ← Back to portal
           </button>
@@ -224,8 +221,8 @@ export function SpeakerApplicationPage() {
 
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 sm:px-6">
         {success && (
-          <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3">
-            <p className="text-sm font-medium text-green-800">
+          <div className="mb-6 rounded-lg border border-sage/30 bg-sage-tint px-4 py-3">
+            <p className="text-sm font-medium text-sage">
               Application submitted successfully. We'll be in touch soon.{' '}
               <button
                 type="button"
@@ -239,35 +236,35 @@ export function SpeakerApplicationPage() {
         )}
 
         {error && (
-          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
-            <p className="text-sm text-red-700">{error}</p>
+          <div className="mb-6 rounded-lg border border-orange/20 bg-orange/5 px-4 py-3">
+            <p className="text-sm text-orange-dark">{error}</p>
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
 
           {/* Auto-filled profile info */}
-          <section className="rounded-xl border border-slate-200 bg-slate-50 p-6">
-            <h2 className="mb-1 text-sm font-semibold text-slate-900">Your info</h2>
-            <p className="mb-4 text-xs text-slate-500">Auto-filled from your member profile</p>
+          <section className="rounded-xl border border-charcoal/15 bg-surface p-6">
+            <h2 className="mb-1 text-sm font-semibold text-ink">Your info</h2>
+            <p className="mb-4 text-xs text-ink/50">Auto-filled from your member profile</p>
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-slate-500">Name</label>
-                <p className="text-sm text-slate-900">
+                <label className="text-xs font-medium text-ink/50">Name</label>
+                <p className="text-sm text-ink">
                   {profile?.first_name} {profile?.last_name}
                 </p>
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-slate-500">Email</label>
-                <p className="text-sm text-slate-900">{profile?.email}</p>
+                <label className="text-xs font-medium text-ink/50">Email</label>
+                <p className="text-sm text-ink">{profile?.email}</p>
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-slate-500">LinkedIn</label>
-                <p className="text-sm text-slate-900">{profile?.linkedin_url ?? '—'}</p>
+                <label className="text-xs font-medium text-ink/50">LinkedIn</label>
+                <p className="text-sm text-ink">{profile?.linkedin_url ?? '—'}</p>
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-slate-500">Location</label>
-                <p className="text-sm text-slate-900">
+                <label className="text-xs font-medium text-ink/50">Location</label>
+                <p className="text-sm text-ink">
                   {[profile?.city, profile?.state_region].filter(Boolean).join(', ') || '—'}
                 </p>
               </div>
@@ -275,13 +272,13 @@ export function SpeakerApplicationPage() {
           </section>
 
           {/* Speaking details */}
-          <section className="rounded-xl border border-slate-200 bg-white p-6">
-            <h2 className="mb-4 text-sm font-semibold text-slate-900">Speaking details</h2>
+          <section className="rounded-xl border border-charcoal/15 bg-white p-6">
+            <h2 className="mb-4 text-sm font-semibold text-ink">Speaking details</h2>
             <div className="space-y-4">
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-slate-600">
-                  Bio / About you <span className="text-red-500">*</span>
+                <label className="text-xs font-medium text-ink/60">
+                  Bio / About you <span className="text-orange">*</span>
                 </label>
                 <textarea
                   name="bio"
@@ -290,13 +287,13 @@ export function SpeakerApplicationPage() {
                   required
                   rows={4}
                   placeholder="Tell us about yourself and your background..."
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-charcoal/20 px-3 py-2 text-sm text-ink placeholder-ink/30 focus:border-orange focus:outline-none"
                 />
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-slate-600">
-                  Interested in speaking at <span className="text-red-500">*</span>
+                <label className="text-xs font-medium text-ink/60">
+                  Interested in speaking at <span className="text-orange">*</span>
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {SPEAKING_INTERESTS.map((interest) => (
@@ -306,8 +303,8 @@ export function SpeakerApplicationPage() {
                       onClick={() => toggleInterest(interest)}
                       className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                         form.speaking_interests.includes(interest)
-                          ? 'border-slate-900 bg-slate-900 text-white'
-                          : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'
+                          ? 'border-orange bg-orange text-white'
+                          : 'border-charcoal/20 bg-white text-ink/70 hover:border-charcoal/40'
                       }`}
                     >
                       {interest}
@@ -317,15 +314,15 @@ export function SpeakerApplicationPage() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-slate-600">
-                  Public speaking experience <span className="text-red-500">*</span>
+                <label className="text-xs font-medium text-ink/60">
+                  Public speaking experience <span className="text-orange">*</span>
                 </label>
                 <select
                   name="speaking_experience"
                   value={form.speaking_experience}
                   onChange={handleChange}
                   required
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-charcoal/20 px-3 py-2 text-sm text-ink focus:border-orange focus:outline-none"
                 >
                   {SPEAKING_EXPERIENCE_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -334,8 +331,8 @@ export function SpeakerApplicationPage() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-slate-600">
-                  What would you like to speak about? <span className="text-red-500">*</span>
+                <label className="text-xs font-medium text-ink/60">
+                  What would you like to speak about? <span className="text-orange">*</span>
                 </label>
                 <textarea
                   name="speaking_topics"
@@ -344,12 +341,12 @@ export function SpeakerApplicationPage() {
                   required
                   rows={3}
                   placeholder="Topics, themes, or specific talks you'd like to give..."
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-charcoal/20 px-3 py-2 text-sm text-ink placeholder-ink/30 focus:border-orange focus:outline-none"
                 />
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-slate-600">
+                <label className="text-xs font-medium text-ink/60">
                   Which teams would benefit from this?
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -360,8 +357,8 @@ export function SpeakerApplicationPage() {
                       onClick={() => toggleTeam(team.key)}
                       className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                         form.teams_that_benefit.includes(team.key)
-                          ? 'border-slate-900 bg-slate-900 text-white'
-                          : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'
+                          ? 'border-orange bg-orange text-white'
+                          : 'border-charcoal/20 bg-white text-ink/70 hover:border-charcoal/40'
                       }`}
                     >
                       {team.label}
@@ -375,7 +372,7 @@ export function SpeakerApplicationPage() {
                     value={form.teams_that_benefit_other_text}
                     onChange={handleChange}
                     placeholder="Describe the team..."
-                    className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                    className="mt-1 rounded-lg border border-charcoal/20 px-3 py-2 text-sm text-ink placeholder-ink/30 focus:border-orange focus:outline-none"
                   />
                 )}
               </div>
@@ -391,25 +388,25 @@ export function SpeakerApplicationPage() {
                       requires_company_approval: e.target.checked,
                     }))
                   }
-                  className="h-4 w-4 rounded border-slate-300"
+                  className="h-4 w-4 rounded border-charcoal/30 accent-orange"
                 />
                 <label
                   htmlFor="requires_company_approval"
-                  className="text-sm text-slate-700"
+                  className="text-sm text-ink/70"
                 >
                   This requires company approval before I can commit
                 </label>
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-slate-600">Other comments</label>
+                <label className="text-xs font-medium text-ink/60">Other comments</label>
                 <textarea
                   name="other_comments"
                   value={form.other_comments}
                   onChange={handleChange}
                   rows={2}
                   placeholder="Anything else you'd like us to know..."
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-charcoal/20 px-3 py-2 text-sm text-ink placeholder-ink/30 focus:border-orange focus:outline-none"
                 />
               </div>
 
@@ -421,14 +418,14 @@ export function SpeakerApplicationPage() {
             <button
               type="button"
               onClick={() => setForm(INITIAL_FORM)}
-              className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="rounded-md border border-charcoal/20 bg-white px-4 py-2 text-sm font-medium text-ink/70 hover:bg-surface"
             >
               Clear form
             </button>
             <button
               type="submit"
               disabled={loading || !profile}
-              className="rounded-md bg-slate-900 px-6 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+              className="rounded-md bg-orange px-6 py-2 text-sm font-medium text-white hover:bg-orange-dark disabled:opacity-50"
             >
               {loading ? 'Submitting...' : 'Submit application'}
             </button>

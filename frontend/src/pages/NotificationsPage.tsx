@@ -44,22 +44,22 @@ const TYPE_META: Record<NotificationType, TypeMeta> = {
   },
   job_change: {
     label: 'Job Change',
-    badgeClass: 'bg-blue-50 text-blue-700 ring-blue-200',
-    iconClass: 'bg-blue-100 text-blue-700',
+    badgeClass: 'bg-sage-tint text-sage ring-sage/20',
+    iconClass: 'bg-sage-tint text-sage',
     iconPath:
       'M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 0 0 .75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 0 0-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0 1 12 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 0 1-.673-.38m0 0A2.18 2.18 0 0 1 3 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 0 1 3.413-.387m7.5 0V5.25A2.25 2.25 0 0 0 13.5 3h-3a2.25 2.25 0 0 0-2.25 2.25v.894m7.5 0a48.667 48.667 0 0 0-7.5 0M12 12.75h.008v.008H12v-.008Z',
   },
   new_signup: {
     label: 'New Signup',
-    badgeClass: 'bg-green-50 text-green-700 ring-green-200',
-    iconClass: 'bg-green-100 text-green-700',
+    badgeClass: 'bg-sage-tint text-sage ring-sage/20',
+    iconClass: 'bg-sage-tint text-sage',
     iconPath:
       'M19 8v6m3-3h-6M9 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 0c-2.67 0-8 1.34-8 4v2h10',
   },
   enrichment_complete: {
     label: 'Enrichment',
-    badgeClass: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-    iconClass: 'bg-emerald-100 text-emerald-700',
+    badgeClass: 'bg-sage-tint text-sage ring-sage/20',
+    iconClass: 'bg-sage-tint text-sage',
     iconPath: 'M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z',
   },
   enrichment_failed: {
@@ -71,16 +71,17 @@ const TYPE_META: Record<NotificationType, TypeMeta> = {
   },
   profile_updated: {
     label: 'Profile Updated',
-    badgeClass: 'bg-indigo-50 text-indigo-700 ring-indigo-200',
-    iconClass: 'bg-indigo-100 text-indigo-700',
+    badgeClass: 'bg-charcoal/10 text-charcoal ring-charcoal/15',
+    iconClass: 'bg-charcoal/10 text-charcoal',
     iconPath:
       'M16.86 4.49 19.5 7.13m-1.41-4.05a1.87 1.87 0 0 1 2.64 2.64L7.5 18.59 3 19.99l1.4-4.5L18.1 3.08Z',
   },
   speaker_application: {
     label: 'Speaker Application',
-    badgeClass: 'bg-violet-50 text-violet-700 ring-violet-200',
-    iconClass: 'bg-violet-100 text-violet-700',
-    iconPath: 'M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 1-3-3V4.5a3 3 0 1 1 6 0v8.25a3 3 0 0 1-3 3Z',
+    badgeClass: 'bg-orange/10 text-orange-dark ring-orange/20',
+    iconClass: 'bg-orange/10 text-orange-dark',
+    iconPath:
+      'M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 1-3-3V4.5a3 3 0 1 1 6 0v8.25a3 3 0 0 1-3 3Z',
   },
 };
 
@@ -167,18 +168,18 @@ export function NotificationsPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="border-b border-slate-200 bg-white">
+      <header className="bg-charcoal">
         <div className="mx-auto flex max-w-[90rem] items-center justify-between px-4 py-4 sm:px-6">
           <div>
-            <h1 className="text-lg font-semibold text-slate-900">
+            <h1 className="text-lg font-semibold text-white">
               SolutionExec Member Intelligence Platform
             </h1>
-            <p className="text-sm text-slate-500">Notifications</p>
+            <p className="text-sm text-white/60">Notifications</p>
           </div>
           <HeaderActions />
         </div>
       </header>
-      <main className="mx-auto w-full max-w-[90rem] flex-1 bg-slate-50 px-4 py-6 sm:px-6">
+      <main className="mx-auto w-full max-w-[90rem] flex-1 bg-surface px-4 py-6 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <button
             type="button"
@@ -216,7 +217,7 @@ export function NotificationsPage() {
                 onClick={() => setActiveFilter(filter.id)}
                 className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
                   isActive
-                    ? 'bg-slate-900 text-white'
+                    ? 'bg-orange text-white'
                     : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
                 }`}
               >
@@ -248,10 +249,10 @@ export function NotificationsPage() {
                 return (
                   <li
                     key={notification.id}
-                    className={`rounded-lg border bg-white p-4 shadow-sm ${
+                    className={`rounded-lg border p-4 shadow-sm ${
                       notification.is_read
-                        ? 'border-slate-200'
-                        : 'border-l-4 border-l-slate-900 border-slate-200 bg-slate-50'
+                        ? 'border-slate-200 bg-white'
+                        : 'border-orange/30 bg-orange/5'
                     }`}
                   >
                     <div className="flex items-start gap-4">
@@ -277,7 +278,7 @@ export function NotificationsPage() {
                             {meta.label}
                           </span>
                           {!notification.is_read && (
-                            <span className="inline-flex items-center rounded-full bg-slate-900 px-2 py-0.5 text-xs font-medium text-white">
+                            <span className="inline-flex items-center rounded-full bg-orange px-2 py-0.5 text-xs font-medium text-white">
                               Unread
                             </span>
                           )}
@@ -291,7 +292,7 @@ export function NotificationsPage() {
                             <Link
                               to="/"
                               state={{ selectedMemberId: notification.member_id }}
-                              className="font-medium text-slate-700 underline-offset-2 hover:text-slate-900 hover:underline"
+                              className="font-medium text-orange-dark underline-offset-2 hover:text-orange hover:underline"
                             >
                               {notification.member_name}
                             </Link>

@@ -14,18 +14,21 @@ export function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-      <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
-        <h1 className="text-center text-xl font-semibold text-slate-900">
+    <div className="flex min-h-screen items-center justify-center bg-charcoal px-4">
+      <div className="w-full max-w-sm rounded-xl border border-white/10 bg-white/5 p-8">
+        <div className="flex justify-center">
+          <img src="/solutionexec-logo.avif" alt="SolutionExec" className="h-16 w-16" />
+        </div>
+        <h1 className="mt-6 text-center text-xl font-semibold text-white">
           SolutionExec Member Intelligence Platform
         </h1>
-        <p className="mt-2 text-center text-sm text-slate-500">
+        <p className="mt-2 text-center text-sm text-white/60">
           Sign in to access the admin dashboard
         </p>
         <button
           type="button"
           onClick={handleGoogleSignIn}
-          className="mt-8 flex w-full items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+          className="mt-8 flex w-full items-center justify-center gap-3 rounded-lg border border-white/15 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-white/90"
         >
           <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
             <path
