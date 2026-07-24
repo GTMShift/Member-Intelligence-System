@@ -897,6 +897,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
             <div className="space-y-4">
               {!isEditing && (
                 <IcpScoringAssistant
+                  key={memberId}
                   memberId={memberId}
                   currentBucket={profile.bucket}
                   currentFitScore={profile.fit_score}
@@ -968,7 +969,14 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
             <h3 className="text-base font-semibold text-slate-900">Interaction Timeline</h3>
             <p className="mt-1 text-xs text-slate-500">Admin only · Tier 3</p>
             <div className="mt-4">
-              <InteractionTimeline interactions={member.interactions} />
+            {memberId && (
+              <InteractionTimeline
+                memberId={memberId}
+                memberCreatedAt={member.created_at}
+                interactions={member.interactions}
+                onInteractionAdded={loadMember}
+              />
+            )}
             </div>
           </section>
         )}
