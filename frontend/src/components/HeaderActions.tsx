@@ -7,7 +7,10 @@ export function HeaderActions() {
   const { user, signOut, role, memberId } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [menuOpen, setMenuOpen] = useState(false);
+  // Open only while pathname matches the path when opened — closes on navigate
+  // without a setState-in-effect.
+  const [menuOpenForPath, setMenuOpenForPath] = useState<string | null>(null);
+  const menuOpen = menuOpenForPath === location.pathname;
   const [unreadCount, setUnreadCount] = useState(0);
 
   const handleSignOut = async () => {
@@ -23,11 +26,7 @@ export function HeaderActions() {
     fetchUnreadNotificationCount().then(setUnreadCount);
   }, [role]);
 
-  useEffect(() => {
-    setMenuOpen(false);
-  }, [location.pathname]);
-
-  const closeMenu = () => setMenuOpen(false);
+  const closeMenu = () => setMenuOpenForPath(null);
 
   const go = (path: string) => {
     closeMenu();
@@ -41,7 +40,7 @@ export function HeaderActions() {
     <div className="flex items-center gap-3 sm:gap-4">
       <button
         type="button"
-        onClick={() => setMenuOpen(true)}
+        onClick={() => setMenuOpenForPath(location.pathname)}
         aria-label="Open menu"
         aria-expanded={menuOpen}
         className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white"
