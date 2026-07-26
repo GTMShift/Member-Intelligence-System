@@ -7,6 +7,11 @@ export function HeaderActions() {
   const { user, signOut, role, memberId } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  // Open only while pathname matches the path when opened — closes on navigate
+  // without a setState-in-effect.
+  const [menuOpenForPath, setMenuOpenForPath] = useState<string | null>(null);
+  const menuOpen = menuOpenForPath === location.pathname;
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const handleSignOut = async () => {
     await signOut();
@@ -14,16 +19,45 @@ export function HeaderActions() {
   };
 
   const isMemberView = location.pathname === '/portal';
-  const [unreadCount, setUnreadCount] = useState(0);
+  const isAdmin = role === 'admin';
 
   useEffect(() => {
     if (role !== 'admin') return;
     fetchUnreadNotificationCount().then(setUnreadCount);
   }, [role]);
 
+  const closeMenu = () => setMenuOpenForPath(null);
+
+  const go = (path: string) => {
+    closeMenu();
+    navigate(path);
+  };
+
+  const navButtonClass =
+    'w-full rounded-md px-3 py-2.5 text-left text-sm font-medium text-slate-800 hover:bg-slate-100';
+
   return (
-    <div className="flex items-center gap-4">
-      {role === 'admin' && (
+    <div className="flex items-center gap-3 sm:gap-4">
+      <button
+        type="button"
+        onClick={() => setMenuOpenForPath(location.pathname)}
+        aria-label="Open menu"
+        aria-expanded={menuOpen}
+        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white"
+      >
+        <svg
+          className="h-5 w-5"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.8}
+          aria-hidden="true"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+
+      {isAdmin && (
         <Link
           to="/notifications"
           aria-label={
@@ -54,60 +88,8 @@ export function HeaderActions() {
           )}
         </Link>
       )}
-      {role === 'admin' && (
-        <button
-          type="button"
-          onClick={() => navigate('/admin/speaker-applications')}
-          className="rounded-md border border-white/20 bg-transparent px-3 py-1.5 text-xs font-medium text-white/80 hover:bg-white/10 hover:text-white"
-        >
-          Speaker applications
-        </button>
-      )}
-      {role === 'admin' && (
-        <button
-          type="button"
-          onClick={() => navigate('/admin/add-member')}
-          className="rounded-md bg-orange px-3 py-1.5 text-xs font-medium text-white hover:bg-orange-dark"
-        >
-          + Add member
-        </button>
-      )}
-      {role === 'admin' && (
-        <button
-          onClick={() => navigate('/analytics')}
-          className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-        >
-          Analytics
-        </button>
-      )}
-      {role === 'admin' && (
-        <button
-          type="button"
-          onClick={() => navigate('/admin/substack-import')}
-          className="rounded-md border border-white/20 bg-transparent px-3 py-1.5 text-xs font-medium text-white/80 hover:bg-white/10 hover:text-white"
-        >
-          Import Substack CSV
-        </button>
-      )}
-      {isMemberView && (
-        <button
-          type="button"
-          onClick={() => navigate(memberId ? '/my-profile' : '/complete-profile')}
-          className="rounded-md border border-white/20 bg-transparent px-3 py-1.5 text-xs font-medium text-white/80 hover:bg-white/10 hover:text-white"
-        >
-          My Profile
-        </button>
-      )}
-      {isMemberView && (
-        <button
-          type="button"
-          onClick={() => navigate('/portal/speaker-application')}
-          className="rounded-md bg-orange px-3 py-1.5 text-xs font-medium text-white hover:bg-orange-dark"
-        >
-          Apply to speak
-        </button>
-      )}
-      {role === 'admin' && (
+
+      {isAdmin && (
         <div className="relative flex rounded-lg border border-white/20 bg-white/5 p-0.5">
           <span
             aria-hidden="true"
@@ -135,9 +117,13 @@ export function HeaderActions() {
           </button>
         </div>
       )}
+
       {user?.email && (
-        <span className="text-sm text-white/60">{user.email}</span>
+        <span className="hidden max-w-[12rem] truncate text-sm text-white/60 sm:inline">
+          {user.email}
+        </span>
       )}
+
       <button
         type="button"
         onClick={handleSignOut}
@@ -145,6 +131,107 @@ export function HeaderActions() {
       >
         Sign out
       </button>
+
+      {/* Overlay */}
+      <div
+        aria-hidden={!menuOpen}
+        onClick={closeMenu}
+        className={`fixed inset-0 z-[60] bg-slate-900/50 transition-opacity duration-300 ${
+          menuOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
+        }`}
+      />
+
+      {/* Sliding sidebar */}
+      <aside
+        role="dialog"
+        aria-modal="true"
+        aria-label="Navigation menu"
+        className={`fixed inset-y-0 right-0 z-[70] flex w-full max-w-xs flex-col bg-white shadow-xl transition-transform duration-300 ease-out ${
+          menuOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4">
+          <h2 className="text-sm font-semibold text-slate-900">Menu</h2>
+          <button
+            type="button"
+            onClick={closeMenu}
+            aria-label="Close menu"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+          >
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+          {isAdmin && (
+            <>
+              <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Admin tools
+              </p>
+              <button type="button" onClick={() => go('/')} className={navButtonClass}>
+                View Admin Dashboard
+              </button>
+              <button type="button" onClick={() => go('/portal')} className={navButtonClass}>
+                View Member Portal
+              </button>
+              <button
+                type="button"
+                onClick={() => go('/admin/add-member')}
+                className={navButtonClass}
+              >
+                + Add member
+              </button>
+              <button
+                type="button"
+                onClick={() => go('/admin/speaker-applications')}
+                className={navButtonClass}
+              >
+                Speaker applications
+              </button>
+              <button type="button" onClick={() => go('/analytics')} className={navButtonClass}>
+                Analytics
+              </button>
+              <button
+                type="button"
+                onClick={() => go('/admin/substack-import')}
+                className={navButtonClass}
+              >
+                Import Substack CSV
+              </button>
+            </>
+          )}
+
+          {(isMemberView || role === 'member') && (
+            <>
+              <p className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Member
+              </p>
+              <button
+                type="button"
+                onClick={() => go(memberId ? '/my-profile' : '/complete-profile')}
+                className={navButtonClass}
+              >
+                My Profile
+              </button>
+              <button
+                type="button"
+                onClick={() => go('/portal/speaker-application')}
+                className={navButtonClass}
+              >
+                Apply to speak
+              </button>
+            </>
+          )}
+        </nav>
+
+        {user?.email && (
+          <div className="border-t border-slate-200 px-4 py-3">
+            <p className="truncate text-xs text-slate-500">{user.email}</p>
+          </div>
+        )}
+      </aside>
     </div>
   );
 }

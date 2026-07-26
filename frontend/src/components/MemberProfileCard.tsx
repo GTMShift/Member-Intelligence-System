@@ -3,12 +3,30 @@ import { Link } from 'react-router-dom';
 import { getMember } from '../api/membersApi';
 import { updateMemberAsAdmin, type AdminUpdateMemberInput } from '../api/adminUpdateMember';
 import { calculateFitScore, suggestIcpBucket, type IcpBucketSuggestion } from '../api/icpScoring';
+import { createNotification } from '../api/notificationsApi';
 import { useAuth } from '../context/authShared';
 import type { EnrichmentResult, MemberDataEntry, MemberDetail } from '../types/api';
 import { formatTimestamp, fullName } from '../utils/format';
 import { EnrichmentReviewPanel } from './EnrichmentReviewPanel';
 import { InteractionTimeline } from './InteractionTimeline';
-// NOTE: aligned to the icp_bucket enum from migration 021 / Meghan's taxonomy.
+
+function summarizeEnrichmentResult(result: EnrichmentResult): string {
+  const contact = result.contact;
+  const parts: string[] = [];
+  if (contact?.most_probable_email) {
+    parts.push(`Work email: ${contact.most_probable_email}`);
+  }
+  if (contact?.profile?.position?.title) {
+    parts.push(`Job title: ${contact.profile.position.title}`);
+  }
+  if (contact?.profile?.position?.company?.name) {
+    parts.push(`Company: ${contact.profile.position.company.name}`);
+  }
+  if (contact?.profile?.location) {
+    parts.push(`Location: ${contact.profile.location}`);
+  }
+  return parts.length > 0 ? parts.join('; ') : 'No new fields returned';
+}// NOTE: aligned to the icp_bucket enum from migration 021 / Meghan's taxonomy.
 // If these values drift from the DB enum, the bucket <select> will silently
 // fail to persist on save (Postgres will reject the enum value).
 const BUCKET_OPTIONS = [
@@ -427,6 +445,10 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
   const handleEnrich = async () => {
     setEnriching(true);
     setEnrichError(null);
+    const memberName = member
+      ? fullName(member.first_name, member.last_name)
+      : 'Unknown member';
+
     try {
       const startResponse = await fetch(
         `http://localhost:3000/members/${memberId}/enrich`,
@@ -467,12 +489,38 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
         }
       }
       if (!finishedResult) {
-        setEnrichError('Enrichment is taking longer than expected — check back later');
+        const timeoutMessage =
+          'Enrichment is taking longer than expected — check back later';
+        setEnrichError(timeoutMessage);
+        await createNotification({
+          type: 'enrichment_failed',
+          title: 'Enrichment timed out',
+          body: `${memberName}: enrichment did not finish within the expected window.`,
+          member_id: memberId,
+          member_name: memberName,
+        });
         return;
       }
+
+      const summary = summarizeEnrichmentResult(finishedResult);
+      await createNotification({
+        type: 'enrichment_complete',
+        title: 'Enrichment complete',
+        body: `${memberName}: enrichment finished. ${summary}. Open the profile to review and apply updates.`,
+        member_id: memberId,
+        member_name: memberName,
+      });
       setEnrichmentResult(finishedResult);
     } catch {
-      setEnrichError('Enrichment failed — please try again later');
+      const failMessage = 'Enrichment failed — please try again later';
+      setEnrichError(failMessage);
+      await createNotification({
+        type: 'enrichment_failed',
+        title: 'Enrichment failed',
+        body: `${memberName}: enrichment could not be completed. Please try again.`,
+        member_id: memberId,
+        member_name: memberName,
+      });
     } finally {
       setEnriching(false);
     }

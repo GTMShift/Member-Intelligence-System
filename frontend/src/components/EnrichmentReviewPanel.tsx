@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
+import { createNotification } from '../api/notificationsApi';
 import { supabase } from '../lib/supabaseClient';
 import type { EnrichmentResult, MemberDetail } from '../types/api';
+import { fullName } from '../utils/format';
 
 interface EnrichmentReviewPanelProps {
   memberId: string;
@@ -189,11 +191,31 @@ export function EnrichmentReviewPanel({
         throw new Error(memberError.message);
       }
 
+      const memberName = fullName(existingMember.first_name, existingMember.last_name);
+      const appliedSummary = selected
+        .map((field) => `${field.label}: ${field.enrichedValue}`)
+        .join('; ');
+      await createNotification({
+        type: 'enrichment_complete',
+        title: 'Enrichment applied',
+        body: `${memberName}: applied ${selected.length} field${selected.length === 1 ? '' : 's'} — ${appliedSummary}.`,
+        member_id: memberId,
+        member_name: memberName,
+      });
+
       onApplied();
     } catch (applyError) {
       const message =
         applyError instanceof Error ? applyError.message : 'Failed to apply enrichment fields.';
       setError(message);
+      const memberName = fullName(existingMember.first_name, existingMember.last_name);
+      await createNotification({
+        type: 'enrichment_failed',
+        title: 'Enrichment apply failed',
+        body: `${memberName}: could not apply enrichment updates. ${message}`,
+        member_id: memberId,
+        member_name: memberName,
+      });
     } finally {
       setSaving(false);
     }

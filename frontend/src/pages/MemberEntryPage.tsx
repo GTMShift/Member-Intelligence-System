@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createMember, type CreateMemberInput, type SocialEntry } from '../api/createMember';
+import { getMember } from '../api/membersApi';
+import { useAuth } from '../context/authShared';
+import type { EnrichmentResult, MemberDetail } from '../types/api';
+import { EnrichmentReviewPanel } from '../components/EnrichmentReviewPanel';
 
 const BUCKET_OPTIONS = [
   { value: '', label: 'Select a category' },
@@ -144,11 +148,18 @@ const EMPTY_SOCIAL: SocialEntry = { platform: 'Twitter/X', username: '', url: ''
 
 export function MemberEntryPage() {
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
   const [form, setForm] = useState<FormState>(INITIAL_STATE);
   const [socials, setSocials] = useState<SocialEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [createdMemberId, setCreatedMemberId] = useState<string | null>(null);
+  const [showEnrichPrompt, setShowEnrichPrompt] = useState(false);
+  const [enriching, setEnriching] = useState(false);
+  const [enrichError, setEnrichError] = useState<string | null>(null);
+  const [enrichmentResult, setEnrichmentResult] = useState<EnrichmentResult | null>(null);
+  const [createdMember, setCreatedMember] = useState<MemberDetail | null>(null);
 
   const showFitScore = ICP_SCORE_BUCKETS.includes(form.bucket);
 
@@ -234,11 +245,96 @@ export function MemberEntryPage() {
         setSuccess(true);
         setForm(INITIAL_STATE);
         setSocials([]);
+        setCreatedMemberId(created.id);
+        setEnrichError(null);
+        setEnrichmentResult(null);
+        setCreatedMember(null);
+        if (isAdmin) {
+          setShowEnrichPrompt(true);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSkipEnrich = () => {
+    setShowEnrichPrompt(false);
+    setEnrichError(null);
+    navigate('/');
+  };
+
+  const handleEnrichNow = async () => {
+    if (!createdMemberId) return;
+
+    setEnriching(true);
+    setEnrichError(null);
+
+    try {
+      const startResponse = await fetch(
+        `http://localhost:3000/members/${createdMemberId}/enrich`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ run_type: 'initial' }),
+        },
+      );
+
+      if (!startResponse.ok) {
+        throw new Error('Failed to start enrichment');
+      }
+
+      const startData = await startResponse.json();
+      const enrichmentId = startData.enrichment_id as string | undefined;
+      if (!enrichmentId) {
+        throw new Error('No enrichment_id returned');
+      }
+
+      const pollIntervalMs = 5_000;
+      const maxAttempts = 36;
+      let finishedResult: EnrichmentResult | null = null;
+
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+
+        const statusResponse = await fetch(
+          `http://localhost:3000/enrich/status/${enrichmentId}`,
+        );
+        if (!statusResponse.ok) {
+          throw new Error('Failed to fetch enrichment status');
+        }
+
+        const pollingResponse = await statusResponse.json();
+        if (pollingResponse.status === 'FINISHED') {
+          finishedResult = {
+            enrichment_id: enrichmentId,
+            status: pollingResponse.status,
+            contact: pollingResponse.datas?.[0]?.contact ?? null,
+          };
+          break;
+        }
+      }
+
+      if (!finishedResult) {
+        setEnrichError('Enrichment is taking longer than expected — you can try again later from the member profile.');
+        return;
+      }
+
+      const memberDetail = await getMember(createdMemberId, 'admin');
+      if (!memberDetail) {
+        setEnrichError('Member was created, but their profile could not be loaded for review.');
+        return;
+      }
+
+      setCreatedMember(memberDetail);
+      setEnrichmentResult(finishedResult);
+      setShowEnrichPrompt(false);
+    } catch {
+      setEnrichError('Enrichment failed — please try again later from the member profile.');
+    } finally {
+      setEnriching(false);
     }
   };
 
@@ -766,6 +862,75 @@ export function MemberEntryPage() {
           </div>
         </form>
       </main>
+
+      {isAdmin && showEnrichPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="enrich-prompt-title"
+            className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-6 shadow-xl"
+          >
+            <h2 id="enrich-prompt-title" className="text-lg font-semibold text-slate-900">
+              Member added successfully!
+            </h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Would you like to enrich their profile with data from FullEnrich? This will
+              automatically fill in company details, job title, location, and employment history.
+            </p>
+
+            {enrichError && (
+              <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                <p className="text-sm text-red-700">{enrichError}</p>
+                <button
+                  type="button"
+                  onClick={() => setEnrichError(null)}
+                  className="mt-2 text-xs font-medium text-red-700 underline hover:text-red-900"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+
+            <div className="mt-6 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={handleSkipEnrich}
+                disabled={enriching}
+                className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Skip for now
+              </button>
+              <button
+                type="button"
+                onClick={handleEnrichNow}
+                disabled={enriching}
+                className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+              >
+                {enriching ? 'Enriching…' : 'Enrich now'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {enrichmentResult && createdMember && createdMemberId && (
+        <EnrichmentReviewPanel
+          memberId={createdMemberId}
+          existingMember={createdMember}
+          enrichedData={enrichmentResult}
+          onClose={() => {
+            setEnrichmentResult(null);
+            setCreatedMember(null);
+            navigate('/');
+          }}
+          onApplied={() => {
+            setEnrichmentResult(null);
+            setCreatedMember(null);
+            navigate('/', { state: { selectedMemberId: createdMemberId } });
+          }}
+        />
+      )}
     </div>
   );
 }
