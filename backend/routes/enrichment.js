@@ -90,6 +90,14 @@ router.post('/', async (req, res) => {
 
   await logEnrichmentRun(id, run_type, 'partial', { enrichment_id: enrichmentId }, {});
 
+  await supabase
+    .from('members')
+    .update({
+      enriched_at: new Date().toISOString(),
+      last_updated: new Date().toISOString(),
+    })
+    .eq('id', id);
+
   return res.json({
     status: 'pending',
     member_id: id,
