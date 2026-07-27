@@ -77,6 +77,11 @@ router.post('/', async (req, res) => {
       return res.status(500).json({ error: interactionError.message });
     }
 
+    await supabase
+      .from('members')
+      .update({ last_updated: new Date().toISOString() })
+      .eq('id', member.id);
+
     console.log('[emailWebhook] Interaction logged for member:', member.id);
     return res.status(201).json({
       status: 'logged',
