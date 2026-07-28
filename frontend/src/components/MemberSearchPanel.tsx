@@ -30,27 +30,78 @@ interface MemberSearchPanelProps {
 
 const EMPTY_FILTERS: MemberSearchParams = {};
 
-const ICP_BADGE_VARIANTS: Record<string, string> = {
-  YES: 'bg-sage-tint text-sage border border-sage/40',
-  NO: 'bg-white/15 text-white border border-white/25',
-  TBD: 'bg-amber-500/25 text-amber-100 border border-amber-400/50',
-  NONE: 'bg-white/10 text-white/70 border border-white/15',
+// ---- Bucket badge -----------------------------------------------------------
+const BUCKET_STYLES: Record<string, { bg: string; text: string; label: string }> = {
+  YES: {
+    bg: 'bg-orange',
+    text: 'text-white',
+    label: 'ICP',
+  },
+  NO: {
+    bg: 'bg-charcoal/5 border border-charcoal/10',
+    text: 'text-charcoal/40',
+    label: 'Non-ICP',
+  },
+  primary_icp: {
+    bg: 'bg-orange',
+    text: 'text-white',
+    label: 'ICP',
+  },
+  secondary_icp: {
+    bg: 'bg-orange/20 border border-orange/30',
+    text: 'text-orange-dark',
+    label: 'ICP',
+  },
+  watchlist: {
+    bg: 'bg-sage/20 border border-sage/30',
+    text: 'text-sage',
+    label: 'Watchlist',
+  },
+  between_jobs: {
+    bg: 'bg-sage-tint',
+    text: 'text-sage',
+    label: 'Between jobs',
+  },
+  consultant: {
+    bg: 'bg-charcoal/10 border border-charcoal/20',
+    text: 'text-charcoal',
+    label: 'Consultant',
+  },
+  partner_sponsor: {
+    bg: 'bg-charcoal',
+    text: 'text-white',
+    label: 'Partner / Sponsor',
+  },
+  manual_review: {
+    bg: 'bg-orange/10 border border-orange/20',
+    text: 'text-orange-dark',
+    label: 'Review',
+  },
+  icp_no: {
+    bg: 'bg-charcoal/5 border border-charcoal/10',
+    text: 'text-charcoal/40',
+    label: 'Non-ICP',
+  },
 };
-
-const ICP_BADGE_LABELS: Record<string, string> = {
-  YES: 'ICP',
-  NO: 'Non-ICP',
-  TBD: 'TBD',
-  NONE: 'Not classified',
-};
-
-function IcpBadge({ icp }: { icp: MemberSearchResult['icp'] }) {
-  const key = icp ?? 'NONE';
+function IcpBucketBadge({ bucket }: { bucket: string | null | undefined }) {
+  if (!bucket) {
+    return (
+      <span className="rounded-full bg-charcoal/5 px-2 py-0.5 text-xs font-medium text-charcoal/30">
+        Unclassified
+      </span>
+    );
+  }
+  const style = BUCKET_STYLES[bucket];
+  if (!style) {
+    return (
+      <span className="rounded-full bg-charcoal/5 px-2 py-0.5 text-xs font-medium text-charcoal/40">
+        {bucket}
+      </span>
+    );
+  }
   return (
-    <span
-      className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${ICP_BADGE_VARIANTS[key]}`}
-    >
-      {ICP_BADGE_LABELS[key]}
+    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${style.bg} ${style.text}`}>
+      {style.label}
     </span>
   );
 }
@@ -68,17 +119,12 @@ export function MemberSearchPanel({
       .then((options) => {
         if (!cancelled) setFilterOptions(options);
       })
-      .catch(() => {
-        // Leave filterOptions at the empty defaults if this fails —
-        // filters just won't have any choices, but the page still renders.
-      });
+      .catch(() => {});
     getMetroAreas()
       .then((areas) => {
         if (!cancelled) setMetroAreas(areas);
       })
-      .catch(() => {
-        // Same graceful fallback — an empty metro area dropdown, not a crash.
-      });
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -112,7 +158,6 @@ export function MemberSearchPanel({
   const runSearch = useCallback(async (searchQuery: string, searchFilters: MemberSearchParams) => {
     setLoading(true);
     setError(null);
-
     try {
       const response = await searchMembers({
         q: searchQuery || undefined,
@@ -157,7 +202,6 @@ export function MemberSearchPanel({
     const timer = setTimeout(() => {
       runSearch(query, filters);
     }, 300);
-
     return () => clearTimeout(timer);
   }, [query, filters, runSearch]);
 
@@ -358,7 +402,7 @@ export function MemberSearchPanel({
                         {member.metro_area_name ?? '—'}
                       </p>
                     </div>
-                    <IcpBadge icp={member.icp} />
+                    <IcpBucketBadge bucket={member.bucket} />
                   </div>
                   <p className="mt-2 text-xs text-white/30">
                     Updated {formatTimestamp(member.last_updated)}

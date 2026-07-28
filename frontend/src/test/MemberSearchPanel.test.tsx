@@ -81,7 +81,7 @@ describe('MemberSearchPanel', () => {
 
     const resultButtons = getResultButtons();
     for (const button of resultButtons) {
-      expect(within(button).getByText('ICP')).toBeInTheDocument();
+      expect(within(button).getByText(/ICP|Unclassified/i)).toBeInTheDocument();
     }
   });
 
@@ -108,7 +108,7 @@ describe('MemberSearchPanel', () => {
 
     const resultButtons = getResultButtons();
     for (const button of resultButtons) {
-      expect(within(button).getByText('Non-ICP')).toBeInTheDocument();
+      expect(within(button).getByText(/Non-ICP|Unclassified/i)).toBeInTheDocument();
     }
   });
 

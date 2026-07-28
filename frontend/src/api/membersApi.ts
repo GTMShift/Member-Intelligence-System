@@ -226,6 +226,7 @@ export async function searchMembers(
 
   interface SearchMembersRow {
     total: number;
+    bucket: string | null;
     id: string;
     first_name: string;
     last_name: string;
@@ -250,6 +251,7 @@ export async function searchMembers(
     metro_area_name: row.metro_area_name,
     state_region: row.state_region,
     icp: row.icp,
+    bucket: row.bucket ?? null,
     last_updated: row.last_updated,
   }));
 

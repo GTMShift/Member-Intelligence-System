@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
+import { createNotification } from '../api/notificationsApi';
 import { supabase } from '../lib/supabaseClient';
 import type { EnrichmentResult, MemberDetail } from '../types/api';
+import { fullName } from '../utils/format';
 
 interface EnrichmentReviewPanelProps {
   memberId: string;
@@ -86,6 +88,25 @@ function parseLocation(location: string): { city: string | null; state_region: s
   return { city: location.trim() || null, state_region: null };
 }
 
+async function findOrCreateCompany(companyName: string): Promise<string> {
+  const name = companyName.trim();
+  const { data: matches, error: findErr } = await supabase
+    .from('companies')
+    .select('id')
+    .ilike('name', name)
+    .limit(1);
+  if (findErr) throw new Error(`Company lookup failed: ${findErr.message}`);
+  if (matches && matches.length > 0) return matches[0].id;
+
+  const { data: created, error: createErr } = await supabase
+    .from('companies')
+    .insert({ name })
+    .select('id')
+    .single();
+  if (createErr) throw new Error(`Failed to create company: ${createErr.message}`);
+  return created.id;
+}
+
 export function EnrichmentReviewPanel({
   memberId,
   existingMember,
@@ -130,6 +151,8 @@ export function EnrichmentReviewPanel({
 
     try {
       const profileUpdates: Record<string, string | null> = {};
+      let companyNameToApply: string | null = null;
+      let jobTitleToApply: string | null = null;
 
       for (const field of selected) {
         if (field.key === 'work_email') {
@@ -143,27 +166,16 @@ export function EnrichmentReviewPanel({
         }
 
         if (field.key === 'job_title') {
-          const { error: employmentError } = await supabase
-            .from('employment_history')
-            .update({ role: field.enrichedValue })
-            .eq('member_id', memberId)
-            .eq('is_current', true);
-
-          if (employmentError) {
-            throw new Error(employmentError.message);
-          }
+          jobTitleToApply = field.enrichedValue;
         }
 
-        if (field.key === 'company' && existingMember.profile.company_id) {
-          const { error: companyError } = await supabase
-            .from('companies')
-            .update({ name: field.enrichedValue })
-            .eq('id', existingMember.profile.company_id);
-
-          if (companyError) {
-            throw new Error(companyError.message);
-          }
+        if (field.key === 'company') {
+          companyNameToApply = field.enrichedValue;
         }
+      }
+
+      if (companyNameToApply) {
+        profileUpdates.company_id = await findOrCreateCompany(companyNameToApply);
       }
 
       if (Object.keys(profileUpdates).length > 0) {
@@ -180,6 +192,49 @@ export function EnrichmentReviewPanel({
         }
       }
 
+      if (jobTitleToApply || companyNameToApply) {
+        const currentRole =
+          existingMember.employment_history.find((entry) => entry.is_current)?.role ?? null;
+        const { data: existingCurrent, error: currentLookupError } = await supabase
+          .from('employment_history')
+          .select('id')
+          .eq('member_id', memberId)
+          .eq('is_current', true)
+          .maybeSingle();
+
+        if (currentLookupError) {
+          throw new Error(currentLookupError.message);
+        }
+
+        if (existingCurrent) {
+          const employmentUpdates: Record<string, string> = {};
+          if (jobTitleToApply) employmentUpdates.role = jobTitleToApply;
+          if (companyNameToApply) employmentUpdates.company = companyNameToApply;
+
+          const { error: employmentError } = await supabase
+            .from('employment_history')
+            .update(employmentUpdates)
+            .eq('id', existingCurrent.id);
+
+          if (employmentError) {
+            throw new Error(employmentError.message);
+          }
+        } else {
+          const { error: employmentError } = await supabase.from('employment_history').insert({
+            member_id: memberId,
+            company:
+              companyNameToApply ?? existingMember.profile.company_name ?? 'Unknown',
+            role: jobTitleToApply ?? currentRole,
+            is_current: true,
+            source: 'Manual',
+          });
+
+          if (employmentError) {
+            throw new Error(employmentError.message);
+          }
+        }
+      }
+
       const { error: memberError } = await supabase
         .from('members')
         .update({ last_updated: new Date().toISOString() })
@@ -189,11 +244,31 @@ export function EnrichmentReviewPanel({
         throw new Error(memberError.message);
       }
 
+      const memberName = fullName(existingMember.first_name, existingMember.last_name);
+      const appliedSummary = selected
+        .map((field) => `${field.label}: ${field.enrichedValue}`)
+        .join('; ');
+      await createNotification({
+        type: 'enrichment_complete',
+        title: 'Enrichment applied',
+        body: `${memberName}: applied ${selected.length} field${selected.length === 1 ? '' : 's'} — ${appliedSummary}.`,
+        member_id: memberId,
+        member_name: memberName,
+      });
+
       onApplied();
     } catch (applyError) {
       const message =
         applyError instanceof Error ? applyError.message : 'Failed to apply enrichment fields.';
       setError(message);
+      const memberName = fullName(existingMember.first_name, existingMember.last_name);
+      await createNotification({
+        type: 'enrichment_failed',
+        title: 'Enrichment apply failed',
+        body: `${memberName}: could not apply enrichment updates. ${message}`,
+        member_id: memberId,
+        member_name: memberName,
+      });
     } finally {
       setSaving(false);
     }
