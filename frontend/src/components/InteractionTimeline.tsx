@@ -1,4 +1,3 @@
-
 // src/components/InteractionTimeline.tsx
 //
 // Unified activity timeline combining:
@@ -12,20 +11,21 @@
 //   text-ink, bg-surface, bg-charcoal, text-charcoal,
 //   bg-orange, text-orange, bg-orange-dark, text-orange-dark,
 //   bg-sage, text-sage, bg-sage-tint
- 
+
 import React, { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/authShared';
 import type { Interaction } from '../types/api';
 import { formatTimestamp } from '../utils/format';
- 
+
 // ---- Types ------------------------------------------------------------------
- 
+
 type TimelineEventType =
   | 'signup'
   | 'event_attended'
   | 'speaker_application'
   | 'otr_application'
+  | 'substack_interaction'
   | 'meeting'
   | 'call'
   | 'email'
@@ -34,7 +34,7 @@ type TimelineEventType =
   | 'sms_message'
   | 'coffee_chat'
   | 'other';
- 
+
 interface TimelineEvent {
   id: string;
   type: TimelineEventType;
@@ -43,15 +43,15 @@ interface TimelineEvent {
   subtitle?: string;
   badge?: string;
 }
- 
+
 // ---- Supabase row types -----------------------------------------------------
- 
+
 interface EventSignupRow {
   id: string;
   signup_date: string;
   event_id: string | null;
 }
- 
+
 interface EventRow {
   id: string;
   event_name: string;
@@ -59,22 +59,38 @@ interface EventRow {
   location: string | null;
   event_type: string | null;
 }
- 
+
 interface SpeakerApplicationRow {
   id: string;
   submitted_at: string;
   status: string;
 }
- 
+
 interface OtrApplicationRow {
   id: string;
   created_at: string;
   status: string | null;
   event_id: string | null;
 }
- 
+
+interface SubstackEngagementRow {
+  id: string;
+  member_id: string;
+  last_email_open: string | null;
+  last_clicked_at: string | null;
+  snapshot_at: string;
+}
+
+interface SubstackSubscriberRow {
+  id: string;
+  member_id: string;
+  last_seen_at: string;
+  start_date: string | null;
+  status: string | null;
+}
+
 // ---- Interaction type options ------------------------------------------------
- 
+
 const INTERACTION_TYPE_OPTIONS = [
   { value: 'meeting', label: 'Meeting' },
   { value: 'sms_message', label: 'SMS Message' },
@@ -82,9 +98,9 @@ const INTERACTION_TYPE_OPTIONS = [
   { value: 'coffee_chat', label: 'Coffee Chat' },
   { value: 'other', label: 'Other' },
 ] as const;
- 
+
 // ---- Style config -----------------------------------------------------------
- 
+
 const EVENT_STYLES: Record<
   string,
   { dot: string; badgeBg: string; badgeText: string; label: string }
@@ -112,6 +128,12 @@ const EVENT_STYLES: Record<
     badgeBg: 'bg-orange/10',
     badgeText: 'text-orange-dark',
     label: 'OTR application',
+  },
+  substack_interaction: {
+    dot: 'bg-sage',
+    badgeBg: 'bg-sage-tint',
+    badgeText: 'text-sage',
+    label: 'Substack',
   },
   meeting: {
     dot: 'bg-charcoal',
@@ -162,29 +184,29 @@ const EVENT_STYLES: Record<
     label: 'Other',
   },
 };
- 
+
 const FALLBACK_STYLE = {
   dot: 'bg-charcoal',
   badgeBg: 'bg-surface',
   badgeText: 'text-charcoal',
   label: 'Interaction',
 };
- 
+
 const STATUS_LABELS: Record<string, string> = {
   pending: 'Pending',
   approved: 'Approved',
   declined: 'Declined',
   waitlist: 'Waitlist',
 };
- 
+
 // ---- Log Interaction Form ---------------------------------------------------
- 
+
 interface LogInteractionFormProps {
   memberId: string;
   onSaved: () => void;
   onCancel: () => void;
 }
- 
+
 function LogInteractionForm({ memberId, onSaved, onCancel }: LogInteractionFormProps) {
   const { user } = useAuth();
   const [type, setType] = useState('meeting');
@@ -194,7 +216,7 @@ function LogInteractionForm({ memberId, onSaved, onCancel }: LogInteractionFormP
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
- 
+
   const handleSave = async () => {
     if (!summary.trim()) {
       setError('Summary is required.');
@@ -219,13 +241,13 @@ function LogInteractionForm({ memberId, onSaved, onCancel }: LogInteractionFormP
       setSaving(false);
     }
   };
- 
+
   return (
     <div className="rounded-lg border border-charcoal/15 bg-surface p-4 space-y-3">
       <h4 className="text-xs font-semibold uppercase tracking-wide text-charcoal">
         Log interaction
       </h4>
- 
+
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1">
           <label className="text-xs font-medium text-ink/60">Type</label>
@@ -241,7 +263,7 @@ function LogInteractionForm({ memberId, onSaved, onCancel }: LogInteractionFormP
             ))}
           </select>
         </div>
- 
+
         <div className="flex flex-col gap-1">
           <label className="text-xs font-medium text-ink/60">Date & time</label>
           <input
@@ -252,7 +274,7 @@ function LogInteractionForm({ memberId, onSaved, onCancel }: LogInteractionFormP
           />
         </div>
       </div>
- 
+
       <div className="flex flex-col gap-1">
         <label className="text-xs font-medium text-ink/60">Summary</label>
         <textarea
@@ -263,11 +285,11 @@ function LogInteractionForm({ memberId, onSaved, onCancel }: LogInteractionFormP
           className="rounded-lg border border-charcoal/20 px-3 py-2 text-sm text-ink placeholder-ink/30 focus:border-orange focus:outline-none bg-white"
         />
       </div>
- 
+
       {error && (
         <p className="text-xs text-orange-dark">{error}</p>
       )}
- 
+
       <div className="flex gap-2">
         <button
           type="button"
@@ -289,16 +311,16 @@ function LogInteractionForm({ memberId, onSaved, onCancel }: LogInteractionFormP
     </div>
   );
 }
- 
+
 // ---- Component --------------------------------------------------------------
- 
+
 interface InteractionTimelineProps {
   memberId: string;
   memberCreatedAt: string;
   interactions: Interaction[];
   onInteractionAdded?: () => void;
 }
- 
+
 export function InteractionTimeline({
   memberId,
   memberCreatedAt,
@@ -309,7 +331,7 @@ export function InteractionTimeline({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
- 
+
   const loadTimelineEvents = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -320,25 +342,25 @@ export function InteractionTimeline({
         .eq('member_id', memberId)
         .eq('approval_status', 'approved')
         .eq('rsvp_status', 'attended');
- 
+
       const signups = signupsResult.data ?? [];
- 
+
       const eventIds = signups
         .map((s: EventSignupRow) => s.event_id)
         .filter(Boolean) as string[];
- 
+
       const eventsResult = eventIds.length > 0
         ? await supabase
             .from('events')
             .select('id, event_name, event_date, location, event_type')
             .in('id', eventIds)
         : { data: [] as EventRow[] };
- 
+
       const eventsMap = Object.fromEntries(
         (eventsResult.data ?? []).map((e: EventRow) => [e.id, e]),
       );
- 
-      const [speakerResult, otrResult] = await Promise.all([
+
+      const [speakerResult, otrResult, substackEngagementResult, substackSubscriberResult] = await Promise.all([
         supabase
           .from('speaker_applications')
           .select('id, submitted_at, status')
@@ -347,10 +369,21 @@ export function InteractionTimeline({
           .from('otr_applications')
           .select('id, created_at, status, event_id')
           .eq('member_id', memberId),
+        supabase
+          .from('substack_engagement_snapshots')
+          .select('id, member_id, last_email_open, last_clicked_at, snapshot_at')
+          .eq('member_id', memberId)
+          .order('snapshot_at', { ascending: false })
+          .limit(1),
+        supabase
+          .from('substack_subscribers')
+          .select('id, member_id, last_seen_at, start_date, status')
+          .eq('member_id', memberId)
+          .limit(1),
       ]);
- 
+
       const timelineEvents: TimelineEvent[] = [];
- 
+
       // Find the earliest event date across all attended events
       const earliestEventDate = (signups as EventSignupRow[]).reduce(
         (earliest: string | null, row: EventSignupRow) => {
@@ -361,21 +394,21 @@ export function InteractionTimeline({
         },
         null,
       );
- 
+
       // If any attended event predates the member's created_at, push the
       // joined date back to that event so the timeline makes chronological sense
       const signupDate =
         earliestEventDate && earliestEventDate < memberCreatedAt
           ? earliestEventDate
           : memberCreatedAt;
- 
+
       timelineEvents.push({
         id: 'signup',
         type: 'signup',
         date: signupDate,
         title: 'Joined the community',
       });
- 
+
       for (const row of signups as EventSignupRow[]) {
         const ev = eventsMap[row.event_id ?? ''];
         timelineEvents.push({
@@ -387,7 +420,7 @@ export function InteractionTimeline({
           badge: ev?.event_type ?? undefined,
         });
       }
- 
+
       for (const row of (speakerResult.data ?? []) as SpeakerApplicationRow[]) {
         timelineEvents.push({
           id: `speaker-${row.id}`,
@@ -397,7 +430,7 @@ export function InteractionTimeline({
           badge: STATUS_LABELS[row.status] ?? row.status,
         });
       }
- 
+
       for (const row of (otrResult.data ?? []) as OtrApplicationRow[]) {
         timelineEvents.push({
           id: `otr-${row.id}`,
@@ -407,7 +440,39 @@ export function InteractionTimeline({
           badge: row.status ? (STATUS_LABELS[row.status] ?? row.status) : undefined,
         });
       }
- 
+
+      // Substack — prefer real engagement data (clicked > opened) over
+      // subscriber start_date. Drop last_seen_at entirely — it's the import
+      // timestamp, not a real interaction date.
+      const engagement = ((substackEngagementResult.data ?? []) as SubstackEngagementRow[])[0];
+      const subscriber = ((substackSubscriberResult.data ?? []) as SubstackSubscriberRow[])[0];
+
+      if (engagement?.last_clicked_at) {
+        timelineEvents.push({
+          id: 'substack',
+          type: 'substack_interaction',
+          date: engagement.last_clicked_at,
+          title: 'Last Substack interaction',
+          subtitle: 'Clicked a link in newsletter',
+        });
+      } else if (engagement?.last_email_open) {
+        timelineEvents.push({
+          id: 'substack',
+          type: 'substack_interaction',
+          date: engagement.last_email_open,
+          title: 'Last Substack interaction',
+          subtitle: 'Opened a newsletter email',
+        });
+      } else if (subscriber?.start_date) {
+        timelineEvents.push({
+          id: 'substack',
+          type: 'substack_interaction',
+          date: subscriber.start_date,
+          title: 'Subscribed to newsletter',
+          subtitle: subscriber.status ? `Status: ${subscriber.status}` : undefined,
+        });
+      }
+
       for (const interaction of interactions) {
         timelineEvents.push({
           id: `interaction-${interaction.id}`,
@@ -417,14 +482,14 @@ export function InteractionTimeline({
           subtitle: interaction.logged_by ? `Logged by ${interaction.logged_by}` : undefined,
         });
       }
- 
+
       // Sort newest first, but always pin the signup event to the bottom
       timelineEvents.sort((a, b) => {
         if (a.id === 'signup') return 1;
         if (b.id === 'signup') return -1;
         return new Date(b.date).getTime() - new Date(a.date).getTime();
       });
- 
+
       setEvents(timelineEvents);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load timeline.');
@@ -432,27 +497,27 @@ export function InteractionTimeline({
       setLoading(false);
     }
   }, [memberId, memberCreatedAt, interactions]);
- 
+
   useEffect(() => {
     async function run() {
       await loadTimelineEvents();
     }
     run().catch(console.error);
   }, [loadTimelineEvents]);
- 
+
   const handleSaved = () => {
     setShowForm(false);
     if (onInteractionAdded) onInteractionAdded();
   };
- 
+
   if (loading) {
     return <p className="text-sm text-ink/50">Loading timeline…</p>;
   }
- 
+
   if (error) {
     return <p className="text-sm text-orange-dark">{error}</p>;
   }
- 
+
   return (
     <div className="space-y-4">
       {/* Log interaction button / form */}
@@ -471,7 +536,7 @@ export function InteractionTimeline({
           onCancel={() => setShowForm(false)}
         />
       )}
- 
+
       {events.length === 0 ? (
         <p className="text-sm text-ink/50">No activity yet.</p>
       ) : (
@@ -510,4 +575,3 @@ export function InteractionTimeline({
     </div>
   );
 }
- 
