@@ -45,12 +45,12 @@ const BUCKET_STYLES: Record<string, { bg: string; text: string; label: string }>
   primary_icp: {
     bg: 'bg-orange',
     text: 'text-white',
-    label: 'ICP',
+    label: 'Primary ICP',
   },
   secondary_icp: {
     bg: 'bg-orange/20 border border-orange/30',
     text: 'text-orange-dark',
-    label: 'ICP',
+    label: 'Secondary ICP',
   },
   watchlist: {
     bg: 'bg-sage/20 border border-sage/30',
@@ -75,7 +75,7 @@ const BUCKET_STYLES: Record<string, { bg: string; text: string; label: string }>
   manual_review: {
     bg: 'bg-orange/10 border border-orange/20',
     text: 'text-orange-dark',
-    label: 'Review',
+    label: 'Manuel Review',
   },
   icp_no: {
     bg: 'bg-charcoal/5 border border-charcoal/10',
