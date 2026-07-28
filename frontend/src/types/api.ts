@@ -101,7 +101,7 @@ export interface MemberSearchResult {
   last_name: string;
   email: string;
   company_id: string | null;
-  bucket: string | null;
+  bucket?: string | null;
   company_name: string | null;
   /** Derived from employment_history where is_current = true */
   current_role: string | null;
