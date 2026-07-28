@@ -1,3 +1,4 @@
+
 // src/components/InteractionTimeline.tsx
 //
 // Unified activity timeline combining:
@@ -350,10 +351,28 @@ export function InteractionTimeline({
  
       const timelineEvents: TimelineEvent[] = [];
  
+      // Find the earliest event date across all attended events
+      const earliestEventDate = (signups as EventSignupRow[]).reduce(
+        (earliest: string | null, row: EventSignupRow) => {
+          const ev = eventsMap[row.event_id ?? ''];
+          const date = ev?.event_date ?? row.signup_date;
+          if (!earliest || date < earliest) return date;
+          return earliest;
+        },
+        null,
+      );
+ 
+      // If any attended event predates the member's created_at, push the
+      // joined date back to that event so the timeline makes chronological sense
+      const signupDate =
+        earliestEventDate && earliestEventDate < memberCreatedAt
+          ? earliestEventDate
+          : memberCreatedAt;
+ 
       timelineEvents.push({
         id: 'signup',
         type: 'signup',
-        date: memberCreatedAt,
+        date: signupDate,
         title: 'Joined the community',
       });
  
@@ -399,9 +418,12 @@ export function InteractionTimeline({
         });
       }
  
-      timelineEvents.sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-      );
+      // Sort newest first, but always pin the signup event to the bottom
+      timelineEvents.sort((a, b) => {
+        if (a.id === 'signup') return 1;
+        if (b.id === 'signup') return -1;
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
+      });
  
       setEvents(timelineEvents);
     } catch (err) {
