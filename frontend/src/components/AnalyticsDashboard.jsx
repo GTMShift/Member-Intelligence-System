@@ -157,6 +157,7 @@ function Section({ title, subtitle, action, children }) {
 // ============================================================================
 
 function ColdMembersSection({ coldMembers }) {
+  const navigate = useNavigate();
   const PAGE_SIZE = 10;
   const [page, setPage] = useState(0);
   const totalPages = Math.ceil(coldMembers.length / PAGE_SIZE);
@@ -168,7 +169,7 @@ function ColdMembersSection({ coldMembers }) {
       subtitle={`${coldMembers.length} members to re-engage`}
     >
       {coldMembers.length === 0 ? (
-        <p className="text-sm text-slate-500">No members flagged. Network is warm.</p>
+        <p className="text-sm text-slate-500">No members flagged. Community is warm.</p>
       ) : (
         <>
           <table className="min-w-full text-sm">
@@ -181,9 +182,13 @@ function ColdMembersSection({ coldMembers }) {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {displayed.map((m) => (
-                <tr key={m.id} className="hover:bg-slate-50">
+                <tr
+                  key={m.id}
+                  className="hover:bg-slate-50 cursor-pointer"
+                  onClick={() => navigate('/', { state: { selectedMemberId: m.id } })}
+                >
                   <td className="py-3 pr-3">
-                    <div className="text-sm font-medium text-slate-900">
+                    <div className="text-sm font-medium text-slate-900 hover:text-emerald-600">
                       {m.first_name} {m.last_name}
                     </div>
                     <div className="text-xs text-slate-500">{m.email}</div>
@@ -217,6 +222,7 @@ function ColdMembersSection({ coldMembers }) {
 // ============================================================================
 
 function TopMembersSection({ topMembers }) {
+  const navigate = useNavigate();
   const PAGE_SIZE = 10;
   const [page, setPage] = useState(0);
   const totalPages = Math.ceil(topMembers.length / PAGE_SIZE);
@@ -242,12 +248,16 @@ function TopMembersSection({ topMembers }) {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {displayed.map((m, i) => (
-              <tr key={m.id} className="hover:bg-slate-50">
+              <tr
+                key={m.id}
+                className="hover:bg-slate-50 cursor-pointer"
+                onClick={() => navigate('/', { state: { selectedMemberId: m.id } })}
+              >
                 <td className="py-3 pr-3 text-xs text-slate-400 tabular-nums">
                   {startRank + i}
                 </td>
                 <td className="py-3 pr-4">
-                  <div className="font-medium text-slate-900">
+                  <div className="font-medium text-slate-900 hover:text-emerald-600">
                     {m.first_name} {m.last_name}
                   </div>
                   <div className="text-xs text-slate-500">
@@ -980,9 +990,13 @@ export default function AnalyticsDashboard() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {topClickers.map((m) => (
-                <tr key={m.id} className="hover:bg-slate-50">
+                <tr
+                  key={m.id}
+                  className="hover:bg-slate-50 cursor-pointer"
+                  onClick={() => navigate('/', { state: { selectedMemberId: m.id } })}
+                >
                   <td className="py-3 pr-4">
-                    <div className="font-medium text-slate-900">
+                    <div className="font-medium text-slate-900 hover:text-emerald-600">
                       {m.first_name} {m.last_name}
                     </div>
                     <div className="text-xs text-slate-500">{m.email}</div>
