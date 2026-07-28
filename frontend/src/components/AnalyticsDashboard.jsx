@@ -58,9 +58,9 @@ const BUCKET_STYLES = {
 
 function scoreColor(score) {
   if (score == null || score === 0) return 'text-slate-400';
-  if (score >= 80) return 'text-emerald-600 font-semibold';
-  if (score >= 50) return 'text-amber-600 font-semibold';
-  if (score >= 20) return 'text-orange-600 font-medium';
+  if (score >= 61) return 'text-emerald-600 font-semibold';
+  if (score >= 31) return 'text-amber-600 font-semibold';
+  if (score >= 1) return 'text-orange-600 font-medium';
   return 'text-slate-500';
 }
 
@@ -569,12 +569,11 @@ export default function AnalyticsDashboard() {
 
     const buckets = [
       { range: 'No score', min: -1, max: 0.001, count: 0 },
-      { range: '1–20', min: 0.001, max: 20, count: 0 },
-      { range: '21–40', min: 20, max: 40, count: 0 },
-      { range: '41–60', min: 40, max: 60, count: 0 },
-      { range: '61–80', min: 60, max: 80, count: 0 },
-      { range: '81–100', min: 80, max: 100, count: 0 },
-      { range: '100+', min: 100, max: Infinity, count: 0 },
+      { range: '1–15', min: 0.001, max: 15, count: 0 },
+      { range: '16–30', min: 15, max: 30, count: 0 },
+      { range: '31–50', min: 30, max: 50, count: 0 },
+      { range: '51–70', min: 50, max: 70, count: 0 },
+      { range: '71–100', min: 70, max: Infinity, count: 0 },
     ];
 
     (data || []).forEach((r) => {
