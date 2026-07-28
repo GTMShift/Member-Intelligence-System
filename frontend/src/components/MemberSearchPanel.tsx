@@ -185,10 +185,10 @@ export function MemberSearchPanel({
   };
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="border-b border-slate-200 bg-white p-4">
-        <h2 className="text-lg font-semibold text-slate-900">Member Search</h2>
-        <p className="mt-1 text-sm text-slate-500">
+    <div className="flex h-full flex-col bg-charcoal">
+      <div className="border-b border-white/10 p-4">
+        <h2 className="text-lg font-semibold text-white">Member Search</h2>
+        <p className="mt-1 text-sm text-white/50">
           Search by name, company, role, or email
         </p>
 
@@ -202,19 +202,19 @@ export function MemberSearchPanel({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by name, company, role, or email…"
-            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-600 focus:border-orange focus:outline-none focus:ring-2 focus:ring-orange/20"
+            className="w-full rounded-lg border border-white/15 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-600 focus:border-orange focus:outline-none focus:ring-2 focus:ring-orange/20"
           />
         </div>
 
         <div className="mt-4">
-          <label htmlFor="sort-by" className="mb-1 block text-xs font-medium text-slate-600">
+          <label htmlFor="sort-by" className="mb-1 block text-xs font-medium text-white/70">
             Sort by
           </label>
           <select
             id="sort-by"
             value={filters.sort ?? 'last_name_asc'}
             onChange={(e) => updateFilter('sort', e.target.value as MemberSortOption)}
-            className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 focus:border-orange focus:outline-none focus:ring-2 focus:ring-orange/20"
+            className="w-full rounded-md border border-white/15 bg-white px-2 py-1.5 text-sm text-slate-900 focus:border-orange focus:outline-none focus:ring-2 focus:ring-orange/20"
           >
             {SORT_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -284,7 +284,7 @@ export function MemberSearchPanel({
           <button
             type="button"
             onClick={clearFilters}
-            className="mt-3 text-sm font-medium text-orange-dark hover:text-orange"
+            className="mt-3 text-sm font-medium text-orange hover:text-white"
           >
             Clear all filters
           </button>
@@ -293,17 +293,17 @@ export function MemberSearchPanel({
 
       <div className="flex-1 overflow-y-auto p-2">
         <div className="mb-2 flex items-center justify-between px-2">
-          <p className="text-xs font-medium text-slate-500">
+          <p className="text-xs font-medium text-white/50">
             {loading ? 'Searching…' : `${total} member${total === 1 ? '' : 's'}`}
           </p>
         </div>
 
         {error && (
-          <p className="mx-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+          <p className="mx-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>
         )}
 
         {!loading && !error && results.length === 0 && (
-          <p className="px-2 py-8 text-center text-sm text-slate-500">
+          <p className="px-2 py-8 text-center text-sm text-white/50">
             No members match your search criteria.
           </p>
         )}
@@ -318,26 +318,26 @@ export function MemberSearchPanel({
                   onClick={() => onSelectMember(member.id)}
                   className={`w-full rounded-lg px-3 py-3 text-left transition-colors ${
                     isSelected
-                      ? 'bg-sage-tint ring-1 ring-sage/40'
-                      : 'hover:bg-slate-50'
+                      ? 'bg-orange/15 ring-1 ring-orange/40'
+                      : 'hover:bg-white/5'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="truncate font-medium text-slate-900">
+                      <p className="truncate font-medium text-white">
                         {fullName(member.first_name, member.last_name)}
                       </p>
-                      <p className="mt-0.5 truncate text-sm text-slate-600">
+                      <p className="mt-0.5 truncate text-sm text-white/60">
                         {member.current_role ?? '—'}
                         {member.company_name ? ` · ${member.company_name}` : ''}
                       </p>
-                      <p className="mt-0.5 truncate text-xs text-slate-500">
+                      <p className="mt-0.5 truncate text-xs text-white/40">
                         {member.metro_area_name ?? '—'}
                       </p>
                     </div>
                     <IcpBadge icp={member.icp} />
                   </div>
-                  <p className="mt-2 text-xs text-slate-400">
+                  <p className="mt-2 text-xs text-white/30">
                     Updated {formatTimestamp(member.last_updated)}
                   </p>
                 </button>
@@ -352,7 +352,7 @@ export function MemberSearchPanel({
               type="button"
               onClick={loadMore}
               disabled={loadingMore}
-              className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="rounded-md border border-white/15 bg-transparent px-4 py-2 text-sm font-medium text-white/80 hover:bg-white/5 disabled:opacity-50"
             >
               {loadingMore ? 'Loading…' : `Load more (${results.length} of ${total})`}
             </button>
@@ -375,14 +375,14 @@ function FilterSelect({ label, value, onChange, options }: FilterSelectProps) {
 
   return (
     <div>
-      <label htmlFor={id} className="mb-1 block text-xs font-medium text-slate-600">
+      <label htmlFor={id} className="mb-1 block text-xs font-medium text-white/70">
         {label}
       </label>
       <select
         id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 focus:border-orange focus:outline-none focus:ring-2 focus:ring-orange/20"
+        className="w-full rounded-md border border-white/15 bg-white px-2 py-1.5 text-sm text-slate-900 focus:border-orange focus:outline-none focus:ring-2 focus:ring-orange/20"
       >
         <option value="">All</option>
         {options.map((opt) => (

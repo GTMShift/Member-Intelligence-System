@@ -290,7 +290,7 @@ function MemberDirectoryLayout({
 
   const directoryContent = (
     <>
-      <aside className="w-full border-b border-slate-200 bg-slate-50 lg:w-[22rem] lg:shrink-0 lg:border-b-0 lg:border-r xl:w-[26rem]">
+      <aside className="w-full border-b border-white/10 lg:w-[22rem] lg:shrink-0 lg:border-b-0 lg:border-r xl:w-[26rem]">
         <div className="h-[28rem] lg:h-[calc(100vh-4.5rem)]">
           <MemberSearchPanel
             selectedMemberId={selectedMemberId}
