@@ -300,8 +300,18 @@ function MemberDirectoryLayout({
       </aside>
 
       <section className="min-h-[24rem] flex-1 overflow-hidden bg-surface lg:h-full lg:overflow-y-auto">
-        {selectedMemberId ? (
-          <MemberProfileCard memberId={selectedMemberId} />
+      {selectedMemberId ? (
+          <div className="flex h-full flex-col">
+            {portalView && portalMember && (
+              <ProfileStalenessBanner
+                member={portalMember}
+                onEnrichClick={handleEnrich}
+              />
+            )}
+            <div className="min-h-0 flex-1">
+              <MemberProfileCard memberId={selectedMemberId} />
+            </div>
+          </div>
         ) : (
           <div className="flex h-full items-center justify-center p-8">
             <div className="text-center">

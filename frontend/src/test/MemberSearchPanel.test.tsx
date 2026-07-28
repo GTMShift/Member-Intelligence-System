@@ -34,6 +34,7 @@ describe('MemberSearchPanel', () => {
 
   it('renders filter dropdowns for ICP, metro area, state, industry, seniority, and signup source', () => {
     renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: /filters/i }));
 
     expect(screen.getByLabelText('ICP')).toBeInTheDocument();
     expect(screen.getByLabelText('Metro Area')).toBeInTheDocument();
@@ -61,6 +62,7 @@ describe('MemberSearchPanel', () => {
     renderPanel();
 
     await advanceSearchTimers();
+    fireEvent.click(screen.getByRole('button', { name: /filters/i }));
 
     fireEvent.change(screen.getByLabelText('ICP'), { target: { value: 'YES' } });
     await advanceSearchTimers();
@@ -87,6 +89,7 @@ describe('MemberSearchPanel', () => {
     renderPanel();
 
     await advanceSearchTimers();
+    fireEvent.click(screen.getByRole('button', { name: /filters/i }));
 
     fireEvent.change(screen.getByLabelText('ICP'), { target: { value: 'NO' } });
     await advanceSearchTimers();
@@ -113,6 +116,7 @@ describe('MemberSearchPanel', () => {
     renderPanel();
 
     await advanceSearchTimers();
+    fireEvent.click(screen.getByRole('button', { name: /filters/i }));
 
     fireEvent.change(screen.getByLabelText('ICP'), { target: { value: 'YES' } });
     fireEvent.change(screen.getByLabelText('Metro Area'), { target: { value: 'Chicago' } });
