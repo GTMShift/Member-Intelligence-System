@@ -660,7 +660,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
     : [];
   return (
     <div ref={scrollRef} className={`h-full overflow-y-auto ${loading ? 'opacity-60 transition-opacity' : ''}`}>
-      <div className="border-b border-slate-200 bg-white px-6 py-5">
+      <div className="bg-surface px-6 py-5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-4">
             <AvatarCircle avatarUrl={profile.avatar_url} firstName={member.first_name} />

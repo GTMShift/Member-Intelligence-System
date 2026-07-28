@@ -320,8 +320,8 @@ function MemberDirectoryLayout({
 
   const directoryContent = (
     <>
-      <aside className="w-full border-b border-slate-200 bg-slate-50 lg:w-[22rem] lg:shrink-0 lg:border-b-0 lg:border-r xl:w-[26rem]">
-        <div className="h-[28rem] lg:h-[calc(100vh-4.5rem)]">
+      <aside className="w-full border-b border-white/10 lg:w-[22rem] lg:shrink-0 lg:border-b-0 lg:border-r xl:w-[26rem]">
+        <div className="h-[28rem] lg:h-full">
           <MemberSearchPanel
             selectedMemberId={selectedMemberId}
             onSelectMember={setSelectedMemberId}
@@ -329,8 +329,8 @@ function MemberDirectoryLayout({
         </div>
       </aside>
 
-      <section className="min-h-[24rem] flex-1 bg-slate-50 lg:min-h-[calc(100vh-4.5rem)]">
-        {selectedMemberId ? (
+      <section className="min-h-[24rem] flex-1 overflow-hidden bg-surface lg:h-full lg:overflow-y-auto">
+      {selectedMemberId ? (
           <div className="flex h-full flex-col">
             {portalView && portalMember && (
               <ProfileStalenessBanner
@@ -345,10 +345,10 @@ function MemberDirectoryLayout({
         ) : (
           <div className="flex h-full items-center justify-center p-8">
             <div className="text-center">
-              <p className="text-base font-medium text-slate-700">
+              <p className="text-base font-medium text-ink">
                 Select a member to view their profile
               </p>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-ink/60">
                 Use search and filters to find members in the directory
               </p>
             </div>
@@ -359,7 +359,7 @@ function MemberDirectoryLayout({
   );
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col lg:h-screen lg:overflow-hidden">
       {showWelcome && <WelcomeToast />}
       <header className="bg-charcoal">
         <div className="mx-auto flex max-w-[90rem] items-center justify-between px-4 py-4 sm:px-6">
@@ -377,7 +377,7 @@ function MemberDirectoryLayout({
         <DuplicateFlagAlerts onViewExistingMember={handleViewExistingMember} />
       )}
 
-      <main className="mx-auto flex w-full max-w-[90rem] flex-1 flex-col lg:flex-row">
+      <main className="mx-auto flex w-full max-w-[90rem] flex-1 flex-col lg:min-h-0 lg:flex-row lg:overflow-hidden">
         {portalView ? (
           <PortalRoleOverride>{directoryContent}</PortalRoleOverride>
         ) : (
