@@ -30,31 +30,27 @@ interface MemberSearchPanelProps {
 
 const EMPTY_FILTERS: MemberSearchParams = {};
 
+const ICP_BADGE_VARIANTS: Record<string, string> = {
+  YES: 'bg-sage-tint text-sage border border-sage/40',
+  NO: 'bg-white/15 text-white border border-white/25',
+  TBD: 'bg-amber-500/25 text-amber-100 border border-amber-400/50',
+  NONE: 'bg-white/10 text-white/70 border border-white/15',
+};
+
+const ICP_BADGE_LABELS: Record<string, string> = {
+  YES: 'ICP',
+  NO: 'Non-ICP',
+  TBD: 'TBD',
+  NONE: 'Not classified',
+};
+
 function IcpBadge({ icp }: { icp: MemberSearchResult['icp'] }) {
-  if (icp === 'YES') {
-    return (
-      <span className="rounded-full bg-sage-tint px-2 py-0.5 text-xs font-medium text-sage">
-        ICP
-      </span>
-    );
-  }
-  if (icp === 'NO') {
-    return (
-      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-        Non-ICP
-      </span>
-    );
-  }
-  if (icp === 'TBD') {
-    return (
-      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
-        TBD
-      </span>
-    );
-  }
+  const key = icp ?? 'NONE';
   return (
-    <span className="rounded-full bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-400">
-      Not classified
+    <span
+      className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${ICP_BADGE_VARIANTS[key]}`}
+    >
+      {ICP_BADGE_LABELS[key]}
     </span>
   );
 }
@@ -96,6 +92,7 @@ export function MemberSearchPanel({
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
 
   const PAGE_SIZE = 50;
 
@@ -224,61 +221,87 @@ export function MemberSearchPanel({
           </select>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <FilterSelect
-            label="ICP"
-            value={filters.icp ?? ''}
-            onChange={(v) => updateFilter('icp', v as 'YES' | 'NO' | 'TBD' | 'NONE' | '')}
-            options={[
-              { value: 'YES', label: 'YES' },
-              { value: 'NO', label: 'NO' },
-              { value: 'TBD', label: 'TBD' },
-              { value: 'NONE', label: 'Not classified' },
-            ]}
-          />
-          <FilterSelect
-            label="Metro Area"
-            value={filters.metro_area_name ?? ''}
-            onChange={(v) => updateFilter('metro_area_name', v)}
-            options={metroAreas.map((m) => ({ value: m.name, label: m.name }))}
-          />
-          <FilterSelect
-            label="State"
-            value={filters.state ?? ''}
-            onChange={(v) => updateFilter('state', v)}
-            options={filterOptions.states.map((s) => ({ value: s, label: s }))}
-          />
-          <FilterSelect
-            label="Industry"
-            value={filters.industry ?? ''}
-            onChange={(v) => updateFilter('industry', v)}
-            options={filterOptions.industries.map((i) => ({ value: i, label: i }))}
-          />
-          <FilterSelect
-            label="Seniority"
-            value={filters.seniority ?? ''}
-            onChange={(v) => updateFilter('seniority', v)}
-            options={filterOptions.seniorityLevels.map((s) => ({ value: s, label: s }))}
-          />
-          <FilterSelect
-            label="Signup source"
-            value={filters.source ?? ''}
-            onChange={(v) => updateFilter('source', v)}
-            options={filterOptions.signupSources.map((s) => ({ value: s, label: s }))}
-          />
-          <FilterSelect
-            label="Team Size"
-            value={filters.team_size ?? ''}
-            onChange={(v) => updateFilter('team_size', v)}
-            options={filterOptions.teamSizes.map((s) => ({ value: s, label: s }))}
-          />
-          <FilterSelect
-            label="Tags"
-            value={filters.tag ?? ''}
-            onChange={(v) => updateFilter('tag', v)}
-            options={filterOptions.companyTags.map((t) => ({ value: t, label: t }))}
-          />
-        </div>
+        <button
+          type="button"
+          onClick={() => setFiltersExpanded((prev) => !prev)}
+          className="mt-4 flex w-full items-center justify-between rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm font-medium text-white/80 hover:bg-white/10"
+        >
+          <span className="flex items-center gap-2">
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="rounded-full bg-orange px-1.5 py-0.5 text-xs font-semibold text-white">
+                {activeFilterCount}
+              </span>
+            )}
+          </span>
+          <svg
+            className={`h-4 w-4 transition-transform ${filtersExpanded ? 'rotate-180' : ''}`}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        {filtersExpanded && (
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <FilterSelect
+              label="ICP"
+              value={filters.icp ?? ''}
+              onChange={(v) => updateFilter('icp', v as 'YES' | 'NO' | 'TBD' | 'NONE' | '')}
+              options={[
+                { value: 'YES', label: 'YES' },
+                { value: 'NO', label: 'NO' },
+                { value: 'TBD', label: 'TBD' },
+                { value: 'NONE', label: 'Not classified' },
+              ]}
+            />
+            <FilterSelect
+              label="Metro Area"
+              value={filters.metro_area_name ?? ''}
+              onChange={(v) => updateFilter('metro_area_name', v)}
+              options={metroAreas.map((m) => ({ value: m.name, label: m.name }))}
+            />
+            <FilterSelect
+              label="State"
+              value={filters.state ?? ''}
+              onChange={(v) => updateFilter('state', v)}
+              options={filterOptions.states.map((s) => ({ value: s, label: s }))}
+            />
+            <FilterSelect
+              label="Industry"
+              value={filters.industry ?? ''}
+              onChange={(v) => updateFilter('industry', v)}
+              options={filterOptions.industries.map((i) => ({ value: i, label: i }))}
+            />
+            <FilterSelect
+              label="Seniority"
+              value={filters.seniority ?? ''}
+              onChange={(v) => updateFilter('seniority', v)}
+              options={filterOptions.seniorityLevels.map((s) => ({ value: s, label: s }))}
+            />
+            <FilterSelect
+              label="Signup source"
+              value={filters.source ?? ''}
+              onChange={(v) => updateFilter('source', v)}
+              options={filterOptions.signupSources.map((s) => ({ value: s, label: s }))}
+            />
+            <FilterSelect
+              label="Team Size"
+              value={filters.team_size ?? ''}
+              onChange={(v) => updateFilter('team_size', v)}
+              options={filterOptions.teamSizes.map((s) => ({ value: s, label: s }))}
+            />
+            <FilterSelect
+              label="Tags"
+              value={filters.tag ?? ''}
+              onChange={(v) => updateFilter('tag', v)}
+              options={filterOptions.companyTags.map((t) => ({ value: t, label: t }))}
+            />
+          </div>
+        )}
 
         {(activeFilterCount > 0 || query) && (
           <button
