@@ -1012,7 +1012,8 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
             </div>
           </TierSection>
         )}
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
+        {isAdmin && (
+          <section className="rounded-xl border border-slate-200 bg-white p-5">
           <h3 className="text-base font-semibold text-slate-900">Interaction Timeline</h3>
           <div className="mt-4">
             {memberId && (
@@ -1020,11 +1021,12 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                 memberId={memberId}
                 memberCreatedAt={member.created_at}
                 interactions={member.interactions}
-                onInteractionAdded={isAdmin ? loadMember : undefined}
+                onInteractionAdded={loadMember}
               />
+            )}
+          </div>
+        </section>
         )}
-        </div>
-          </section>
         </div>
       {enrichmentResult && (
         <EnrichmentReviewPanel

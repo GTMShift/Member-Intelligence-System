@@ -33,15 +33,25 @@ const EMPTY_FILTERS: MemberSearchParams = {};
 // ---- Bucket badge -----------------------------------------------------------
 
 const BUCKET_STYLES: Record<string, { bg: string; text: string; label: string }> = {
+  YES: {
+    bg: 'bg-orange',
+    text: 'text-white',
+    label: 'ICP',
+  },
+  NO: {
+    bg: 'bg-charcoal/5 border border-charcoal/10',
+    text: 'text-charcoal/40',
+    label: 'Non-ICP',
+  },
   primary_icp: {
     bg: 'bg-orange',
     text: 'text-white',
-    label: 'Primary ICP',
+    label: 'ICP',
   },
   secondary_icp: {
     bg: 'bg-orange/20 border border-orange/30',
     text: 'text-orange-dark',
-    label: 'Secondary ICP',
+    label: 'ICP',
   },
   watchlist: {
     bg: 'bg-sage/20 border border-sage/30',
@@ -71,7 +81,7 @@ const BUCKET_STYLES: Record<string, { bg: string; text: string; label: string }>
   icp_no: {
     bg: 'bg-charcoal/5 border border-charcoal/10',
     text: 'text-charcoal/40',
-    label: 'Not ICP',
+    label: 'Non-ICP',
   },
 };
 
