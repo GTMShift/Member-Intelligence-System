@@ -18,8 +18,8 @@ export function HeaderActions() {
     navigate('/login');
   };
 
-  const isMemberView = location.pathname === '/portal';
   const isAdmin = role === 'admin';
+  const isMember = role === 'member';
 
   useEffect(() => {
     if (role !== 'admin') return;
@@ -89,35 +89,6 @@ export function HeaderActions() {
         </Link>
       )}
 
-      {isAdmin && (
-        <div className="relative flex rounded-lg border border-white/20 bg-white/5 p-0.5">
-          <span
-            aria-hidden="true"
-            className={`absolute inset-y-0.5 w-[calc(50%-0.125rem)] rounded-md bg-white shadow-sm transition-transform duration-200 ease-out ${
-              isMemberView ? 'translate-x-full' : 'translate-x-0'
-            }`}
-          />
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            className={`relative z-10 w-20 rounded-md px-3 py-1 text-xs font-medium transition-colors ${
-              isMemberView ? 'text-white/70 hover:text-white' : 'text-charcoal'
-            }`}
-          >
-            Admin
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/portal')}
-            className={`relative z-10 w-20 rounded-md px-3 py-1 text-xs font-medium transition-colors ${
-              isMemberView ? 'text-charcoal' : 'text-white/70 hover:text-white'
-            }`}
-          >
-            Member
-          </button>
-        </div>
-      )}
-
       {user?.email && (
         <span className="hidden max-w-[12rem] truncate text-sm text-white/60 sm:inline">
           {user.email}
@@ -171,10 +142,7 @@ export function HeaderActions() {
                 Admin tools
               </p>
               <button type="button" onClick={() => go('/')} className={navButtonClass}>
-                View Admin Dashboard
-              </button>
-              <button type="button" onClick={() => go('/portal')} className={navButtonClass}>
-                View Member Portal
+                Dashboard
               </button>
               <button
                 type="button"
@@ -203,11 +171,18 @@ export function HeaderActions() {
             </>
           )}
 
-          {(isMemberView || role === 'member') && (
+          {isMember && (
             <>
               <p className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
                 Member
               </p>
+              <button
+                type="button"
+                onClick={() => go('/portal')}
+                className={navButtonClass}
+              >
+                Member portal
+              </button>
               <button
                 type="button"
                 onClick={() => go(memberId ? '/my-profile' : '/complete-profile')}

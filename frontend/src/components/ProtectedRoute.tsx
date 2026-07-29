@@ -34,13 +34,17 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
   }
 
   if (requiredRole === 'member') {
-    if (role !== 'admin' && role !== 'member') {
+    // Admins stay on the admin dashboard — no portal toggle / dual view.
+    if (role === 'admin') {
+      return <Navigate to="/" replace />;
+    }
+    if (role !== 'member') {
       return <Navigate to="/unauthorized" replace />;
     }
     // A member-role user with no linked member record yet needs to complete
     // their profile before seeing the portal — but skip this check when
     // they're already on that page, or we'd redirect to it in an infinite loop.
-    if (role === 'member' && needsOnboarding && location.pathname !== '/complete-profile') {
+    if (needsOnboarding && location.pathname !== '/complete-profile') {
       return <Navigate to="/complete-profile" replace />;
     }
   }
