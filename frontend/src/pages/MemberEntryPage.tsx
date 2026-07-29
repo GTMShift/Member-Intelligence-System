@@ -58,6 +58,102 @@ const REGION_FIELDS = [
 type TeamKey = typeof TEAM_FIELDS[number]['key'];
 type RegionKey = typeof REGION_FIELDS[number]['key'];
 
+// ---- Country + region data --------------------------------------------------
+
+const COUNTRIES = [
+  'United States',
+  'Canada',
+  'Brazil',
+  'United Kingdom',
+  'Germany',
+  'France',
+  'Switzerland',
+  'Romania',
+  'Poland',
+  'United Arab Emirates',
+  'India',
+  'Other',
+];
+
+const REGIONS_BY_COUNTRY: Record<string, string[]> = {
+  'United States': [
+    'Alabama','Alaska','Arizona','Arkansas','California','Colorado',
+    'Connecticut','Delaware','Florida','Georgia','Hawaii','Idaho',
+    'Illinois','Indiana','Iowa','Kansas','Kentucky','Louisiana',
+    'Maine','Maryland','Massachusetts','Michigan','Minnesota',
+    'Mississippi','Missouri','Montana','Nebraska','Nevada',
+    'New Hampshire','New Jersey','New Mexico','New York',
+    'North Carolina','North Dakota','Ohio','Oklahoma','Oregon',
+    'Pennsylvania','Rhode Island','South Carolina','South Dakota',
+    'Tennessee','Texas','Utah','Vermont','Virginia','Washington',
+    'West Virginia','Wisconsin','Wyoming',
+  ],
+  'Canada': [
+    'Alberta','British Columbia','Manitoba','New Brunswick',
+    'Newfoundland and Labrador','Northwest Territories','Nova Scotia',
+    'Nunavut','Ontario','Prince Edward Island','Quebec','Saskatchewan',
+    'Yukon',
+  ],
+  'Brazil': [
+    'Acre','Alagoas','Amapá','Amazonas','Bahia','Ceará',
+    'Distrito Federal','Espírito Santo','Goiás','Maranhão',
+    'Mato Grosso','Mato Grosso do Sul','Minas Gerais','Pará',
+    'Paraíba','Paraná','Pernambuco','Piauí','Rio de Janeiro',
+    'Rio Grande do Norte','Rio Grande do Sul','Rondônia','Roraima',
+    'Santa Catarina','São Paulo','Sergipe','Tocantins',
+  ],
+  'United Kingdom': [
+    'England','Scotland','Wales','Northern Ireland',
+  ],
+  'Germany': [
+    'Baden-Württemberg','Bavaria','Berlin','Brandenburg','Bremen',
+    'Hamburg','Hesse','Lower Saxony','Mecklenburg-Vorpommern',
+    'North Rhine-Westphalia','Rhineland-Palatinate','Saarland',
+    'Saxony','Saxony-Anhalt','Schleswig-Holstein','Thuringia',
+  ],
+  'France': [
+    'Auvergne-Rhône-Alpes','Bourgogne-Franche-Comté','Bretagne',
+    'Centre-Val de Loire','Corse','Grand Est','Hauts-de-France',
+    'Île-de-France','Normandie','Nouvelle-Aquitaine','Occitanie',
+    "Pays de la Loire","Provence-Alpes-Côte d'Azur",
+  ],
+  'Switzerland': [
+    'Aargau','Appenzell Ausserrhoden','Appenzell Innerrhoden',
+    'Basel-Landschaft','Basel-Stadt','Bern','Fribourg','Geneva',
+    'Glarus','Graubünden','Jura','Lucerne','Neuchâtel','Nidwalden',
+    'Obwalden','Schaffhausen','Schwyz','Solothurn','St. Gallen',
+    'Thurgau','Ticino','Uri','Valais','Vaud','Zug','Zürich',
+  ],
+  'Romania': [
+    'Bucharest','Center','North-East','North-West','South','South-East',
+    'South-West Oltenia','West',
+  ],
+  'Poland': [
+    'Greater Poland','Holy Cross','Kuyavian-Pomeranian','Lesser Poland',
+    'Lodz','Lower Silesian','Lublin','Lubusz','Masovian',
+    'Opole','Podkarpackie','Podlaskie','Pomeranian','Silesian',
+    'Warmian-Masurian','West Pomeranian',
+  ],
+  'United Arab Emirates': [
+    'Abu Dhabi','Ajman','Dubai','Fujairah','Ras Al Khaimah',
+    'Sharjah','Umm Al Quwain',
+  ],
+  'India': [
+    'Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh',
+    'Goa','Gujarat','Haryana','Himachal Pradesh','Jharkhand',
+    'Karnataka','Kerala','Madhya Pradesh','Maharashtra','Manipur',
+    'Meghalaya','Mizoram','Nagaland','Odisha','Punjab','Rajasthan',
+    'Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh',
+    'Uttarakhand','West Bengal',
+    // Union territories
+    'Andaman and Nicobar Islands','Chandigarh',
+    'Dadra and Nagar Haveli and Daman and Diu','Delhi','Jammu and Kashmir',
+    'Ladakh','Lakshadweep','Puducherry',
+  ],
+};
+
+// ---- Form state -------------------------------------------------------------
+
 type FormState = {
   first_name: string;
   last_name: string;
@@ -146,6 +242,106 @@ const INITIAL_STATE: FormState = {
 
 const EMPTY_SOCIAL: SocialEntry = { platform: 'Twitter/X', username: '', url: '' };
 
+// ---- Typeahead component ----------------------------------------------------
+
+interface TypeaheadProps {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+  onValidChange: (value: string) => void;
+  placeholder?: string;
+  required?: boolean;
+  error?: string | null;
+}
+
+function Typeahead({
+  label,
+  value,
+  options,
+  onChange,
+  onValidChange,
+  placeholder,
+  required,
+  error,
+}: TypeaheadProps) {
+  const [query, setQuery] = useState(value);
+  const [open, setOpen] = useState(false);
+  const [valid, setValid] = useState(!!value);
+
+  const filtered = options.filter((o) =>
+    o.toLowerCase().includes(query.toLowerCase())
+  );
+
+  return (
+    <div className="flex flex-col gap-1.5 relative">
+      <label className="text-xs font-medium text-slate-600">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setValid(false);
+          setOpen(true);
+          onChange('');
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => {
+          setTimeout(() => {
+            setOpen(false);
+            if (!valid) {
+              setQuery('');
+              onChange('');
+            }
+          }, 150);
+        }}
+        placeholder={placeholder}
+        autoComplete="off"
+        required={required}
+        className={`rounded-lg border px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none ${
+          query && !valid
+            ? 'border-red-400 focus:border-red-400'
+            : 'border-slate-300 focus:border-slate-500'
+        }`}
+      />
+      {open && query && (
+        <ul className="absolute top-full left-0 right-0 z-20 mt-1 max-h-48 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+          {filtered.length > 0 ? (
+            filtered.map((opt) => (
+              <li key={opt}>
+                <button
+                  type="button"
+                  onMouseDown={() => {
+                    setQuery(opt);
+                    setValid(true);
+                    setOpen(false);
+                    onChange(opt);
+                    onValidChange(opt);
+                  }}
+                  className="w-full px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-50"
+                >
+                  {opt}
+                </button>
+              </li>
+            ))
+          ) : (
+            <li className="px-3 py-2 text-sm text-slate-400">No results</li>
+          )}
+        </ul>
+      )}
+      {query && !valid && (
+        <p className="text-xs text-red-600">
+          {error ?? 'Please select an option from the list.'}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ---- Main page --------------------------------------------------------------
+
 export function MemberEntryPage() {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
@@ -162,7 +358,17 @@ export function MemberEntryPage() {
   const [createdMember, setCreatedMember] = useState<MemberDetail | null>(null);
   const [zipError, setZipError] = useState<string | null>(null);
 
+  // Country / region picker state
+  const [selectedCountry, setSelectedCountry] = useState('');
+  const [selectedRegion, setSelectedRegion] = useState('');
+  const [regionOtherText, setRegionOtherText] = useState('');
+  const [countryOtherText, setCountryOtherText] = useState('');
+
   const showFitScore = ICP_SCORE_BUCKETS.includes(form.bucket);
+
+  const regionOptions = selectedCountry && selectedCountry !== 'Other'
+    ? [...(REGIONS_BY_COUNTRY[selectedCountry] ?? []), 'Other']
+    : [];
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
@@ -179,19 +385,55 @@ export function MemberEntryPage() {
   };
 
   const validateZip = async (zip: string) => {
-    if (!zip.trim()) {
+    if (!zip.trim() || selectedCountry !== 'United States') {
       setZipError(null);
       return;
     }
+  
+    // Need city and state present to cross-validate
+    if (!form.city.trim() || !selectedRegion) {
+      setZipError(null);
+      return;
+    }
+  
     try {
       const res = await fetch(`https://api.zippopotam.us/us/${zip.trim()}`);
       if (!res.ok) {
-        setZipError('Invalid zip code — please check and try again.');
+        setZipError('Invalid US zip code.');
+        return;
+      }
+  
+      const data = await res.json();
+      const places = data.places as Array<{
+        'place name': string;
+        state: string;
+        'state abbreviation': string;
+      }>;
+  
+      // Normalize strings for case-insensitive comparison
+      const userCity = form.city.trim().toLowerCase();
+      const userState = selectedRegion.trim().toLowerCase();
+  
+      // Check if any returned place matches BOTH the city and state
+      const matchesCityAndState = places.some((place) => {
+        const placeCity = place['place name'].toLowerCase();
+        const placeState = place.state.toLowerCase();
+        const placeStateAbbr = place['state abbreviation'].toLowerCase();
+  
+        const cityMatches = placeCity === userCity;
+        const stateMatches = placeState === userState || placeStateAbbr === userState;
+  
+        return cityMatches && stateMatches;
+      });
+  
+      if (!matchesCityAndState) {
+        setZipError(`ZIP code ${zip} does not match ${form.city}, ${selectedRegion}.`);
       } else {
         setZipError(null);
       }
     } catch {
-      setZipError(null); // fail silently if API is unreachable
+      // Fail gracefully on network errors so user isn't blocked
+      setZipError(null);
     }
   };
 
@@ -211,6 +453,10 @@ export function MemberEntryPage() {
     setSocials((prev) => prev.map((s, i) => i === index ? { ...s, [field]: value } : s));
   };
 
+  // Derive final country and state_region for submission
+  const finalCountry = selectedCountry === 'Other' ? countryOtherText.trim() : selectedCountry;
+  const finalStateRegion = selectedRegion === 'Other' ? regionOtherText.trim() : selectedRegion;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -218,6 +464,16 @@ export function MemberEntryPage() {
 
     if (zipError) {
       setError('Please fix the zip code before submitting.');
+      setLoading(false);
+      return;
+    }
+    if (!finalCountry) {
+      setError('Please select a country.');
+      setLoading(false);
+      return;
+    }
+    if (selectedCountry !== 'Other' && regionOptions.length > 0 && !finalStateRegion) {
+      setError('Please select a state or region.');
       setLoading(false);
       return;
     }
@@ -256,9 +512,9 @@ export function MemberEntryPage() {
         region_latin_america: form.region_latin_america,
         address: form.address.trim() || null,
         city: form.city.trim() || null,
-        state_region: form.state_region.trim() || null,
+        state_region: finalStateRegion || null,
         zip_code: form.zip_code.trim() || null,
-        country: form.country.trim() || null,
+        country: finalCountry || null,
         tshirt_size: (form.tshirt_size as CreateMemberInput['tshirt_size']) || null,
         dietary_restrictions: form.dietary_restrictions.trim() || null,
         socials: socials.filter((s) => s.username.trim() !== ''),
@@ -273,6 +529,10 @@ export function MemberEntryPage() {
         setSuccess(true);
         setForm(INITIAL_STATE);
         setSocials([]);
+        setSelectedCountry('');
+        setSelectedRegion('');
+        setRegionOtherText('');
+        setCountryOtherText('');
         setCreatedMemberId(created.id);
         setEnrichError(null);
         setEnrichmentResult(null);
@@ -670,85 +930,152 @@ export function MemberEntryPage() {
           <section className="rounded-xl border border-slate-200 bg-white p-6">
             <h2 className="mb-4 text-sm font-semibold text-slate-900">Personal Details</h2>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4">
+              
+              {/* 1. Country Typeahead (Full Row) */}
+              <div className="col-span-2">
+                <Typeahead
+                  label="Country"
+                  value={selectedCountry}
+                  options={COUNTRIES}
+                  placeholder="United States"
+                  required
+                  onChange={(val) => {
+                    if (val !== selectedCountry) {
+                      setSelectedRegion('');
+                      setRegionOtherText('');
+                      setForm((prev) => ({ ...prev, state_region: '', country: val }));
+                    }
+                    setSelectedCountry(val);
+                  }}
+                  onValidChange={(val) => {
+                    setSelectedCountry(val);
+                    setSelectedRegion('');
+                    setRegionOtherText('');
+                    setForm((prev) => ({ ...prev, state_region: '', country: val }));
+                  }}
+                  error="Please select a country from the list."
+                />
+              </div>
+
+              {/* Other country free text (Full Row) */}
+              {selectedCountry === 'Other' && (
                 <div className="col-span-2 flex flex-col gap-1.5">
                   <label className="text-xs font-medium text-slate-600">
-                    Address <span className="text-red-500">*</span>
+                    Country name <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
-                    name="address"
-                    value={form.address}
-                    onChange={handleChange}
+                    value={countryOtherText}
+                    onChange={(e) => setCountryOtherText(e.target.value)}
                     required
-                    placeholder="123 Main St"
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
+                    placeholder="Enter country"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
                   />
                 </div>
-                <div className="flex flex-col gap-1.5">
+              )}
+
+              {/* 2. State / Region (Full Row, only shows after Country is selected) */}
+              {selectedCountry && selectedCountry !== 'Other' && regionOptions.length > 0 && (
+                <div className="col-span-2">
+                  <Typeahead
+                    label="State / Region"
+                    value={selectedRegion}
+                    options={regionOptions}
+                    placeholder={selectedCountry === 'United States' ? 'Illinois' : 'Select region'}
+                    required
+                    onChange={(val) => {
+                      setSelectedRegion(val);
+                      if (val !== 'Other') {
+                        setRegionOtherText('');
+                        setForm((prev) => ({ ...prev, state_region: val }));
+                      } else {
+                        setForm((prev) => ({ ...prev, state_region: '' }));
+                      }
+                    }}
+                    onValidChange={(val) => {
+                      setSelectedRegion(val);
+                      if (val !== 'Other') {
+                        setForm((prev) => ({ ...prev, state_region: val }));
+                      }
+                    }}
+                    error="Please select a region from the list."
+                  />
+                </div>
+              )}
+
+              {/* Other region free text (Full Row) */}
+              {selectedRegion === 'Other' && (
+                <div className="col-span-2 flex flex-col gap-1.5">
                   <label className="text-xs font-medium text-slate-600">
-                    City <span className="text-red-500">*</span>
+                    Region name <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
-                    name="city"
-                    value={form.city}
-                    onChange={handleChange}
+                    value={regionOtherText}
+                    onChange={(e) => {
+                      setRegionOtherText(e.target.value);
+                      setForm((prev) => ({ ...prev, state_region: e.target.value }));
+                    }}
                     required
-                    placeholder="Chicago"
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
+                    placeholder="Enter region"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-500 focus:outline-none"
                   />
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-medium text-slate-600">
-                    State / Region <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="state_region"
-                    value={form.state_region}
-                    onChange={handleChange}
-                    required
-                    placeholder="Illinois"
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-medium text-slate-600">
-                    Zip code <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="zip_code"
-                    value={form.zip_code}
-                    onChange={handleChange}
-                    onBlur={(e) => validateZip(e.target.value)}
-                    required
-                    placeholder="60601"
-                    className={`rounded-lg border px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none ${
-                      zipError
-                        ? 'border-red-400 focus:border-red-400'
-                        : 'border-slate-300 focus:border-slate-500'
-                    }`}
-                  />
-                  {zipError && (
-                    <p className="text-xs text-red-600">{zipError}</p>
-                  )}
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-medium text-slate-600">
-                    Country <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="country"
-                    value={form.country}
-                    onChange={handleChange}
-                    required
-                    placeholder="United States"
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
-                  />
-                </div>
+              )}
+              {/* 3. City (Half Row - Left) */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-slate-600">
+                  City <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="city"
+                  value={form.city}
+                  onChange={handleChange}
+                  required
+                  placeholder="Chicago"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
+                />
+              </div>
+
+              {/* 4. Zip code (Half Row - Right) */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-slate-600">
+                  Zip/Postal code <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="zip_code"
+                  value={form.zip_code}
+                  onChange={handleChange}
+                  onBlur={(e) => validateZip(e.target.value)}
+                  required
+                  placeholder="60601"
+                  className={`rounded-lg border px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none ${
+                    zipError ? 'border-red-400 focus:border-red-400' : 'border-slate-300 focus:border-slate-500'
+                  }`}
+                />
+                {zipError && <p className="text-xs text-red-600">{zipError}</p>}
+              </div>
+
+              {/* 5. Address (Full Row - Bottom) */}
+              <div className="col-span-2 flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-slate-600">
+                  Address <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="address"
+                  value={form.address}
+                  onChange={handleChange}
+                  required
+                  placeholder="123 Main St"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
+                />
+              </div>
+
+              
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-medium text-slate-600">
                     T-shirt size <span className="text-red-500">*</span>
@@ -766,6 +1093,7 @@ export function MemberEntryPage() {
                     ))}
                   </select>
                 </div>
+
                 <div className="col-span-2 flex flex-col gap-1.5">
                   <label className="text-xs font-medium text-slate-600">Dietary restrictions</label>
                   <input
@@ -883,7 +1211,14 @@ export function MemberEntryPage() {
           <div className="flex items-center justify-between pb-8">
             <button
               type="button"
-              onClick={() => { setForm(INITIAL_STATE); setSocials([]); }}
+              onClick={() => {
+                setForm(INITIAL_STATE);
+                setSocials([]);
+                setSelectedCountry('');
+                setSelectedRegion('');
+                setRegionOtherText('');
+                setCountryOtherText('');
+              }}
               className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
               Clear form
