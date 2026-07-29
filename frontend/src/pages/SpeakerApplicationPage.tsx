@@ -40,6 +40,7 @@ interface MemberProfile {
 type FormState = {
   bio: string;
   speaking_interests: string[];
+  speaking_interests_other_text: string; // <-- ADDED
   speaking_experience: string;
   speaking_topics: string;
   teams_that_benefit: string[];
@@ -51,6 +52,7 @@ type FormState = {
 const INITIAL_FORM: FormState = {
   bio: '',
   speaking_interests: [],
+  speaking_interests_other_text: '', // <-- ADDED
   speaking_experience: '',
   speaking_topics: '',
   teams_that_benefit: [],
@@ -119,13 +121,19 @@ export function SpeakerApplicationPage() {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
+  // <-- UPDATED: Clears the text input if "Other" is deselected
   const toggleInterest = (value: string) => {
-    setForm((prev) => ({
-      ...prev,
-      speaking_interests: prev.speaking_interests.includes(value)
-        ? prev.speaking_interests.filter((v) => v !== value)
-        : [...prev.speaking_interests, value],
-    }));
+    setForm((prev) => {
+      const isSelected = prev.speaking_interests.includes(value);
+      return {
+        ...prev,
+        speaking_interests: isSelected
+          ? prev.speaking_interests.filter((v) => v !== value)
+          : [...prev.speaking_interests, value],
+        speaking_interests_other_text:
+          value === 'Other' && isSelected ? '' : prev.speaking_interests_other_text,
+      };
+    });
   };
 
   const toggleTeam = (value: string) => {
@@ -149,6 +157,14 @@ export function SpeakerApplicationPage() {
     setLoading(true);
     setError(null);
 
+    // <-- ADDED: Maps the speaking interests array to include the text input
+    const interestsWithOther = form.speaking_interests.map((i) => {
+      if (i === 'Other' && form.speaking_interests_other_text.trim()) {
+        return `Other: ${form.speaking_interests_other_text.trim()}`;
+      }
+      return i;
+    });
+
     const teamsWithOther = form.teams_that_benefit.map((t) => {
       if (t === 'Other' && form.teams_that_benefit_other_text.trim()) {
         return `Other: ${form.teams_that_benefit_other_text.trim()}`;
@@ -162,7 +178,7 @@ export function SpeakerApplicationPage() {
         .insert({
           member_id: profile.member_id,
           bio: form.bio.trim(),
-          speaking_interest: form.speaking_interests,
+          speaking_interest: interestsWithOther, // <-- UPDATED to use mapped array
           speaking_experience: form.speaking_experience || null,
           speaking_topics: form.speaking_topics.trim() || null,
           teams_that_benefit: teamsWithOther,
@@ -243,7 +259,6 @@ export function SpeakerApplicationPage() {
 
         <form onSubmit={handleSubmit} className="space-y-6">
 
-          {/* Auto-filled profile info */}
           <section className="rounded-xl border border-charcoal/15 bg-surface p-6">
             <h2 className="mb-1 text-sm font-semibold text-ink">Your info</h2>
             <p className="mb-4 text-xs text-ink/50">Auto-filled from your member profile</p>
@@ -271,7 +286,6 @@ export function SpeakerApplicationPage() {
             </div>
           </section>
 
-          {/* Speaking details */}
           <section className="rounded-xl border border-charcoal/15 bg-white p-6">
             <h2 className="mb-4 text-sm font-semibold text-ink">Speaking details</h2>
             <div className="space-y-4">
@@ -311,6 +325,19 @@ export function SpeakerApplicationPage() {
                     </button>
                   ))}
                 </div>
+                
+                {/* <-- ADDED: Conditionally renders the text input for Other --> */}
+                {form.speaking_interests.includes('Other') && (
+                  <input
+                    type="text"
+                    name="speaking_interests_other_text"
+                    value={form.speaking_interests_other_text}
+                    onChange={handleChange}
+                    required
+                    placeholder="Specify your speaking interest..."
+                    className="mt-1 rounded-lg border border-charcoal/20 px-3 py-2 text-sm text-ink placeholder-ink/30 focus:border-orange focus:outline-none"
+                  />
+                )}
               </div>
 
               <div className="flex flex-col gap-1.5">
@@ -371,6 +398,7 @@ export function SpeakerApplicationPage() {
                     name="teams_that_benefit_other_text"
                     value={form.teams_that_benefit_other_text}
                     onChange={handleChange}
+                    required
                     placeholder="Describe the team..."
                     className="mt-1 rounded-lg border border-charcoal/20 px-3 py-2 text-sm text-ink placeholder-ink/30 focus:border-orange focus:outline-none"
                   />
@@ -413,7 +441,6 @@ export function SpeakerApplicationPage() {
             </div>
           </section>
 
-          {/* Actions */}
           <div className="flex items-center justify-between pb-8">
             <button
               type="button"
