@@ -221,15 +221,18 @@ export interface EnrichmentResult {
   contact: {
     most_probable_email?: string;
     most_probable_email_status?: string;
+    most_probable_phone?: string;
     profile?: {
       location?: string;
       position?: {
         title?: string;
+        seniority?: string;
         company?: {
           name?: string;
           website?: string;
         };
-        start_at?: { month?: number; year?: number };
+        /** ISO date string or { month, year } depending on FullEnrich shape */
+        start_at?: string | { month?: number; year?: number };
       };
     };
   } | null;

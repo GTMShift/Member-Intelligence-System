@@ -54,7 +54,7 @@ router.post('/', async (req, res) => {
   const contactData = {
     first_name: member.first_name,
     last_name: member.last_name,
-    enrich_fields: ['contact.work_emails'],
+    enrich_fields: ['contact.work_emails', 'contact.phones'],
     custom: { member_id: id },
   };
 

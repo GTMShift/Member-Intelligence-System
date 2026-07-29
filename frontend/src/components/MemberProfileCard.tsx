@@ -7,20 +7,32 @@ import { createNotification } from '../api/notificationsApi';
 import { useAuth } from '../context/authShared';
 import type { EnrichmentResult, MemberDataEntry, MemberDetail } from '../types/api';
 import { formatTimestamp, fullName } from '../utils/format';
+import { formatEnrichmentStartDate, normalizeFullEnrichRecord } from '../utils/enrichment';
 import { EnrichmentReviewPanel } from './EnrichmentReviewPanel';
 import { InteractionTimeline } from './InteractionTimeline';
 
 function summarizeEnrichmentResult(result: EnrichmentResult): string {
   const contact = result.contact;
+  const position = contact?.profile?.position;
   const parts: string[] = [];
   if (contact?.most_probable_email) {
     parts.push(`Work email: ${contact.most_probable_email}`);
   }
-  if (contact?.profile?.position?.title) {
-    parts.push(`Job title: ${contact.profile.position.title}`);
+  if (contact?.most_probable_phone) {
+    parts.push(`Phone: ${contact.most_probable_phone}`);
   }
-  if (contact?.profile?.position?.company?.name) {
-    parts.push(`Company: ${contact.profile.position.company.name}`);
+  if (position?.title) {
+    parts.push(`Job title: ${position.title}`);
+  }
+  if (position?.seniority) {
+    parts.push(`Seniority: ${position.seniority}`);
+  }
+  const jobStart = formatEnrichmentStartDate(position?.start_at);
+  if (jobStart) {
+    parts.push(`Job start: ${jobStart}`);
+  }
+  if (position?.company?.name) {
+    parts.push(`Company: ${position.company.name}`);
   }
   if (contact?.profile?.location) {
     parts.push(`Location: ${contact.profile.location}`);
@@ -479,11 +491,11 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
         }
         const pollingResponse = await statusResponse.json();
         if (pollingResponse.status === 'FINISHED') {
-          const contact = pollingResponse.datas?.[0]?.contact ?? null;
+          const row = pollingResponse.datas?.[0] ?? pollingResponse.data?.[0] ?? null;
           finishedResult = {
             enrichment_id: enrichmentId,
             status: pollingResponse.status,
-            contact,
+            contact: normalizeFullEnrichRecord(row),
           };
           break;
         }
@@ -670,6 +682,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
               </h2>
               <p className="mt-1 text-sm text-slate-600">
                 {currentRole ?? '—'}
+                {profile.seniority_level ? ` · ${profile.seniority_level}` : ''}
                 {profile.company_name ? (
                   <>
                     {' · '}
@@ -687,6 +700,18 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                   </>
                 ) : null}
               </p>
+              {(member.phone || profile.current_job_start_date) && (
+                <p className="mt-1 text-xs text-slate-500">
+                  {[
+                    member.phone ? `Phone ${member.phone}` : null,
+                    profile.current_job_start_date
+                      ? `Started ${profile.current_job_start_date}`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </p>
+              )}
               <p className="mt-2 text-xs text-slate-400">
                 Last updated {formatTimestamp(member.last_updated)}
                 {profile.updated_at !== member.last_updated && (
