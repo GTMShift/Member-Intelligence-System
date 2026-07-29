@@ -55,6 +55,8 @@ const REGION_FIELDS = [
   { key: 'region_latin_america', label: 'Latin America' },
 ] as const;
 
+
+
 type TeamKey = typeof TEAM_FIELDS[number]['key'];
 type RegionKey = typeof REGION_FIELDS[number]['key'];
 
@@ -150,6 +152,25 @@ const REGIONS_BY_COUNTRY: Record<string, string[]> = {
     'Dadra and Nagar Haveli and Daman and Diu','Delhi','Jammu and Kashmir',
     'Ladakh','Lakshadweep','Puducherry',
   ],
+};
+
+const TIER_1_COUNTRIES = [
+  'United States',
+  'Canada',
+  'United Kingdom',
+  'Germany',
+  'France',
+  'Switzerland',
+];
+
+
+const POSTAL_CODE_PATTERNS: Record<string, RegExp> = {
+  'United States': /^\d{5}(-\d{4})?$/, // 12345 or 12345-6789
+  'Canada': /^[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d$/, // A1A 1A1
+  'United Kingdom': /^[A-Z]{1,2}\d[A-Z\d]? ?\d[A-Z]{2}$/i, // SW1A 1AA
+  'Germany': /^\d{5}$/, // 5 digits
+  'France': /^\d{5}$/, // 5 digits
+  'Switzerland': /^\d{4}$/, // 4 digits
 };
 
 // ---- Form state -------------------------------------------------------------
@@ -364,6 +385,8 @@ export function MemberEntryPage() {
   const [regionOtherText, setRegionOtherText] = useState('');
   const [countryOtherText, setCountryOtherText] = useState('');
 
+  const isTier1Country = TIER_1_COUNTRIES.includes(selectedCountry);
+
   const showFitScore = ICP_SCORE_BUCKETS.includes(form.bucket);
 
   const regionOptions = selectedCountry && selectedCountry !== 'Other'
@@ -385,56 +408,44 @@ export function MemberEntryPage() {
   };
 
   const validateZip = async (zip: string) => {
-    if (!zip.trim() || selectedCountry !== 'United States') {
+    const trimmedZip = zip.trim();
+  
+    // Tier 2 & Tier 3: Skip validation entirely & clear errors
+    if (!isTier1Country) {
       setZipError(null);
       return;
     }
   
-    // Need city and state present to cross-validate
-    if (!form.city.trim() || !selectedRegion) {
-      setZipError(null);
+    // Tier 1: Required check
+    if (!trimmedZip) {
+      setZipError('Zip/Postal code is required.');
       return;
     }
   
-    try {
-      const res = await fetch(`https://api.zippopotam.us/us/${zip.trim()}`);
-      if (!res.ok) {
-        setZipError('Invalid US zip code.');
+    // Tier 1: Light Format Regex Check
+    const pattern = POSTAL_CODE_PATTERNS[selectedCountry];
+    if (pattern && !pattern.test(trimmedZip)) {
+      setZipError(`Invalid format for ${selectedCountry}.`);
+      return;
+    }
+  
+    // Tier 1: Optional Light Existence API Check (US only example)
+    if (selectedCountry === 'United States') {
+      try {
+        const res = await fetch(`https://api.zippopotam.us/us/${trimmedZip}`);
+        if (!res.ok) {
+          setZipError('Zip code not found. Please check and try again.');
+          return;
+        }
+      } catch {
+        // On network failure, clear error so the user isn't stuck
+        setZipError(null);
         return;
       }
-  
-      const data = await res.json();
-      const places = data.places as Array<{
-        'place name': string;
-        state: string;
-        'state abbreviation': string;
-      }>;
-  
-      // Normalize strings for case-insensitive comparison
-      const userCity = form.city.trim().toLowerCase();
-      const userState = selectedRegion.trim().toLowerCase();
-  
-      // Check if any returned place matches BOTH the city and state
-      const matchesCityAndState = places.some((place) => {
-        const placeCity = place['place name'].toLowerCase();
-        const placeState = place.state.toLowerCase();
-        const placeStateAbbr = place['state abbreviation'].toLowerCase();
-  
-        const cityMatches = placeCity === userCity;
-        const stateMatches = placeState === userState || placeStateAbbr === userState;
-  
-        return cityMatches && stateMatches;
-      });
-  
-      if (!matchesCityAndState) {
-        setZipError(`ZIP code ${zip} does not match ${form.city}, ${selectedRegion}.`);
-      } else {
-        setZipError(null);
-      }
-    } catch {
-      // Fail gracefully on network errors so user isn't blocked
-      setZipError(null);
     }
+  
+    // If everything passes
+    setZipError(null);
   };
 
   const toggleBoolean = (field: TeamKey | RegionKey) => {
@@ -1042,7 +1053,7 @@ export function MemberEntryPage() {
               {/* 4. Zip code (Half Row - Right) */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-slate-600">
-                  Zip/Postal code <span className="text-red-500">*</span>
+                  Zip/Postal code {isTier1Country && <span className="text-red-500">*</span>}
                 </label>
                 <input
                   type="text"
@@ -1050,10 +1061,18 @@ export function MemberEntryPage() {
                   value={form.zip_code}
                   onChange={handleChange}
                   onBlur={(e) => validateZip(e.target.value)}
-                  required
-                  placeholder="60601"
+                  required={isTier1Country} // Only required for Tier 1!
+                  placeholder={
+                    selectedCountry === 'United States'
+                      ? '60601'
+                      : isTier1Country
+                      ? 'Postal code'
+                      : 'Postal code (optional)'
+                  }
                   className={`rounded-lg border px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none ${
-                    zipError ? 'border-red-400 focus:border-red-400' : 'border-slate-300 focus:border-slate-500'
+                    zipError
+                      ? 'border-red-400 focus:border-red-400'
+                      : 'border-slate-300 focus:border-slate-500'
                   }`}
                 />
                 {zipError && <p className="text-xs text-red-600">{zipError}</p>}
