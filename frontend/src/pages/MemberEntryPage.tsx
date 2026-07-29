@@ -5,6 +5,7 @@ import { getMember } from '../api/membersApi';
 import { useAuth } from '../context/authShared';
 import type { EnrichmentResult, MemberDetail } from '../types/api';
 import { EnrichmentReviewPanel } from '../components/EnrichmentReviewPanel';
+import { normalizeFullEnrichRecord } from '../utils/enrichment';
 
 const BUCKET_OPTIONS = [
   { value: '', label: 'Select a category' },
@@ -308,10 +309,11 @@ export function MemberEntryPage() {
 
         const pollingResponse = await statusResponse.json();
         if (pollingResponse.status === 'FINISHED') {
+          const row = pollingResponse.datas?.[0] ?? pollingResponse.data?.[0] ?? null;
           finishedResult = {
             enrichment_id: enrichmentId,
             status: pollingResponse.status,
-            contact: pollingResponse.datas?.[0]?.contact ?? null,
+            contact: normalizeFullEnrichRecord(row),
           };
           break;
         }

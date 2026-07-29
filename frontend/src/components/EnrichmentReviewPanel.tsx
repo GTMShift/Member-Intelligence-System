@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { createNotification } from '../api/notificationsApi';
 import { supabase } from '../lib/supabaseClient';
 import type { EnrichmentResult, MemberDetail } from '../types/api';
+import { formatEnrichmentStartDate } from '../utils/enrichment';
 import { fullName } from '../utils/format';
 
 interface EnrichmentReviewPanelProps {
@@ -12,7 +13,14 @@ interface EnrichmentReviewPanelProps {
   onApplied: () => void;
 }
 
-type ReviewFieldKey = 'work_email' | 'job_title' | 'company' | 'location';
+type ReviewFieldKey =
+  | 'work_email'
+  | 'phone'
+  | 'job_title'
+  | 'seniority'
+  | 'job_start'
+  | 'company'
+  | 'location';
 
 interface ReviewField {
   key: ReviewFieldKey;
@@ -31,8 +39,12 @@ function buildReviewFields(
   enrichedData: EnrichmentResult,
 ): ReviewField[] {
   const contact = enrichedData.contact;
+  const position = contact?.profile?.position;
   const currentRole =
     existingMember.employment_history.find((entry) => entry.is_current)?.role ?? null;
+  const currentStart =
+    existingMember.employment_history.find((entry) => entry.is_current)?.start_date ??
+    existingMember.profile.current_job_start_date;
   const fields: ReviewField[] = [];
 
   if (contact?.most_probable_email) {
@@ -44,21 +56,49 @@ function buildReviewFields(
     });
   }
 
-  if (contact?.profile?.position?.title) {
+  if (contact?.most_probable_phone) {
+    fields.push({
+      key: 'phone',
+      label: 'Phone',
+      currentValue: existingMember.phone,
+      enrichedValue: contact.most_probable_phone,
+    });
+  }
+
+  if (position?.title) {
     fields.push({
       key: 'job_title',
       label: 'Job title',
       currentValue: currentRole,
-      enrichedValue: contact.profile.position.title,
+      enrichedValue: position.title,
     });
   }
 
-  if (contact?.profile?.position?.company?.name) {
+  if (position?.seniority) {
+    fields.push({
+      key: 'seniority',
+      label: 'Seniority level',
+      currentValue: existingMember.profile.seniority_level,
+      enrichedValue: position.seniority,
+    });
+  }
+
+  const jobStart = formatEnrichmentStartDate(position?.start_at);
+  if (jobStart) {
+    fields.push({
+      key: 'job_start',
+      label: 'Job start date',
+      currentValue: currentStart,
+      enrichedValue: jobStart,
+    });
+  }
+
+  if (position?.company?.name) {
     fields.push({
       key: 'company',
       label: 'Company',
       currentValue: existingMember.profile.company_name,
-      enrichedValue: contact.profile.position.company.name,
+      enrichedValue: position.company.name,
     });
   }
 
@@ -120,7 +160,10 @@ export function EnrichmentReviewPanel({
   );
   const [accepted, setAccepted] = useState<Record<ReviewFieldKey, boolean>>({
     work_email: false,
+    phone: false,
     job_title: false,
+    seniority: false,
+    job_start: false,
     company: false,
     location: false,
   });
@@ -151,18 +194,33 @@ export function EnrichmentReviewPanel({
 
     try {
       const profileUpdates: Record<string, string | null> = {};
+      const memberUpdates: Record<string, string | null> = {};
       let companyNameToApply: string | null = null;
       let jobTitleToApply: string | null = null;
+      let jobStartToApply: string | null = null;
 
       for (const field of selected) {
         if (field.key === 'work_email') {
           profileUpdates.work_email_enriched = field.enrichedValue;
         }
 
+        if (field.key === 'phone') {
+          memberUpdates.phone = field.enrichedValue;
+        }
+
         if (field.key === 'location') {
           const parsed = parseLocation(field.enrichedValue);
           profileUpdates.city = parsed.city;
           profileUpdates.state_region = parsed.state_region;
+        }
+
+        if (field.key === 'seniority') {
+          profileUpdates.seniority_level = field.enrichedValue;
+        }
+
+        if (field.key === 'job_start') {
+          jobStartToApply = field.enrichedValue;
+          profileUpdates.current_job_start_date = field.enrichedValue;
         }
 
         if (field.key === 'job_title') {
@@ -192,7 +250,7 @@ export function EnrichmentReviewPanel({
         }
       }
 
-      if (jobTitleToApply || companyNameToApply) {
+      if (jobTitleToApply || companyNameToApply || jobStartToApply) {
         const currentRole =
           existingMember.employment_history.find((entry) => entry.is_current)?.role ?? null;
         const { data: existingCurrent, error: currentLookupError } = await supabase
@@ -210,6 +268,7 @@ export function EnrichmentReviewPanel({
           const employmentUpdates: Record<string, string> = {};
           if (jobTitleToApply) employmentUpdates.role = jobTitleToApply;
           if (companyNameToApply) employmentUpdates.company = companyNameToApply;
+          if (jobStartToApply) employmentUpdates.start_date = jobStartToApply;
 
           const { error: employmentError } = await supabase
             .from('employment_history')
@@ -225,6 +284,7 @@ export function EnrichmentReviewPanel({
             company:
               companyNameToApply ?? existingMember.profile.company_name ?? 'Unknown',
             role: jobTitleToApply ?? currentRole,
+            start_date: jobStartToApply,
             is_current: true,
             source: 'Manual',
           });
@@ -237,7 +297,10 @@ export function EnrichmentReviewPanel({
 
       const { error: memberError } = await supabase
         .from('members')
-        .update({ last_updated: new Date().toISOString() })
+        .update({
+          ...memberUpdates,
+          last_updated: new Date().toISOString(),
+        })
         .eq('id', memberId);
 
       if (memberError) {

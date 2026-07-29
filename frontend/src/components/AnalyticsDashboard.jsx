@@ -191,7 +191,11 @@ function ColdMembersSection({ coldMembers }) {
                     <div className="text-sm font-medium text-slate-900 hover:text-emerald-600">
                       {m.first_name} {m.last_name}
                     </div>
-                    <div className="text-xs text-slate-500">{m.email}</div>
+                    <div className="text-xs text-slate-500">
+                      {[m.seniority_level, m.phone, m.job_start_date, m.email]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </div>
                   </td>
                   <td className="py-3 pr-3 text-right text-slate-700 align-top pt-3.5">
                     {m.events_attended_count}
@@ -261,7 +265,9 @@ function TopMembersSection({ topMembers }) {
                     {m.first_name} {m.last_name}
                   </div>
                   <div className="text-xs text-slate-500">
-                    {m.current_company || m.seniority_level || m.email}
+                    {[m.current_company, m.seniority_level, m.phone, m.job_start_date, m.email]
+                      .filter(Boolean)
+                      .join(' · ')}
                   </div>
                 </td>
                 <td className="py-3 pr-4">
@@ -505,12 +511,13 @@ export default function AnalyticsDashboard() {
           first_name,
           last_name,
           email,
+          phone,
           engagement_score,
           events_attended_count,
           last_engagement_date,
           last_newsletter_open_at,
           subscription_status,
-          member_profile ( bucket, seniority_level )
+          member_profile ( bucket, seniority_level, current_job_start_date )
         `,
       )
       .gt('engagement_score', 0)
@@ -527,6 +534,7 @@ export default function AnalyticsDashboard() {
         first_name: row.first_name,
         last_name: row.last_name,
         email: row.email,
+        phone: row.phone ?? null,
         engagement_score: Number(row.engagement_score),
         events_attended_count: row.events_attended_count ?? 0,
         last_engagement_date: row.last_engagement_date,
@@ -534,6 +542,7 @@ export default function AnalyticsDashboard() {
         subscription_status: row.subscription_status,
         bucket: profile?.bucket ?? null,
         seniority_level: profile?.seniority_level ?? null,
+        job_start_date: profile?.current_job_start_date ?? null,
         current_company: null,
       };
     });
@@ -673,12 +682,13 @@ export default function AnalyticsDashboard() {
           first_name,
           last_name,
           email,
+          phone,
           engagement_score,
           last_engagement_date,
           last_event_date,
           events_attended_count,
           subscription_status,
-          member_profile ( bucket, seniority_level )
+          member_profile ( bucket, seniority_level, current_job_start_date )
         `,
       )
       .eq('subscription_status', 'active')
@@ -704,12 +714,14 @@ export default function AnalyticsDashboard() {
         first_name: row.first_name,
         last_name: row.last_name,
         email: row.email,
+        phone: row.phone ?? null,
         engagement_score: Number(row.engagement_score),
         last_engagement_date: row.last_engagement_date,
         last_event_date: row.last_event_date,
         events_attended_count: row.events_attended_count ?? 0,
         bucket: profile?.bucket ?? null,
         seniority_level: profile?.seniority_level ?? null,
+        job_start_date: profile?.current_job_start_date ?? null,
       };
     });
   }
