@@ -160,6 +160,7 @@ export function MemberEntryPage() {
   const [enrichError, setEnrichError] = useState<string | null>(null);
   const [enrichmentResult, setEnrichmentResult] = useState<EnrichmentResult | null>(null);
   const [createdMember, setCreatedMember] = useState<MemberDetail | null>(null);
+  const [zipError, setZipError] = useState<string | null>(null);
 
   const showFitScore = ICP_SCORE_BUCKETS.includes(form.bucket);
 
@@ -167,9 +168,30 @@ export function MemberEntryPage() {
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    const nameFields = ['first_name', 'last_name'];
+    const normalizedValue = nameFields.includes(name)
+      ? value.replace(/\b\w/g, (c) => c.toUpperCase())
+      : value;
+    setForm((prev) => ({ ...prev, [name]: normalizedValue }));
     if (name === 'bucket' && !ICP_SCORE_BUCKETS.includes(value)) {
       setForm((prev) => ({ ...prev, bucket: value, fit_score: '' }));
+    }
+  };
+
+  const validateZip = async (zip: string) => {
+    if (!zip.trim()) {
+      setZipError(null);
+      return;
+    }
+    try {
+      const res = await fetch(`https://api.zippopotam.us/us/${zip.trim()}`);
+      if (!res.ok) {
+        setZipError('Invalid zip code — please check and try again.');
+      } else {
+        setZipError(null);
+      }
+    } catch {
+      setZipError(null); // fail silently if API is unreachable
     }
   };
 
@@ -194,10 +216,16 @@ export function MemberEntryPage() {
     setLoading(true);
     setError(null);
 
+    if (zipError) {
+      setError('Please fix the zip code before submitting.');
+      setLoading(false);
+      return;
+    }
+
     try {
       const input: CreateMemberInput = {
-        first_name: form.first_name.trim(),
-        last_name: form.last_name.trim(),
+        first_name: form.first_name.trim().replace(/\b\w/g, (c) => c.toUpperCase()),
+        last_name: form.last_name.trim().replace(/\b\w/g, (c) => c.toUpperCase()),
         email: form.email.trim(),
         linkedin_url: form.linkedin_url.trim(),
         phone: form.phone.trim() || null,
@@ -694,10 +722,18 @@ export function MemberEntryPage() {
                     name="zip_code"
                     value={form.zip_code}
                     onChange={handleChange}
+                    onBlur={(e) => validateZip(e.target.value)}
                     required
                     placeholder="60601"
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
+                    className={`rounded-lg border px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none ${
+                      zipError
+                        ? 'border-red-400 focus:border-red-400'
+                        : 'border-slate-300 focus:border-slate-500'
+                    }`}
                   />
+                  {zipError && (
+                    <p className="text-xs text-red-600">{zipError}</p>
+                  )}
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-medium text-slate-600">
