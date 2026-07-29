@@ -49,72 +49,69 @@ router.post('/', async (req, res) => {
     return res.status(500).json({ error: memberError.message });
   }
 
-  if (member) {
-    const memberName = `${member.first_name} ${member.last_name}`.trim();
-    console.log('[emailWebhook] Member found:', member.id, memberName);
-
-    const interactionSummary = summary || subject || 'Email interaction';
-    const { error: interactionError } = await supabase
-      .from('interactions')
-      .insert({
-        member_id: member.id,
-        interaction_type: 'email',
-        summary: interactionSummary,
-        occurred_at,
-        logged_by: logged_by || 'Claude email plugin',
-        direction: dbDirection,
-        metadata: {
-          subject,
-          sender_email,
-          recipient_email,
-          thread_id,
-          direction
-        }
-      });
-
-    if (interactionError) {
-      console.log('[emailWebhook] Failed to insert interaction:', interactionError.message);
-      return res.status(500).json({ error: interactionError.message });
-    }
-
-    await supabase
-      .from('members')
-      .update({ last_updated: new Date().toISOString() })
-      .eq('id', member.id);
-
-    console.log('[emailWebhook] Interaction logged for member:', member.id);
-    return res.status(201).json({
-      status: 'logged',
-      member_id: member.id,
-      member_name: memberName
+  if (!member) {
+    console.log('[emailWebhook] No matching member — ignoring', lookupEmail);
+    return res.status(200).json({
+      status: 'ignored',
+      message: 'No matching member found — email ignored',
+      unmatched_email: lookupEmail
     });
   }
 
-  console.log('[emailWebhook] No matching member — flagging for admin review');
+  const memberName = `${member.first_name} ${member.last_name}`.trim();
+  console.log('[emailWebhook] Member found:', member.id, memberName);
 
-  const notificationBody =
-    `Email from ${sender_email} could not be matched to a member. Subject: ${subject}. Flagged for review.`;
+  const interactionSummary = summary || subject || 'Email interaction';
+  const { error: interactionError } = await supabase
+    .from('interactions')
+    .insert({
+      member_id: member.id,
+      interaction_type: 'email',
+      summary: interactionSummary,
+      occurred_at,
+      logged_by: logged_by || 'Claude email plugin',
+      direction: dbDirection,
+      metadata: {
+        subject,
+        sender_email,
+        recipient_email,
+        thread_id,
+        direction
+      }
+    });
 
+  if (interactionError) {
+    console.log('[emailWebhook] Failed to insert interaction:', interactionError.message);
+    return res.status(500).json({ error: interactionError.message });
+  }
+
+  await supabase
+    .from('members')
+    .update({ last_updated: new Date().toISOString() })
+    .eq('id', member.id);
+
+  const directionLabel = direction === 'sent' ? 'Sent to' : 'Received from';
+  const otherParty = direction === 'sent' ? recipient_email : sender_email;
   const { error: notificationError } = await supabase
     .from('notifications')
     .insert({
-      type: 'new_signup',
-      title: 'Unmatched email contact',
-      body: notificationBody,
-      member_id: null,
+      type: 'profile_updated',
+      title: 'Email interaction logged',
+      body: `${directionLabel} ${otherParty} (${memberName}): ${interactionSummary}`,
+      member_id: member.id,
+      member_name: memberName,
       is_read: false
     });
 
   if (notificationError) {
     console.log('[emailWebhook] Failed to insert notification:', notificationError.message);
-    return res.status(500).json({ error: notificationError.message });
   }
 
-  console.log('[emailWebhook] Notification created for unmatched email:', lookupEmail);
-  return res.status(200).json({
-    status: 'flagged',
-    message: 'No matching member found — flagged for admin review',
-    unmatched_email: lookupEmail
+  console.log('[emailWebhook] Interaction logged for member:', member.id);
+  return res.status(201).json({
+    status: 'logged',
+    member_id: member.id,
+    member_name: memberName
   });
 });
 
