@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 export interface IcpBucketSuggestion {
   bucket: string;
   reason?: string;
-  score: number; // filled in by the caller after calculateFitScore resolves
+  score: number | null;
 }
  
 /**
