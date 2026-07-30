@@ -19,40 +19,50 @@ import { supabase } from '../lib/supabaseClient';
 // ============================================================================
 
 const BUCKET_STYLES = {
-  icp_member: {
-    label: 'ICP',
-    className: 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200',
-    color: '#10b981',
+  primary_icp: {
+    label: 'Primary ICP',
+    className: 'bg-[#d65617] text-white',
+    color: '#d65617',
   },
-  adjacent_remit: {
-    label: 'Adjacent',
-    className: 'bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-200',
-    color: '#0ea5e9',
+  secondary_icp: {
+    label: 'Secondary ICP',
+    className: 'bg-[#d65617]/20 text-[#b8460e] border border-[#d65617]/30',
+    color: '#f5c9b3',
   },
-  between_roles: {
-    label: 'Between Roles',
-    className: 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200',
-    color: '#f59e0b',
+  watchlist: {
+    label: 'Watchlist',
+    className: 'bg-[#7c8f5e]/20 text-[#7c8f5e] border border-[#7c8f5e]/30',
+    color: '#7c8f5e',
+  },
+  between_jobs: {
+    label: 'Between Jobs',
+    className: 'bg-[#eef1e7] text-[#7c8f5e]',
+    color: '#c8d4b8',
   },
   consultant: {
     label: 'Consultant',
-    className: 'bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-200',
-    color: '#f97316',
+    className: 'bg-[#4a5150]/10 text-[#4a5150] border border-[#4a5150]/20',
+    color: '#c8cccc',
   },
-  sponsor: {
-    label: 'Sponsor',
-    className: 'bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-200',
-    color: '#8b5cf6',
+  partner_sponsor: {
+    label: 'Partner / Sponsor',
+    className: 'bg-[#4a5150] text-white',
+    color: '#4a5150',
   },
-  personal_connection: {
-    label: 'Personal',
-    className: 'bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200',
-    color: '#64748b',
+  manual_review: {
+    label: 'Manual Review',
+    className: 'bg-[#d65617]/10 text-[#b8460e] border border-[#d65617]/20',
+    color: '#7b0000',
+  },
+  icp_no: {
+    label: 'ICP No',
+    className: 'bg-[#4a5150]/5 text-[#4a5150]/40 border border-[#4a5150]/10',
+    color: '#e8eaea',
   },
   unclassified: {
     label: 'Unclassified',
-    className: 'bg-slate-50 text-slate-500 ring-1 ring-inset ring-slate-200',
-    color: '#cbd5e1',
+    className: 'bg-slate-50 text-slate-400 border border-slate-200',
+    color: '#ffffff',
   },
 };
 
@@ -104,6 +114,18 @@ function BucketBadge({ bucket }) {
   );
 }
 
+function BucketDot({ bucket }) {
+  const key = bucket || 'unclassified';
+  const style = BUCKET_STYLES[key] || BUCKET_STYLES.unclassified;
+  return (
+    <span
+      title={style.label}
+      className="inline-block h-2 w-2 rounded-full flex-shrink-0"
+      style={{ backgroundColor: style.color }}
+    />
+  );
+}
+
 // ============================================================================
 // Metric Card
 // ============================================================================
@@ -133,7 +155,7 @@ function MetricCard({ label, value, sublabel, trend }) {
 
 function Section({ title, subtitle, action, children }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white shadow-sm h-full flex flex-col">
+    <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
       <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
         <div>
           <h2 className="text-base font-semibold text-slate-900">{title}</h2>
@@ -143,7 +165,7 @@ function Section({ title, subtitle, action, children }) {
         </div>
         {action}
       </div>
-      <div className="p-5 flex-1">{children}</div>
+      <div className="p-5">{children}</div>
     </section>
   );
 }
@@ -188,13 +210,14 @@ function ColdMembersSection({ coldMembers }) {
                   onClick={() => navigate('/', { state: { selectedMemberId: m.id } })}
                 >
                   <td className="py-3 pr-3">
-                    <div className="text-sm font-medium text-slate-900 hover:text-emerald-600">
-                      {m.first_name} {m.last_name}
-                    </div>
-                    <div className="text-xs text-slate-500">
-                      {[m.seniority_level, m.phone, m.job_start_date, m.email]
-                        .filter(Boolean)
-                        .join(' · ')}
+                    <div className="flex items-center gap-1.5">
+                      <BucketDot bucket={m.bucket} />
+                      <div>
+                        <div className="text-sm font-medium text-slate-900 hover:text-emerald-600">
+                          {m.first_name} {m.last_name}
+                        </div>
+                        <div className="text-xs text-slate-500">{m.email}</div>
+                      </div>
                     </div>
                   </td>
                   <td className="py-3 pr-3 text-right text-slate-700 align-top pt-3.5">
@@ -244,7 +267,7 @@ function TopMembersSection({ topMembers }) {
             <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
               <th className="pb-3 pr-3 w-8">#</th>
               <th className="pb-3 pr-4">Member</th>
-              <th className="pb-3 pr-4">Bucket</th>
+              <th className="pb-3 pr-4">Company</th>
               <th className="pb-3 pr-4 text-right">Score</th>
               <th className="pb-3 pr-4 text-right">Events</th>
               <th className="pb-3">Last Engaged</th>
@@ -261,17 +284,18 @@ function TopMembersSection({ topMembers }) {
                   {startRank + i}
                 </td>
                 <td className="py-3 pr-4">
-                  <div className="font-medium text-slate-900 hover:text-emerald-600">
-                    {m.first_name} {m.last_name}
-                  </div>
-                  <div className="text-xs text-slate-500">
-                    {[m.current_company, m.seniority_level, m.phone, m.job_start_date, m.email]
-                      .filter(Boolean)
-                      .join(' · ')}
+                  <div className="flex items-center gap-1.5">
+                    <BucketDot bucket={m.bucket} />
+                    <div>
+                      <div className="font-medium text-slate-900 hover:text-emerald-600">
+                        {m.first_name} {m.last_name}
+                      </div>
+                      <div className="text-xs text-slate-500">{m.email}</div>
+                    </div>
                   </div>
                 </td>
-                <td className="py-3 pr-4">
-                  <BucketBadge bucket={m.bucket} />
+                <td className="py-3 pr-4 text-sm text-slate-600">
+                  {m.current_company || m.seniority_level || '—'}
                 </td>
                 <td className={`py-3 pr-4 text-right ${scoreColor(m.engagement_score)}`}>
                   {m.engagement_score.toFixed(1)}
@@ -511,13 +535,12 @@ export default function AnalyticsDashboard() {
           first_name,
           last_name,
           email,
-          phone,
           engagement_score,
           events_attended_count,
           last_engagement_date,
           last_newsletter_open_at,
           subscription_status,
-          member_profile ( bucket, seniority_level, current_job_start_date )
+          member_profile ( bucket, seniority_level, company_id, companies ( name ) )
         `,
       )
       .gt('engagement_score', 0)
@@ -529,12 +552,14 @@ export default function AnalyticsDashboard() {
       const profile = Array.isArray(row.member_profile)
         ? row.member_profile[0]
         : row.member_profile;
+      const company = Array.isArray(profile?.companies)
+        ? profile?.companies[0]
+        : profile?.companies;
       return {
         id: row.id,
         first_name: row.first_name,
         last_name: row.last_name,
         email: row.email,
-        phone: row.phone ?? null,
         engagement_score: Number(row.engagement_score),
         events_attended_count: row.events_attended_count ?? 0,
         last_engagement_date: row.last_engagement_date,
@@ -542,8 +567,7 @@ export default function AnalyticsDashboard() {
         subscription_status: row.subscription_status,
         bucket: profile?.bucket ?? null,
         seniority_level: profile?.seniority_level ?? null,
-        job_start_date: profile?.current_job_start_date ?? null,
-        current_company: null,
+        current_company: company?.name ?? null,
       };
     });
   }
@@ -682,13 +706,12 @@ export default function AnalyticsDashboard() {
           first_name,
           last_name,
           email,
-          phone,
           engagement_score,
           last_engagement_date,
           last_event_date,
           events_attended_count,
           subscription_status,
-          member_profile ( bucket, seniority_level, current_job_start_date )
+          member_profile ( bucket, seniority_level )
         `,
       )
       .eq('subscription_status', 'active')
@@ -714,14 +737,12 @@ export default function AnalyticsDashboard() {
         first_name: row.first_name,
         last_name: row.last_name,
         email: row.email,
-        phone: row.phone ?? null,
         engagement_score: Number(row.engagement_score),
         last_engagement_date: row.last_engagement_date,
         last_event_date: row.last_event_date,
         events_attended_count: row.events_attended_count ?? 0,
         bucket: profile?.bucket ?? null,
         seniority_level: profile?.seniority_level ?? null,
-        job_start_date: profile?.current_job_start_date ?? null,
       };
     });
   }
@@ -874,7 +895,7 @@ export default function AnalyticsDashboard() {
       {/* Charts row */}
       <div className="grid gap-6 lg:grid-cols-3">
         <Section title="ICP Breakdown" subtitle="How members are classified">
-          <div className="h-64">
+          <div className="h-64" style={{ position: 'relative' }}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -888,7 +909,12 @@ export default function AnalyticsDashboard() {
                   paddingAngle={2}
                 >
                   {icpBreakdown.map((entry, i) => (
-                    <Cell key={i} fill={entry.color} />
+                    <Cell
+                      key={i}
+                      fill={entry.color}
+                      stroke={entry.bucket === 'unclassified' ? '#e2e8f0' : 'none'}
+                      strokeWidth={entry.bucket === 'unclassified' ? 1.5 : 0}
+                    />
                   ))}
                 </Pie>
                 <Tooltip
@@ -901,20 +927,19 @@ export default function AnalyticsDashboard() {
                 />
               </PieChart>
             </ResponsiveContainer>
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            {icpBreakdown.map((row) => (
-              <div key={row.bucket} className="flex items-center gap-2 text-xs">
-                <span
-                  className="h-2.5 w-2.5 rounded-sm"
-                  style={{ background: row.color }}
-                />
-                <span className="text-slate-700">{row.label}</span>
-                <span className="ml-auto font-medium text-slate-900">
-                  {row.count}
-                </span>
+            <div style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              textAlign: 'center',
+              pointerEvents: 'none',
+            }}>
+              <div className="text-2xl font-semibold text-slate-900">
+                {icpBreakdown.reduce((sum, r) => sum + r.count, 0).toLocaleString()}
               </div>
-            ))}
+              <div className="text-xs text-slate-500 mt-0.5">members</div>
+            </div>
           </div>
         </Section>
 
@@ -993,7 +1018,6 @@ export default function AnalyticsDashboard() {
             <thead>
               <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <th className="pb-3 pr-4">Member</th>
-                <th className="pb-3 pr-4">Bucket</th>
                 <th className="pb-3 pr-4 text-right">Clicks</th>
                 <th className="pb-3 pr-4 text-right">Score</th>
                 <th className="pb-3">Last Click</th>
@@ -1007,13 +1031,15 @@ export default function AnalyticsDashboard() {
                   onClick={() => navigate('/', { state: { selectedMemberId: m.id } })}
                 >
                   <td className="py-3 pr-4">
-                    <div className="font-medium text-slate-900 hover:text-emerald-600">
-                      {m.first_name} {m.last_name}
+                    <div className="flex items-center gap-1.5">
+                      <BucketDot bucket={m.bucket} />
+                      <div>
+                        <div className="font-medium text-slate-900 hover:text-emerald-600">
+                          {m.first_name} {m.last_name}
+                        </div>
+                        <div className="text-xs text-slate-500">{m.email}</div>
+                      </div>
                     </div>
-                    <div className="text-xs text-slate-500">{m.email}</div>
-                  </td>
-                  <td className="py-3 pr-4">
-                    <BucketBadge bucket={m.bucket} />
                   </td>
                   <td className="py-3 pr-4 text-right font-semibold text-slate-900">
                     {m.links_clicked}
