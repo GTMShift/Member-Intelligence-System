@@ -38,7 +38,9 @@ function summarizeEnrichmentResult(result: EnrichmentResult): string {
     parts.push(`Location: ${contact.profile.location}`);
   }
   return parts.length > 0 ? parts.join('; ') : 'No new fields returned';
-}// NOTE: aligned to the icp_bucket enum from migration 021 / Meghan's taxonomy.
+}
+
+// NOTE: aligned to the icp_bucket enum from migration 021 / Meghan's taxonomy.
 // If these values drift from the DB enum, the bucket <select> will silently
 // fail to persist on save (Postgres will reject the enum value).
 const BUCKET_OPTIONS = [
@@ -52,9 +54,14 @@ const BUCKET_OPTIONS = [
   { value: 'icp_no', label: 'Not ICP' },
   { value: 'manual_review', label: 'Manual Review' },
 ] as const;
+
 const BUCKET_LABELS: Record<string, string> = Object.fromEntries(
   BUCKET_OPTIONS.filter((o) => o.value).map((o) => [o.value, o.label]),
 );
+
+// Buckets that support fit scoring
+const SCORED_BUCKETS = ['primary_icp', 'secondary_icp'];
+
 // NOTE: aligned to the seniority tiers used by calculate_fit_score's scoring
 // table (Global VP/SVP=50, VP=45, Senior Director=35, Director=30). If the
 // member_profile.seniority_level column still stores the old labels
@@ -62,14 +69,18 @@ const BUCKET_LABELS: Record<string, string> = Object.fromEntries(
 // scoring function will disagree — reconcile before shipping.
 const SENIORITY_OPTIONS = [
   { value: '', label: 'Select seniority' },
-  { value: 'Global VP/SVP', label: 'Global VP / SVP' },
+  { value: 'Global VP', label: 'Global VP' },
+  { value: 'SVP', label: 'SVP' },
   { value: 'VP', label: 'VP' },
   { value: 'Senior Director', label: 'Senior Director' },
   { value: 'Director', label: 'Director' },
   { value: 'Senior Manager', label: 'Senior Manager' },
   { value: 'Manager', label: 'Manager' },
+  { value: 'Team Lead', label: 'Team Lead' },
+  { value: 'Senior Individual Contributor', label: 'Senior Individual Contributor' },
   { value: 'Individual Contributor', label: 'Individual Contributor' },
 ] as const;
+
 type EditFormState = {
   first_name: string;
   last_name: string;
@@ -86,6 +97,7 @@ type EditFormState = {
   fit_score: string;
   tag_note: string;
 };
+
 function normalizeLinkedInUrl(input: string): string {
   let url = input.trim();
   if (!url) return url;
@@ -95,16 +107,20 @@ function normalizeLinkedInUrl(input: string): string {
   }
   return `https://${url}`;
 }
+
 interface MemberProfileCardProps {
   memberId: string;
 }
+
 interface ProfileField {
   label: string;
   value: string | null | undefined;
 }
+
 // Values over this length stack (label above, left-aligned text below)
 // instead of sitting inline as a row — a right-aligned paragraph reads badly.
 const LONG_VALUE_THRESHOLD = 50;
+
 function FieldGrid({ fields }: { fields: ProfileField[] }) {
   const visible = fields.filter((f) => f.value);
   if (visible.length === 0) {
@@ -132,6 +148,7 @@ function FieldGrid({ fields }: { fields: ProfileField[] }) {
     </dl>
   );
 }
+
 function TierSection({
   title,
   description,
@@ -165,12 +182,14 @@ function TierSection({
     </section>
   );
 }
+
 const FEEDBACK_PROMPT_LABELS: Record<string, string> = {
   challenge: 'What are your top 3 challenges right now?',
   event_feedback: 'Event feedback',
   interest: 'Personal interests',
   mandate: 'Team dynamics / mandates',
 };
+
 function FeedbackPrompts({ entries }: { entries: MemberDataEntry[] }) {
   const feedbackEntries = entries.filter(
     (e) =>
@@ -188,10 +207,7 @@ function FeedbackPrompts({ entries }: { entries: MemberDataEntry[] }) {
   return (
     <div className="space-y-4">
       {Object.entries(grouped).map(([category, items]) => (
-        <div
-          key={category}
-          className="rounded-lg border-2 border-sage/30 bg-sage-tint/50 p-4"
-        >
+        <div key={category} className="rounded-lg border-2 border-sage/30 bg-sage-tint/50 p-4">
           <h4 className="text-sm font-semibold text-sage">
             {FEEDBACK_PROMPT_LABELS[category] ?? category}
           </h4>
@@ -199,11 +215,7 @@ function FeedbackPrompts({ entries }: { entries: MemberDataEntry[] }) {
             {items
               .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
               .map((entry) => (
-                <li
-                  key={entry.id}
-                  className="border-l-2 border-sage/50 py-0.5 pl-3"
-                  style={{ borderRadius: 0 }}
-                >
+                <li key={entry.id} className="border-l-2 border-sage/50 py-0.5 pl-3" style={{ borderRadius: 0 }}>
                   <FeedbackEntryContent entry={entry} />
                   <p className="mt-2 text-xs text-slate-400">
                     Submitted {formatTimestamp(entry.created_at)}
@@ -217,6 +229,7 @@ function FeedbackPrompts({ entries }: { entries: MemberDataEntry[] }) {
     </div>
   );
 }
+
 function FeedbackEntryContent({ entry }: { entry: MemberDataEntry }) {
   const { data, category } = entry;
   if (category === 'event_feedback') {
@@ -232,6 +245,7 @@ function FeedbackEntryContent({ entry }: { entry: MemberDataEntry }) {
   const text = typeof data.text === 'string' ? data.text : JSON.stringify(data);
   return <p className="text-sm text-slate-900">{text}</p>;
 }
+
 function AdminDataEntry({ entry }: { entry: MemberDataEntry }) {
   const { category } = entry;
   const categoryLabels: Record<string, string> = {
@@ -252,6 +266,7 @@ function AdminDataEntry({ entry }: { entry: MemberDataEntry }) {
     </div>
   );
 }
+
 function AdminEntryContent({ entry }: { entry: MemberDataEntry }) {
   const { data, category } = entry;
   if (category === 'transcript') {
@@ -271,6 +286,7 @@ function AdminEntryContent({ entry }: { entry: MemberDataEntry }) {
   const text = typeof data.text === 'string' ? data.text : JSON.stringify(data);
   return <p className="mt-1 text-sm text-slate-900">{text}</p>;
 }
+
 function AvatarCircle({
   avatarUrl,
   firstName,
@@ -290,60 +306,102 @@ function AvatarCircle({
     </div>
   );
 }
-// --- New: ICP Scoring Assistant -------------------------------------------------
+
+// --- ICP Scoring Assistant ---------------------------------------------------
+// FIX: calculateFitScore (which writes to DB as a side effect) is now only
+// called inside approve(), never during runScoring(). Dismissing the
+// suggestion no longer mutates fit_score.
+
 function IcpScoringAssistant({
   memberId,
   currentBucket,
   currentFitScore,
+  linkedinUrl,
   onApplied,
 }: {
   memberId: string;
   currentBucket: string | null | undefined;
   currentFitScore: number | null | undefined;
+  linkedinUrl: string | null | undefined;
   onApplied: () => Promise<void>;
 }) {
   const { user } = useAuth();
   const [isRunning, setIsRunning] = useState(false);
   const [isApplying, setIsApplying] = useState(false);
+  const [isFlagging, setIsFlagging] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [suggestion, setSuggestion] = useState<IcpBucketSuggestion | null>(null);
+  const [suggestion, setSuggestion] = useState<Omit<IcpBucketSuggestion, 'score'> | null>(null);
+  const [manualBucket, setManualBucket] = useState('');
+
+  const isManualReview = suggestion?.bucket === 'manual_review';
+  const alreadyFlagged = currentBucket === 'manual_review';
+
   const runScoring = async () => {
     setIsRunning(true);
     setError(null);
+    setManualBucket('');
     try {
-      const [score, bucketSuggestion] = await Promise.all([
-        calculateFitScore(memberId),
-        suggestIcpBucket(memberId),
-      ]);
-      setSuggestion({ ...bucketSuggestion, score });
+      const bucketSuggestion = await suggestIcpBucket(memberId);
+      setSuggestion(bucketSuggestion);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to run ICP scoring.');
     } finally {
       setIsRunning(false);
     }
   };
+
   const dismiss = () => {
     setSuggestion(null);
     setError(null);
+    setManualBucket('');
   };
+
+  const flagForReview = async () => {
+    if (!user?.id) return;
+    setIsFlagging(true);
+    setError(null);
+    try {
+      const input: AdminUpdateMemberInput = {
+        bucket: 'manual_review',
+      };
+      await updateMemberAsAdmin(memberId, input, user.id);
+      await onApplied();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to flag for review.');
+    } finally {
+      setIsFlagging(false);
+    }
+  };
+
   const approve = async () => {
     if (!suggestion || !user?.id) return;
+    const bucketToApply = isManualReview ? manualBucket : suggestion.bucket;
+    if (!bucketToApply) {
+      setError('Please select a bucket before applying.');
+      return;
+    }
     setIsApplying(true);
     setError(null);
     try {
-      const input: Partial<AdminUpdateMemberInput> = {
-        bucket: suggestion.bucket,
-        fit_score: suggestion.score,
+      const fitScore = SCORED_BUCKETS.includes(bucketToApply)
+        ? await calculateFitScore(memberId)
+        : null;
+
+      const input: AdminUpdateMemberInput = {
+        bucket: bucketToApply,
+        fit_score: fitScore,
       };
-      await updateMemberAsAdmin(memberId, input as AdminUpdateMemberInput, user.id);
+      await updateMemberAsAdmin(memberId, input, user.id);
       await onApplied();
       setSuggestion(null);
+      setManualBucket('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to apply suggestion.');
     } finally {
       setIsApplying(false);
     }
   };
+
   return (
     <div className="rounded-lg border border-amber-200 bg-amber-50/40 p-4">
       <div className="flex items-center justify-between gap-3">
@@ -356,38 +414,103 @@ function IcpScoringAssistant({
             {currentFitScore !== null && currentFitScore !== undefined ? ` · Score ${currentFitScore}` : ''}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={runScoring}
-          disabled={isRunning}
-          className="shrink-0 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
-        >
-          {isRunning ? 'Running…' : 'Run scoring'}
-        </button>
+        <div className="flex items-center gap-2">
+          {!alreadyFlagged && (
+            <button
+              type="button"
+              onClick={flagForReview}
+              disabled={isFlagging || isRunning}
+              className="shrink-0 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            >
+              {isFlagging ? 'Flagging…' : 'Flag for review'}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={runScoring}
+            disabled={isRunning || isFlagging}
+            className="shrink-0 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+          >
+            {isRunning ? 'Running…' : 'Run scoring'}
+          </button>
+        </div>
       </div>
+
       {error && (
         <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
         </p>
       )}
+
       {suggestion && (
-        <div className="mt-3 rounded-md border border-amber-200 bg-white p-3">
-          <p className="text-sm text-slate-900">
-            Suggested bucket:{' '}
-            <span className="font-semibold">{BUCKET_LABELS[suggestion.bucket] ?? suggestion.bucket}</span>
-            {' · '}Score: <span className="font-semibold">{suggestion.score}</span>
-          </p>
-          {suggestion.reason && (
-            <p className="mt-1 text-xs text-slate-500">{suggestion.reason}</p>
+        <div className="mt-3 rounded-md border border-amber-200 bg-white p-3 space-y-3">
+          <div>
+            <p className="text-sm text-slate-900">
+              Suggested bucket:{' '}
+              <span className="font-semibold">
+                {BUCKET_LABELS[suggestion.bucket] ?? suggestion.bucket}
+              </span>
+              {!isManualReview && SCORED_BUCKETS.includes(suggestion.bucket) && (
+                <span className="ml-2 text-xs text-slate-400">
+                  · Fit score calculated on apply
+                </span>
+              )}
+            </p>
+            {suggestion.reason && (
+              <p className="mt-1 text-xs text-slate-500">{suggestion.reason}</p>
+            )}
+          </div>
+
+          {isManualReview && (
+            <div className="rounded-md border border-orange/20 bg-orange/5 p-3 space-y-3">
+              <p className="text-xs font-semibold text-orange-dark uppercase tracking-wide">
+                Manual review required
+              </p>
+
+              {linkedinUrl ? (
+                <a
+                  href={linkedinUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-orange-dark hover:text-orange hover:underline"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+                  </svg>
+                  View LinkedIn profile
+                </a>
+              ) : (
+                <p className="text-xs text-slate-400">No LinkedIn URL on file.</p>
+              )}
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-slate-600">
+                  Select correct bucket <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={manualBucket}
+                  onChange={(e) => setManualBucket(e.target.value)}
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
+                >
+                  <option value="">Select a bucket…</option>
+                  {BUCKET_OPTIONS.filter((o) => o.value && o.value !== 'manual_review').map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
           )}
-          <div className="mt-3 flex gap-2">
+
+          <div className="flex gap-2">
             <button
               type="button"
               onClick={approve}
-              disabled={isApplying}
+              disabled={isApplying || (isManualReview && !manualBucket)}
               className="rounded-md bg-orange px-3 py-1.5 text-sm font-medium text-white hover:bg-orange-dark disabled:opacity-50"
             >
-              {isApplying ? 'Applying…' : 'Approve & apply'}
+              {isApplying ? 'Applying…' : 'Apply'}
             </button>
             <button
               type="button"
@@ -403,7 +526,9 @@ function IcpScoringAssistant({
     </div>
   );
 }
-// --------------------------------------------------------------------------------
+
+// ----------------------------------------------------------------------------
+
 export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
   const { role, isAdmin, user } = useAuth();
   const [member, setMember] = useState<MemberDetail | null>(null);
@@ -417,6 +542,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
   const loadMember = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -435,10 +561,10 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
       setLoading(false);
     }
   }, [memberId, role]);
+
   useEffect(() => {
     let cancelled = false;
     async function run() {
-      // Yield so enrich resets / loadMember setState aren't sync inside the effect.
       await Promise.resolve();
       if (cancelled) return;
       setEnrichError(null);
@@ -451,16 +577,17 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
       cancelled = true;
     };
   }, [loadMember]);
+
   const reloadMember = async () => {
     await loadMember();
   };
+
   const handleEnrich = async () => {
     setEnriching(true);
     setEnrichError(null);
     const memberName = member
       ? fullName(member.first_name, member.last_name)
       : 'Unknown member';
-
     try {
       const startResponse = await fetch(
         `http://localhost:3000/members/${memberId}/enrich`,
@@ -501,8 +628,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
         }
       }
       if (!finishedResult) {
-        const timeoutMessage =
-          'Enrichment is taking longer than expected — check back later';
+        const timeoutMessage = 'Enrichment is taking longer than expected — check back later';
         setEnrichError(timeoutMessage);
         await createNotification({
           type: 'enrichment_failed',
@@ -513,7 +639,6 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
         });
         return;
       }
-
       const summary = summarizeEnrichmentResult(finishedResult);
       await createNotification({
         type: 'enrichment_complete',
@@ -537,19 +662,11 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
       setEnriching(false);
     }
   };
-  // Jump to the top of the card the moment a different member is selected,
-  // rather than keeping whatever scroll position was left over from the
-  // previously viewed member's (likely differently-sized) profile.
+
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0 });
   }, [memberId]);
-  // Only show the full-page "Loading…" placeholder on a genuinely first
-  // load, when there's no member data at all yet. When switching from one
-  // already-loaded member to another, keep the previous member's content
-  // visible (slightly dimmed) while the new one loads in the background —
-  // this avoids the content area suddenly collapsing to a tiny placeholder
-  // and then snapping back to full height, which is what caused the
-  // scroll-jump bug.
+
   if (loading && !member) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -557,6 +674,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
       </div>
     );
   }
+
   if (error || !member) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -564,12 +682,14 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
       </div>
     );
   }
+
   const { profile } = member;
   const userEditableEntries = member.member_data.filter((e) => e.tier === 'user_editable');
   const adminOnlyEntries = member.member_data.filter((e) => e.tier === 'admin_only');
   const currentRole =
     member.employment_history.find((entry) => entry.is_current)?.role ?? null;
   const canEnrich = isAdmin || user?.email === member.email;
+
   const startEditing = () => {
     setSaveError(null);
     setEditForm({
@@ -586,22 +706,27 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
       city: profile.city ?? '',
       bucket: profile.bucket ?? '',
       fit_score:
-        profile.fit_score !== null && profile.fit_score !== undefined ? String(profile.fit_score) : '',
+        profile.fit_score !== null && profile.fit_score !== undefined
+          ? String(profile.fit_score)
+          : '',
       tag_note: profile.tag_note ?? '',
     });
     setIsEditing(true);
   };
+
   const cancelEditing = () => {
     setIsEditing(false);
     setEditForm(null);
     setSaveError(null);
   };
+
   const handleEditChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = e.target;
     setEditForm((prev) => (prev ? { ...prev, [name]: value } : prev));
   };
+
   const handleSaveEdit = async () => {
     if (!editForm || !user?.id) return;
     setIsSaving(true);
@@ -633,22 +758,26 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
       setIsSaving(false);
     }
   };
+
   const identityFields: ProfileField[] = [
     { label: 'Email', value: member.email },
     { label: 'LinkedIn', value: member.linkedin_url },
     { label: 'Phone', value: member.phone },
     { label: 'Work email (enriched)', value: profile.work_email_enriched },
   ];
+
   const roleFields: ProfileField[] = [
     { label: 'Job title', value: currentRole },
     { label: 'Job start date', value: profile.current_job_start_date },
     { label: 'Seniority level', value: profile.seniority_level },
   ];
+
   const locationFields: ProfileField[] = [
     { label: 'Country', value: profile.country },
     { label: 'State/region', value: profile.state_region },
     { label: 'City', value: profile.city },
   ];
+
   const historyFields: ProfileField[] = [
     { label: 'Previous company 1', value: profile.prev_company_1 },
     { label: 'Previous role 1', value: profile.prev_role_1 },
@@ -658,18 +787,25 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
     { label: 'Previous role 3', value: profile.prev_role_3 },
     { label: 'Signup source', value: profile.signup_source },
   ];
+
   const adminProfileFields: ProfileField[] = isAdmin
     ? [
         { label: 'ICP', value: profile.icp },
-        { label: 'Bucket', value: profile.bucket ? (BUCKET_LABELS[profile.bucket] ?? profile.bucket) : null },
+        {
+          label: 'Bucket',
+          value: profile.bucket ? (BUCKET_LABELS[profile.bucket] ?? profile.bucket) : null,
+        },
         {
           label: 'Fit score',
           value:
-            profile.fit_score !== null && profile.fit_score !== undefined ? String(profile.fit_score) : null,
+            profile.fit_score !== null && profile.fit_score !== undefined
+              ? String(profile.fit_score)
+              : null,
         },
         { label: 'Tag note', value: profile.tag_note },
       ]
     : [];
+
   return (
     <div ref={scrollRef} className={`h-full overflow-y-auto ${loading ? 'opacity-60 transition-opacity' : ''}`}>
       <div className="bg-surface px-6 py-5">
@@ -765,23 +901,19 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
               ))}
           </div>
         </div>
+
         {saveError && (
           <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {saveError}
           </p>
         )}
       </div>
+
       <div className="space-y-5 p-6">
-        <TierSection
-          title="Public Profile"
-          description="Tier 1 · Visible to all"
-          tierColor="neutral"
-        >
+        <TierSection title="Public Profile" description="Tier 1 · Visible to all" tierColor="neutral">
           <div className="space-y-5">
             <div>
-              <h4 className="mb-2 text-sm font-semibold text-slate-700">
-                Identity
-              </h4>
+              <h4 className="mb-2 text-sm font-semibold text-slate-700">Identity</h4>
               {isEditing && editForm ? (
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-1.5">
@@ -833,10 +965,9 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                 <FieldGrid fields={identityFields} />
               )}
             </div>
+
             <div>
-              <h4 className="mb-2 text-sm font-semibold text-slate-700">
-                Current role
-              </h4>
+              <h4 className="mb-2 text-sm font-semibold text-slate-700">Current role</h4>
               {isEditing && editForm ? (
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-1.5">
@@ -879,11 +1010,10 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                 <FieldGrid fields={roleFields} />
               )}
             </div>
+
             {(profile.company_name || isEditing) && (
               <div>
-                <h4 className="mb-2 text-sm font-semibold text-slate-700">
-                  Company
-                </h4>
+                <h4 className="mb-2 text-sm font-semibold text-slate-700">Company</h4>
                 {isEditing && editForm ? (
                   <input
                     type="text"
@@ -905,10 +1035,9 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                 )}
               </div>
             )}
+
             <div>
-              <h4 className="mb-2 text-sm font-semibold text-slate-700">
-                Location
-              </h4>
+              <h4 className="mb-2 text-sm font-semibold text-slate-700">Location</h4>
               {isEditing && editForm ? (
                 <div className="grid grid-cols-3 gap-4">
                   <div className="flex flex-col gap-1.5">
@@ -946,37 +1075,32 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
                 <FieldGrid fields={locationFields} />
               )}
             </div>
+
             <div>
-              <h4 className="mb-2 text-sm font-semibold text-slate-700">
-                History & source
-              </h4>
+              <h4 className="mb-2 text-sm font-semibold text-slate-700">History & source</h4>
               <FieldGrid fields={historyFields} />
             </div>
           </div>
         </TierSection>
-        <TierSection
-          title="Member Feedback"
-          description="Tier 2 · User-editable"
-          tierColor="sage"
-        >
+
+        <TierSection title="Member Feedback" description="Tier 2 · User-editable" tierColor="sage">
           <FeedbackPrompts entries={userEditableEntries} />
         </TierSection>
+
         {isAdmin && (
-          <TierSection
-            title="Admin Intelligence"
-            description="Tier 3 · Admin only"
-            tierColor="orange"
-          >
+          <TierSection title="Admin Intelligence" description="Tier 3 · Admin only" tierColor="orange">
             <div className="space-y-4">
               {!isEditing && (
                 <IcpScoringAssistant
-                  key={memberId}
-                  memberId={memberId}
-                  currentBucket={profile.bucket}
-                  currentFitScore={profile.fit_score}
-                  onApplied={loadMember}
+                key={memberId}
+                memberId={memberId}
+                currentBucket={profile.bucket}
+                currentFitScore={profile.fit_score}
+                linkedinUrl={member.linkedin_url}
+                onApplied={loadMember}
                 />
               )}
+
               {isEditing && editForm ? (
                 <div className="grid grid-cols-2 gap-4 rounded-lg border border-orange/20 bg-orange/5 p-4">
                   <div className="flex flex-col gap-1.5">
@@ -1023,6 +1147,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
               ) : (
                 adminProfileFields.length > 0 && <FieldGrid fields={adminProfileFields} />
               )}
+
               {adminOnlyEntries.length > 0 ? (
                 <div className="space-y-3">
                   {adminOnlyEntries
@@ -1037,22 +1162,24 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
             </div>
           </TierSection>
         )}
+
         {isAdmin && (
           <section className="rounded-xl border border-slate-200 bg-white p-5">
-          <h3 className="text-base font-semibold text-slate-900">Interaction Timeline</h3>
-          <div className="mt-4">
-            {memberId && (
-              <InteractionTimeline
-                memberId={memberId}
-                memberCreatedAt={member.created_at}
-                interactions={member.interactions}
-                onInteractionAdded={loadMember}
-              />
-            )}
-          </div>
-        </section>
+            <h3 className="text-base font-semibold text-slate-900">Interaction Timeline</h3>
+            <div className="mt-4">
+              {memberId && (
+                <InteractionTimeline
+                  memberId={memberId}
+                  memberCreatedAt={member.created_at}
+                  interactions={member.interactions}
+                  onInteractionAdded={loadMember}
+                />
+              )}
+            </div>
+          </section>
         )}
-        </div>
+      </div>
+
       {enrichmentResult && (
         <EnrichmentReviewPanel
           memberId={memberId}

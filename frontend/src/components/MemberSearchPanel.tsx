@@ -32,16 +32,6 @@ const EMPTY_FILTERS: MemberSearchParams = {};
 
 // ---- Bucket badge -----------------------------------------------------------
 const BUCKET_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  YES: {
-    bg: 'bg-orange',
-    text: 'text-white',
-    label: 'ICP',
-  },
-  NO: {
-    bg: 'bg-charcoal/5 border border-charcoal/10',
-    text: 'text-charcoal/40',
-    label: 'Non-ICP',
-  },
   primary_icp: {
     bg: 'bg-orange',
     text: 'text-white',
@@ -53,18 +43,18 @@ const BUCKET_STYLES: Record<string, { bg: string; text: string; label: string }>
     label: 'Secondary ICP',
   },
   watchlist: {
-    bg: 'bg-sage/20 border border-sage/30',
+    bg: 'bg-sage-tint border border-sage/30',
     text: 'text-sage',
     label: 'Watchlist',
   },
   between_jobs: {
     bg: 'bg-sage-tint',
     text: 'text-sage',
-    label: 'Between jobs',
+    label: 'Between Jobs',
   },
   consultant: {
     bg: 'bg-charcoal/10 border border-charcoal/20',
-    text: 'text-charcoal',
+    text: 'text-white',
     label: 'Consultant',
   },
   partner_sponsor: {
@@ -75,11 +65,11 @@ const BUCKET_STYLES: Record<string, { bg: string; text: string; label: string }>
   manual_review: {
     bg: 'bg-orange/10 border border-orange/20',
     text: 'text-orange-dark',
-    label: 'Manuel Review',
+    label: 'Manual Review',
   },
   icp_no: {
-    bg: 'bg-charcoal/5 border border-charcoal/10',
-    text: 'text-charcoal/40',
+    bg: 'bg-charcoal/10 border border-charcoal/20',
+    text: 'text-white/60',
     label: 'Non-ICP',
   },
 };
