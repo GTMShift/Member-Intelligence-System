@@ -86,7 +86,7 @@ const BUCKET_STYLES: Record<string, { bg: string; text: string; label: string }>
 function IcpBucketBadge({ bucket }: { bucket: string | null | undefined }) {
   if (!bucket) {
     return (
-      <span className="rounded-full bg-charcoal/5 px-2 py-0.5 text-xs font-medium text-charcoal/30">
+      <span className="shrink-0 whitespace-nowrap rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-xs font-semibold text-white/70">
         Unclassified
       </span>
     );
@@ -94,13 +94,15 @@ function IcpBucketBadge({ bucket }: { bucket: string | null | undefined }) {
   const style = BUCKET_STYLES[bucket];
   if (!style) {
     return (
-      <span className="rounded-full bg-charcoal/5 px-2 py-0.5 text-xs font-medium text-charcoal/40">
+      <span className="shrink-0 whitespace-nowrap rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-xs font-semibold text-white/70">
         {bucket}
       </span>
     );
   }
   return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${style.bg} ${style.text}`}>
+    <span
+      className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${style.bg} ${style.text}`}
+    >
       {style.label}
     </span>
   );
