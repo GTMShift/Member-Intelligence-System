@@ -316,23 +316,30 @@ function IcpScoringAssistant({
   memberId,
   currentBucket,
   currentFitScore,
+  linkedinUrl,
   onApplied,
 }: {
   memberId: string;
   currentBucket: string | null | undefined;
   currentFitScore: number | null | undefined;
+  linkedinUrl: string | null | undefined;
   onApplied: () => Promise<void>;
 }) {
   const { user } = useAuth();
   const [isRunning, setIsRunning] = useState(false);
   const [isApplying, setIsApplying] = useState(false);
+  const [isFlagging, setIsFlagging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [suggestion, setSuggestion] = useState<Omit<IcpBucketSuggestion, 'score'> | null>(null);
+  const [manualBucket, setManualBucket] = useState('');
 
-  // Only calls suggestIcpBucket — read-only, no DB writes.
+  const isManualReview = suggestion?.bucket === 'manual_review';
+  const alreadyFlagged = currentBucket === 'manual_review';
+
   const runScoring = async () => {
     setIsRunning(true);
     setError(null);
+    setManualBucket('');
     try {
       const bucketSuggestion = await suggestIcpBucket(memberId);
       setSuggestion(bucketSuggestion);
@@ -343,29 +350,51 @@ function IcpScoringAssistant({
     }
   };
 
-  // Clears UI only — no DB writes.
   const dismiss = () => {
     setSuggestion(null);
     setError(null);
+    setManualBucket('');
   };
 
-  // Only here do we call calculateFitScore, which writes to DB.
+  const flagForReview = async () => {
+    if (!user?.id) return;
+    setIsFlagging(true);
+    setError(null);
+    try {
+      const input: Partial<AdminUpdateMemberInput> = {
+        bucket: 'manual_review',
+      };
+      await updateMemberAsAdmin(memberId, input as AdminUpdateMemberInput, user.id);
+      await onApplied();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to flag for review.');
+    } finally {
+      setIsFlagging(false);
+    }
+  };
+
   const approve = async () => {
     if (!suggestion || !user?.id) return;
+    const bucketToApply = isManualReview ? manualBucket : suggestion.bucket;
+    if (!bucketToApply) {
+      setError('Please select a bucket before applying.');
+      return;
+    }
     setIsApplying(true);
     setError(null);
     try {
-      const fitScore = SCORED_BUCKETS.includes(suggestion.bucket)
+      const fitScore = SCORED_BUCKETS.includes(bucketToApply)
         ? await calculateFitScore(memberId)
         : null;
 
       const input: Partial<AdminUpdateMemberInput> = {
-        bucket: suggestion.bucket,
+        bucket: bucketToApply,
         fit_score: fitScore,
       };
       await updateMemberAsAdmin(memberId, input as AdminUpdateMemberInput, user.id);
       await onApplied();
       setSuggestion(null);
+      setManualBucket('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to apply suggestion.');
     } finally {
@@ -385,14 +414,26 @@ function IcpScoringAssistant({
             {currentFitScore !== null && currentFitScore !== undefined ? ` · Score ${currentFitScore}` : ''}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={runScoring}
-          disabled={isRunning}
-          className="shrink-0 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
-        >
-          {isRunning ? 'Running…' : 'Run scoring'}
-        </button>
+        <div className="flex items-center gap-2">
+          {!alreadyFlagged && (
+            <button
+              type="button"
+              onClick={flagForReview}
+              disabled={isFlagging || isRunning}
+              className="shrink-0 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            >
+              {isFlagging ? 'Flagging…' : 'Flag for review'}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={runScoring}
+            disabled={isRunning || isFlagging}
+            className="shrink-0 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+          >
+            {isRunning ? 'Running…' : 'Run scoring'}
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -402,29 +443,74 @@ function IcpScoringAssistant({
       )}
 
       {suggestion && (
-        <div className="mt-3 rounded-md border border-amber-200 bg-white p-3">
-          <p className="text-sm text-slate-900">
-            Suggested bucket:{' '}
-            <span className="font-semibold">
-              {BUCKET_LABELS[suggestion.bucket] ?? suggestion.bucket}
-            </span>
-            {SCORED_BUCKETS.includes(suggestion.bucket) && (
-              <span className="ml-2 text-xs text-slate-400">
-                · Fit score calculated on approve
+        <div className="mt-3 rounded-md border border-amber-200 bg-white p-3 space-y-3">
+          <div>
+            <p className="text-sm text-slate-900">
+              Suggested bucket:{' '}
+              <span className="font-semibold">
+                {BUCKET_LABELS[suggestion.bucket] ?? suggestion.bucket}
               </span>
+              {!isManualReview && SCORED_BUCKETS.includes(suggestion.bucket) && (
+                <span className="ml-2 text-xs text-slate-400">
+                  · Fit score calculated on apply
+                </span>
+              )}
+            </p>
+            {suggestion.reason && (
+              <p className="mt-1 text-xs text-slate-500">{suggestion.reason}</p>
             )}
-          </p>
-          {suggestion.reason && (
-            <p className="mt-1 text-xs text-slate-500">{suggestion.reason}</p>
+          </div>
+
+          {isManualReview && (
+            <div className="rounded-md border border-orange/20 bg-orange/5 p-3 space-y-3">
+              <p className="text-xs font-semibold text-orange-dark uppercase tracking-wide">
+                Manual review required
+              </p>
+
+              {linkedinUrl ? (
+                <a
+                  href={linkedinUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-orange-dark hover:text-orange hover:underline"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+                  </svg>
+                  View LinkedIn profile
+                </a>
+              ) : (
+                <p className="text-xs text-slate-400">No LinkedIn URL on file.</p>
+              )}
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-slate-600">
+                  Select correct bucket <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={manualBucket}
+                  onChange={(e) => setManualBucket(e.target.value)}
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
+                >
+                  <option value="">Select a bucket…</option>
+                  {BUCKET_OPTIONS.filter((o) => o.value && o.value !== 'manual_review').map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
           )}
-          <div className="mt-3 flex gap-2">
+
+          <div className="flex gap-2">
             <button
               type="button"
               onClick={approve}
-              disabled={isApplying}
+              disabled={isApplying || (isManualReview && !manualBucket)}
               className="rounded-md bg-orange px-3 py-1.5 text-sm font-medium text-white hover:bg-orange-dark disabled:opacity-50"
             >
-              {isApplying ? 'Applying…' : 'Approve & apply'}
+              {isApplying ? 'Applying…' : 'Apply'}
             </button>
             <button
               type="button"
@@ -1006,11 +1092,12 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
             <div className="space-y-4">
               {!isEditing && (
                 <IcpScoringAssistant
-                  key={memberId}
-                  memberId={memberId}
-                  currentBucket={profile.bucket}
-                  currentFitScore={profile.fit_score}
-                  onApplied={loadMember}
+                key={memberId}
+                memberId={memberId}
+                currentBucket={profile.bucket}
+                currentFitScore={profile.fit_score}
+                linkedinUrl={member.linkedin_url}
+                onApplied={loadMember}
                 />
               )}
 
