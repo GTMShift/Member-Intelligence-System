@@ -361,10 +361,10 @@ function IcpScoringAssistant({
     setIsFlagging(true);
     setError(null);
     try {
-      const input: Partial<AdminUpdateMemberInput> = {
+      const input: AdminUpdateMemberInput = {
         bucket: 'manual_review',
       };
-      await updateMemberAsAdmin(memberId, input as AdminUpdateMemberInput, user.id);
+      await updateMemberAsAdmin(memberId, input, user.id);
       await onApplied();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to flag for review.');
@@ -387,11 +387,11 @@ function IcpScoringAssistant({
         ? await calculateFitScore(memberId)
         : null;
 
-      const input: Partial<AdminUpdateMemberInput> = {
+      const input: AdminUpdateMemberInput = {
         bucket: bucketToApply,
         fit_score: fitScore,
       };
-      await updateMemberAsAdmin(memberId, input as AdminUpdateMemberInput, user.id);
+      await updateMemberAsAdmin(memberId, input, user.id);
       await onApplied();
       setSuggestion(null);
       setManualBucket('');
