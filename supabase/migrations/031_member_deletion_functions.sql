@@ -24,8 +24,16 @@ BEGIN
   -- Delete every other dependent row
   DELETE FROM substack_subscribers WHERE member_id = p_member_id;
   DELETE FROM substack_engagement_snapshots WHERE member_id = p_member_id;
-  DELETE FROM employment_history WHERE member_id = p_member_id;
+
+  -- employment_history has its own logging trigger too (trg_employment_history_log),
+  -- same pattern as member_profile/members below — disable it around the delete,
+  -- otherwise deleting employment_history immediately re-creates a fresh
+  -- employment_history_log row logging that very deletion.
+  EXECUTE 'ALTER TABLE employment_history DISABLE TRIGGER trg_employment_history_log';
   DELETE FROM employment_history_log WHERE member_id = p_member_id;
+  DELETE FROM employment_history WHERE member_id = p_member_id;
+  EXECUTE 'ALTER TABLE employment_history ENABLE TRIGGER trg_employment_history_log';
+
   DELETE FROM interactions WHERE member_id = p_member_id;
   DELETE FROM event_signups WHERE member_id = p_member_id;
   DELETE FROM newsletter_engagement WHERE member_id = p_member_id;
