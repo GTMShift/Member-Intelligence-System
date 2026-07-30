@@ -156,18 +156,18 @@ function DashboardPage() {
 function AnalyticsPage() {
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="border-b border-slate-200 bg-white">
+      <header className="bg-charcoal">
         <div className="mx-auto flex max-w-[90rem] items-center justify-between px-4 py-4 sm:px-6">
           <div>
-            <h1 className="text-lg font-semibold text-slate-900">
+            <h1 className="text-lg font-semibold text-white">
               SolutionExec Member Intelligence Platform
             </h1>
-            <p className="text-sm text-slate-500">Analytics</p>
+            <p className="text-sm text-white/60">Analytics</p>
           </div>
           <HeaderActions />
         </div>
       </header>
-      <main className="mx-auto w-full max-w-[90rem] flex-1 bg-slate-50">
+      <main className="mx-auto w-full max-w-[90rem] flex-1 bg-surface">
         <AnalyticsDashboard />
       </main>
     </div>
