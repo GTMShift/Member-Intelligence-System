@@ -148,6 +148,7 @@ vi.mock('../api/membersApi', async () => {
       seniorityLevels: sort(seniorityLevels),
       signupSources: sort(signupSources),
       companyTags: sort(companyTags),
+      countries: [],
       teamSizes: [],
     };
   }

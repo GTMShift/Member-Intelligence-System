@@ -10,6 +10,7 @@ const EMPTY_FILTER_OPTIONS: FilterOptions = {
   signupSources: [],
   companyTags: [],
   teamSizes: [],
+  countries: [],
 };
 
 const SORT_OPTIONS: { value: MemberSortOption; label: string }[] = [
@@ -139,6 +140,7 @@ export function MemberSearchPanel({
       filters.icp,
       filters.metro_area_name,
       filters.state,
+      filters.country,
       filters.industry,
       filters.seniority,
       filters.source,
@@ -305,6 +307,12 @@ export function MemberSearchPanel({
               value={filters.state ?? ''}
               onChange={(v) => updateFilter('state', v)}
               options={filterOptions.states.map((s) => ({ value: s, label: s }))}
+            />
+            <FilterSelect
+              label="Country"
+              value={filters.country ?? ''}
+              onChange={(v) => updateFilter('country', v)}
+              options={filterOptions.countries.map((c) => ({ value: c, label: c }))}
             />
             <FilterSelect
               label="Industry"
