@@ -23,7 +23,7 @@ export function LoginPage() {
           SolutionExec Member Intelligence Platform
         </h1>
         <p className="mt-2 text-center text-sm text-white/60">
-          Sign in to access the dashboard
+          Sign in to access your dashboard
         </p>
         <button
           type="button"
