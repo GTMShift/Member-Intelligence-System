@@ -159,30 +159,31 @@ export type MemberSortOption =
   | 'updated_newest'
   | 'updated_oldest';
   
-export interface MemberSearchParams {
-  q?: string;
-  metro_area_name?: string;
-  state?: string;
-  industry?: string;
-  seniority?: string;
-  source?: string;
-  company_size?: string;
-  tag?: string;
-  page?: number;
-  limit?: number;
-  icp?: 'YES' | 'NO' | 'TBD' | 'NONE';
-  team_size?: string;
-  sort?: MemberSortOption;
-}
-
-export interface FilterOptions {
-  states: string[];
-  industries: string[];
-  seniorityLevels: string[];
-  signupSources: string[];
-  companyTags: string[];
-  teamSizes: string[];
-}
+  export interface MemberSearchParams {
+    q?: string;
+    metro_area_name?: string;
+    state?: string;
+    industry?: string;
+    seniority?: string;
+    source?: string;
+    company_size?: string;
+    tag?: string;
+    page?: number;
+    limit?: number;
+    icp?: 'YES' | 'NO' | 'TBD' | 'NONE';
+    team_size?: string;
+    sort?: MemberSortOption;
+    country?: string;
+  }
+  export interface FilterOptions {
+    states: string[];
+    industries: string[];
+    seniorityLevels: string[];
+    signupSources: string[];
+    companyTags: string[];
+    teamSizes: string[];
+    countries: string[];
+  }
 
 export type DedupMatchedOn = 'email' | 'linkedin_url' | 'phone';
 
