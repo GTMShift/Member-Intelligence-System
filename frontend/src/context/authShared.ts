@@ -12,6 +12,8 @@ export const ADMIN_EMAILS = [
   'meghan@solutionexec.com',
   'vivaanb2@illinois.edu',
   'wchen236@illinois.edu',
+  'seteam@solutionexec.com',
+  'atlas@solutionexec.com',
 ];
 
 export interface AuthContextValue {
