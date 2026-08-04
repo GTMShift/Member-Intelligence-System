@@ -50,6 +50,12 @@ export function SubstackImportPage() {
   }, []);
 
   useEffect(() => {
+    // loadHistory sets loading state synchronously before its first await,
+    // which trips react-hooks/set-state-in-effect — but this is the same
+    // standard "fetch on mount" pattern used throughout the app, and
+    // loadHistory needs to stay callable separately too (it's re-invoked
+    // after a successful import below), so it can't just be inlined here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadHistory();
   }, [loadHistory]);
 
