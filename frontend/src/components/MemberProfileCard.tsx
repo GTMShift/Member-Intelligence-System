@@ -590,7 +590,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
       : 'Unknown member';
     try {
       const startResponse = await fetch(
-        `http://localhost:3000/members/${memberId}/enrich`,
+        `${import.meta.env.VITE_API_URL}/members/${memberId}/enrich`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -611,7 +611,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
         const statusResponse = await fetch(
-          `http://localhost:3000/enrich/status/${enrichmentId}`,
+          `${import.meta.env.VITE_API_URL}/enrich/status/${enrichmentId}`,
         );
         if (!statusResponse.ok) {
           throw new Error('Failed to fetch enrichment status');

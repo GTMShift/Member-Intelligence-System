@@ -574,7 +574,7 @@ export function MemberEntryPage() {
 
     try {
       const startResponse = await fetch(
-        `http://localhost:3000/members/${createdMemberId}/enrich`,
+        `${import.meta.env.VITE_API_URL}/members/${createdMemberId}/enrich`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -600,7 +600,7 @@ export function MemberEntryPage() {
         await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
 
         const statusResponse = await fetch(
-          `http://localhost:3000/enrich/status/${enrichmentId}`,
+          `${import.meta.env.VITE_API_URL}/enrich/status/${enrichmentId}`,
         );
         if (!statusResponse.ok) {
           throw new Error('Failed to fetch enrichment status');
