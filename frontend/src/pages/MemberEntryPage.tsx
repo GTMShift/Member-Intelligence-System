@@ -438,8 +438,39 @@ export function MemberEntryPage() {
           setZipError('Zip code not found. Please check and try again.');
           return;
         }
+    
+        const data = await res.json();
+        const apiState = (data.places?.[0]?.['state'] as string | undefined)?.toLowerCase();
+        const apiCity = (data.places?.[0]?.['place name'] as string | undefined)?.toLowerCase();
+        const apiStateAbbr = (data['state abbreviation'] as string | undefined)?.toLowerCase();
+    
+        const enteredState = form.state_region.trim().toLowerCase();
+        const enteredCity = form.city.trim().toLowerCase();
+    
+        if (apiState && enteredState) {
+          const stateMatches =
+            apiState === enteredState ||
+            apiStateAbbr === enteredState;
+          if (!stateMatches) {
+            setZipError(
+              `Zip code ${trimmedZip} is in ${data.places?.[0]?.['state']}, not "${form.state_region}". Please check the zip or state.`
+            );
+            return;
+          }
+        }
+    
+        if (apiCity && enteredCity) {
+          const cityMatches =
+            apiCity.includes(enteredCity) ||
+            enteredCity.includes(apiCity);
+          if (!cityMatches) {
+            setZipError(
+              `Zip code ${trimmedZip} is associated with ${data.places?.[0]?.['place name']}, not "${form.city}". Please check the zip or city.`
+            );
+            return;
+          }
+        }
       } catch {
-        // On network failure, clear error so the user isn't stuck
         setZipError(null);
         return;
       }
