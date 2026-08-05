@@ -856,6 +856,7 @@ export function MemberEntryPage() {
                     className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
                   >
                     <option value="">Select seniority</option>
+                    <option value="C-Suite">C-Suite</option>
                     <option value="Global VP">Global VP</option>
                     <option value="SVP">SVP</option>
                     <option value="VP">VP</option>

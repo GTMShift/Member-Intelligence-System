@@ -69,6 +69,7 @@ const SCORED_BUCKETS = ['primary_icp', 'secondary_icp'];
 // scoring function will disagree — reconcile before shipping.
 const SENIORITY_OPTIONS = [
   { value: '', label: 'Select seniority' },
+  { value: 'C-Suite', label: 'C-Suite' },
   { value: 'Global VP', label: 'Global VP' },
   { value: 'SVP', label: 'SVP' },
   { value: 'VP', label: 'VP' },
