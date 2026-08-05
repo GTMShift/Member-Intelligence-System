@@ -65,6 +65,8 @@ const FILTER_OPTIONS: { value: ApplicationStatus | 'all'; label: string }[] = [
   { value: 'declined', label: 'Declined' },
 ];
 
+const PAGE_SIZE = 5;
+
 function StatusBadge({ status }: { status: ApplicationStatus }) {
   return (
     <span
@@ -233,10 +235,16 @@ export function SpeakerApplicationsAdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<ApplicationStatus | 'all'>('all');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     if (!isAdmin) navigate('/');
   }, [isAdmin, navigate]);
+
+  // Reset to page 1 when filter changes
+  useEffect(() => {
+    setPage(1);
+  }, [filter]);
 
   const loadApplications = useCallback(async () => {
     setLoading(true);
@@ -333,6 +341,9 @@ export function SpeakerApplicationsAdminPage() {
     ? applications
     : applications.filter((a) => a.status === filter);
 
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const counts = applications.reduce<Record<string, number>>(
     (acc, a) => ({ ...acc, [a.status]: (acc[a.status] ?? 0) + 1 }),
     {},
@@ -409,16 +420,49 @@ export function SpeakerApplicationsAdminPage() {
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {filtered.map((application) => (
-              <ApplicationCard
-                key={application.id}
-                application={application}
-                onStatusChange={handleStatusChange}
-                isUpdating={updatingId === application.id}
-              />
-            ))}
-          </div>
+          <>
+            <div className="mb-4 flex items-center justify-between">
+              <p className="text-xs text-ink/40">
+                Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} application{filtered.length !== 1 ? 's' : ''}
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {paginated.map((application) => (
+                <ApplicationCard
+                  key={application.id}
+                  application={application}
+                  onStatusChange={handleStatusChange}
+                  isUpdating={updatingId === application.id}
+                />
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-6 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="rounded-md border border-charcoal/20 bg-white px-4 py-2 text-sm font-medium text-ink/70 hover:bg-surface disabled:opacity-40"
+                >
+                  ← Previous
+                </button>
+                <p className="text-xs text-ink/40">
+                  Page {page} of {totalPages}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="rounded-md border border-charcoal/20 bg-white px-4 py-2 text-sm font-medium text-ink/70 hover:bg-surface disabled:opacity-40"
+                >
+                  Next →
+                </button>
+              </div>
+            )}
+          </>
         )}
       </main>
     </div>
