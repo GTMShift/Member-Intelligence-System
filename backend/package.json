@@ -15,7 +15,7 @@
     "@supabase/supabase-js": "^2.110.7",
     "axios": "^1.18.1",
     "cors": "^2.8.6",
-    "csv-parse": "^7.0.1",
+    "csv-parse": "^7.0.2",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "googleapis": "^173.0.0",
