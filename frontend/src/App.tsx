@@ -35,7 +35,7 @@ function PortalRoleOverride({ children }: { children: ReactNode }) {
 }
 
 function RoleBasedRedirect() {
-  const { role, loading } = useAuth();
+  const { role, loading, session, needsOnboarding } = useAuth();
 
   if (loading) {
     return (
@@ -45,9 +45,19 @@ function RoleBasedRedirect() {
     );
   }
 
+  // OAuth can land on /redirect before the session is fully attached — send
+  // them back to login rather than Access Denied.
+  if (!session) return <Navigate to="/login" replace />;
+
   if (role === 'admin') return <Navigate to="/" replace />;
-  if (role === 'member') return <Navigate to="/portal" replace />;
-  return <Navigate to="/unauthorized" replace />;
+  if (role === 'member') {
+    // Existing members go to the portal; brand-new logins with no members row
+    // complete their profile first.
+    return (
+      <Navigate to={needsOnboarding ? '/complete-profile' : '/portal'} replace />
+    );
+  }
+  return <Navigate to="/login" replace />;
 }
 
 function App() {

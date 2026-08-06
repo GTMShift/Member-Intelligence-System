@@ -38,14 +38,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Not linked yet — try auto-matching by email against an existing member.
       if (!email) return null;
-      const { data: matchedMember } = await supabase
+      const normalizedEmail = email.trim();
+      const { data: matchedMember, error: matchError } = await supabase
         .from('members')
         .select('id')
-        .ilike('email', email.trim())
+        .ilike('email', normalizedEmail)
         .maybeSingle();
 
+      if (matchError) {
+        console.error('Failed to match member by email:', matchError.message);
+        return null;
+      }
+
       if (matchedMember?.id) {
-        await supabase.from('profiles').update({ member_id: matchedMember.id }).eq('id', profileId);
+        const { error: linkError } = await supabase
+          .from('profiles')
+          .update({ member_id: matchedMember.id })
+          .eq('id', profileId);
+        if (linkError) {
+          console.error('Failed to link profile to member:', linkError.message);
+        }
         return matchedMember.id;
       }
 
@@ -72,8 +84,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .eq('id', currentSession.user.id)
           .maybeSingle();
 
-        if (existingProfile?.role) {
-          resolvedRole = toUserRole(existingProfile.role);
+        if (existingProfile) {
+          // Profile row exists (often created by the auth trigger). Prefer its
+          // role; fall back to ADMIN_EMAILS if role is somehow missing.
+          resolvedRole = existingProfile.role
+            ? toUserRole(existingProfile.role)
+            : isAdmin
+              ? 'admin'
+              : 'member';
         } else {
           const insertResult = await supabase
             .from('profiles')
@@ -98,16 +116,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (retryProfile?.role) {
               resolvedRole = toUserRole(retryProfile.role);
             } else if (fetchError && insertResult.error && retryError) {
-              await supabase.auth.signOut();
-              if (mounted) {
-                setSession(null);
-                setUser(null);
-                setRole('member');
-                setMemberId(null);
-                setLoading(false);
-                window.location.href = '/unauthorized';
-              }
-              return;
+              // Don't hard-bounce to Access Denied on a transient profile race —
+              // fall back to email-based role so members can still reach portal /
+              // complete-profile.
+              console.error('Profile sync failed; using email-based role fallback', {
+                fetchError: fetchError.message,
+                insertError: insertResult.error.message,
+                retryError: retryError.message,
+              });
+              resolvedRole = isAdmin ? 'admin' : 'member';
             }
           }
         }
