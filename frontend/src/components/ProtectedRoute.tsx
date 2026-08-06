@@ -29,6 +29,16 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
 
   if (requiredRole === 'admin') {
     if (role !== 'admin') {
+      // Members who land on `/` (common after OAuth when Site URL is the root)
+      // should go to their portal / onboarding — not Access Denied.
+      if (role === 'member') {
+        return (
+          <Navigate
+            to={needsOnboarding ? '/complete-profile' : '/portal'}
+            replace
+          />
+        );
+      }
       return <Navigate to="/unauthorized" replace />;
     }
   }
