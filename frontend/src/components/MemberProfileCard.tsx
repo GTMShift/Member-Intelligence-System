@@ -10,6 +10,7 @@ import { formatTimestamp, fullName } from '../utils/format';
 import { formatEnrichmentStartDate, normalizeFullEnrichRecord } from '../utils/enrichment';
 import { EnrichmentReviewPanel } from './EnrichmentReviewPanel';
 import { InteractionTimeline } from './InteractionTimeline';
+import { ScoreBreakdownCard } from './ScoreBreakdownCard';
 
 function summarizeEnrichmentResult(result: EnrichmentResult): string {
   const contact = result.contact;
@@ -590,7 +591,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
       : 'Unknown member';
     try {
       const startResponse = await fetch(
-        `${import.meta.env.VITE_API_URL}/members/${memberId}/enrich`,
+        `http://localhost:3000/members/${memberId}/enrich`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -611,7 +612,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
         const statusResponse = await fetch(
-          `${import.meta.env.VITE_API_URL}/enrich/status/${enrichmentId}`,
+          `http://localhost:3000/enrich/status/${enrichmentId}`,
         );
         if (!statusResponse.ok) {
           throw new Error('Failed to fetch enrichment status');
@@ -1161,6 +1162,10 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
               )}
             </div>
           </TierSection>
+        )}
+
+        {isAdmin && !isEditing && (
+          <ScoreBreakdownCard memberId={memberId} />
         )}
 
         {isAdmin && (
