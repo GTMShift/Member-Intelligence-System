@@ -182,7 +182,7 @@ export function ScoreBreakdownCard({ memberId }: ScoreBreakdownCardProps) {
 
   return (
     <section className="rounded-xl border border-orange/25 bg-white p-5">
-      <h3 className="text-base font-semibold text-slate-900">Score Breakdown</h3>
+      <h3 className="text-base font-semibold text-slate-900">Engagement Score Breakdown</h3>
 
       {loading && <p className="mt-3 text-sm text-slate-500">Calculating…</p>}
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
