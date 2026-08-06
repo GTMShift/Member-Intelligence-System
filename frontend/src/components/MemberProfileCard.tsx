@@ -354,10 +354,17 @@ function IcpScoringAssistant({
   };
 
   const dismiss = () => {
-    // Instead of clearing, show manual selector
-    setShowManualSelector(true);
-    setManualBucket('');
-    setError(null);
+    if (isManualReview) {
+      // Already showing the selector in the suggestion card — just clear
+      setSuggestion(null);
+      setManualBucket('');
+      setError(null);
+    } else {
+      // Show manual selector so admin can override the suggestion
+      setShowManualSelector(true);
+      setManualBucket('');
+      setError(null);
+    }
   };
 
   const cancelManual = () => {
