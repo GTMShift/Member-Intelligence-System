@@ -918,11 +918,25 @@ export default function AnalyticsDashboard() {
                   ))}
                 </Pie>
                 <Tooltip
+                  position={{ y: 20 }}
                   contentStyle={{
                     background: 'white',
                     border: '1px solid #e2e8f0',
                     borderRadius: 8,
                     fontSize: 12,
+                  }}
+                  formatter={(value, name) => [value, name]}
+                  content={({ active, payload }) => {
+                    if (!active || !payload || !payload.length) return null;
+                    const entry = payload[0];
+                    const isUnclassified = entry.name === 'Unclassified';
+                    return (
+                      <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 8, padding: '6px 10px', fontSize: 12 }}>
+                        <span style={{ color: isUnclassified ? '#000000' : entry.payload.color }}>
+                          {entry.name}: {entry.value}
+                        </span>
+                      </div>
+                    );
                   }}
                 />
               </PieChart>
