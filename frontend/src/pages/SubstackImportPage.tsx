@@ -50,24 +50,14 @@ export function SubstackImportPage() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function run() {
-      const { data, error: historyErr } = await supabase
-        .from('substack_import_runs')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(20);
-      if (cancelled) return;
-      setHistory(historyErr ? [] : data ?? []);
-      setIsLoadingHistory(false);
-    }
-
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    // loadHistory sets loading state synchronously before its first await,
+    // which trips react-hooks/set-state-in-effect — but this is the same
+    // standard "fetch on mount" pattern used throughout the app, and
+    // loadHistory needs to stay callable separately too (it's re-invoked
+    // after a successful import below), so it can't just be inlined here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadHistory();
+  }, [loadHistory]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setResult(null);
@@ -90,7 +80,9 @@ export function SubstackImportPage() {
         body: formData,
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Import failed');
+      if (!res.ok) {
+        throw new Error(data.details ? `${data.error}: ${data.details}` : (data.error || 'Import failed'));
+      }
       setResult(data);
       setFile(null);
       loadHistory();

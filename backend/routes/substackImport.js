@@ -35,6 +35,17 @@ const toDateOnly = (v) => {
   return `${year}-${month}-${day}`;
 };
 
+// Splits an array into fixed-size chunks. Used to batch large .in() queries
+// instead of sending hundreds of emails in a single request — a single
+// enormous IN clause was causing "fetch failed" errors on large imports.
+function chunk(array, size) {
+  const chunks = [];
+  for (let i = 0; i < array.length; i += size) {
+    chunks.push(array.slice(i, i + size));
+  }
+  return chunks;
+}
+
 // TODO: add an auth/admin check here once the project has one — right now this
 // endpoint is open to anyone who can reach your backend, same as your other routes.
 router.get('/import-runs', async (req, res) => {
@@ -117,12 +128,17 @@ router.post('/import', upload.single('file'), async (req, res) => {
 
   const incomingEmails = parsedRows.map((r) => r.email);
 
-  // 2. Find which subscribers already exist
-  const { data: existingRows, error: fetchErr } = await supabase
-    .from('substack_subscribers')
-    .select('id, email, status')
-    .in('email', incomingEmails);
-  if (fetchErr) return res.status(500).json({ error: 'Failed to query existing subscribers', details: fetchErr.message });
+  // 2. Find which subscribers already exist. Batched — a single .in() with
+  // hundreds of emails at once was causing "fetch failed" errors on large imports.
+  const existingRows = [];
+  for (const batch of chunk(incomingEmails, 200)) {
+    const { data, error: fetchErr } = await supabase
+      .from('substack_subscribers')
+      .select('id, email, status')
+      .in('email', batch);
+    if (fetchErr) return res.status(500).json({ error: 'Failed to query existing subscribers', details: fetchErr.message });
+    existingRows.push(...(data || []));
+  }
 
   const existingByEmail = new Map((existingRows || []).map((r) => [r.email, r]));
   const toInsert = [];
@@ -156,12 +172,14 @@ router.post('/import', upload.single('file'), async (req, res) => {
     if (insertErr) return res.status(500).json({ error: 'Failed to insert new subscribers', details: insertErr.message });
   }
 
-  // 3. Mark everyone in this import as active + update last_seen_at
-  const { error: touchErr } = await supabase
-    .from('substack_subscribers')
-    .update({ last_seen_at: now, status: 'active', unsubscribed_at: null, updated_at: now })
-    .in('email', incomingEmails);
-  if (touchErr) return res.status(500).json({ error: 'Failed to update seen subscribers', details: touchErr.message });
+  // 3. Mark everyone in this import as active + update last_seen_at. Batched, same reason as above.
+  for (const batch of chunk(incomingEmails, 200)) {
+    const { error: touchErr } = await supabase
+      .from('substack_subscribers')
+      .update({ last_seen_at: now, status: 'active', unsubscribed_at: null, updated_at: now })
+      .in('email', batch);
+    if (touchErr) return res.status(500).json({ error: 'Failed to update seen subscribers', details: touchErr.message });
+  }
 
   // 4. Anyone previously active but missing from this import = unsubscribed.
   // Compared in JS rather than a giant inline SQL "NOT IN" list, since that approach
@@ -212,12 +230,16 @@ router.post('/import', upload.single('file'), async (req, res) => {
     if (!matchErr && count) matchedCount += count;
   }
 
-  // 6. Fetch subscriber ids (including newly inserted ones, now with member_id linked where matched)
-  const { data: allSubscribers, error: allSubsErr } = await supabase
-    .from('substack_subscribers')
-    .select('id, email, member_id')
-    .in('email', incomingEmails);
-  if (allSubsErr) return res.status(500).json({ error: 'Failed to fetch subscriber ids for engagement snapshot', details: allSubsErr.message });
+  // 6. Fetch subscriber ids (including newly inserted ones, now with member_id linked where matched). Batched, same reason as above.
+  const allSubscribers = [];
+  for (const batch of chunk(incomingEmails, 200)) {
+    const { data, error: allSubsErr } = await supabase
+      .from('substack_subscribers')
+      .select('id, email, member_id')
+      .in('email', batch);
+    if (allSubsErr) return res.status(500).json({ error: 'Failed to fetch subscriber ids for engagement snapshot', details: allSubsErr.message });
+    allSubscribers.push(...(data || []));
+  }
 
   const subscriberByEmail = new Map(allSubscribers.map((s) => [s.email, s]));
 

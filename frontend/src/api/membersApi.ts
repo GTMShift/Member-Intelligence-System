@@ -207,6 +207,7 @@ export async function searchMembers(
   const { data, error } = await supabase.rpc('search_members', {
     p_q: params.q ?? null,
     p_icp: params.icp ?? null,
+    p_bucket: params.bucket ?? null,
     p_metro_area_name: params.metro_area_name ?? null,
     p_state: params.state ?? null,
     p_industry: params.industry ?? null,
@@ -214,6 +215,7 @@ export async function searchMembers(
     p_source: params.source ?? null,
     p_team_size: params.team_size ?? null,
     p_tag: params.tag ?? null,
+    p_country: params.country ?? null,
     p_sort: params.sort ?? 'last_name_asc',
     p_page: page,
     p_limit: limit,
@@ -274,20 +276,20 @@ export async function getMetroAreas(): Promise<{ id: string; name: string }[]> {
 
 export async function getFilterOptions(): Promise<FilterOptions> {
   const all = await fetchAllMemberDetails();
-
   const states = new Set<string>();
   const industries = new Set<string>();
   const seniorityLevels = new Set<string>();
   const signupSources = new Set<string>();
   const companyTags = new Set<string>();
   const teamSizes = new Set<string>();
-
+  const countries = new Set<string>();
   for (const member of all) {
     if (member.profile.state_region) states.add(member.profile.state_region);
     const industry = industryByMemberId.get(member.id);
     if (industry) industries.add(industry);
     if (member.profile.seniority_level) seniorityLevels.add(member.profile.seniority_level);
     if (member.profile.signup_source) signupSources.add(member.profile.signup_source);
+    if (member.profile.country) countries.add(member.profile.country);
     if (member.profile.team_size !== null && member.profile.team_size !== undefined) {
       const range = TEAM_SIZE_RANGES.find(
         (r) => member.profile.team_size! >= r.min && member.profile.team_size! <= r.max,
@@ -298,9 +300,7 @@ export async function getFilterOptions(): Promise<FilterOptions> {
       companyTags.add(tag);
     }
   }
-
   const sort = (values: Set<string>) => [...values].sort((a, b) => a.localeCompare(b));
-
   return {
     states: sort(states),
     industries: sort(industries),
@@ -308,5 +308,6 @@ export async function getFilterOptions(): Promise<FilterOptions> {
     signupSources: sort(signupSources),
     companyTags: sort(companyTags),
     teamSizes: TEAM_SIZE_RANGES.filter((r) => teamSizes.has(r.value)).map((r) => r.value),
+    countries: sort(countries),
   };
 }
