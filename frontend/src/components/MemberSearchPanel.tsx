@@ -137,7 +137,7 @@ export function MemberSearchPanel({
 
   const activeFilterCount = useMemo(() => {
     return [
-      filters.icp,
+      filters.bucket,
       filters.metro_area_name,
       filters.state,
       filters.country,
@@ -286,14 +286,19 @@ export function MemberSearchPanel({
         {filtersExpanded && (
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
             <FilterSelect
-              label="ICP"
-              value={filters.icp ?? ''}
-              onChange={(v) => updateFilter('icp', v as 'YES' | 'NO' | 'TBD' | 'NONE' | '')}
+              label="ICP Bucket"
+              value={filters.bucket ?? ''}
+              onChange={(v) => updateFilter('bucket', v)}
               options={[
-                { value: 'YES', label: 'YES' },
-                { value: 'NO', label: 'NO' },
-                { value: 'TBD', label: 'TBD' },
-                { value: 'NONE', label: 'Not classified' },
+                { value: 'primary_icp', label: 'Primary ICP' },
+                { value: 'secondary_icp', label: 'Secondary ICP' },
+                { value: 'watchlist', label: 'Watchlist' },
+                { value: 'between_jobs', label: 'Between Jobs' },
+                { value: 'consultant', label: 'Consultant' },
+                { value: 'partner_sponsor', label: 'Partner / Sponsor' },
+                { value: 'icp_no', label: 'Non-ICP' },
+                { value: 'manual_review', label: 'Manual Review' },
+                { value: 'NONE', label: 'Unclassified' },
               ]}
             />
             <FilterSelect
