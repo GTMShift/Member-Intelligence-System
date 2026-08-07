@@ -47,4 +47,14 @@ app.use('/form-responses', formResponsesRouter);
 app.use('/webhook/email', emailWebhookRouter);
 
 const PORT = 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+
+  if (process.env.GMAIL_CREDENTIALS_B64 && process.env.GMAIL_TOKEN_B64) {
+    const { startMonitoring } = require('./services/gmailMonitor');
+    startMonitoring();
+    console.log('Gmail monitor started');
+  } else {
+    console.log('Gmail monitor not started — GMAIL_CREDENTIALS_B64 or GMAIL_TOKEN_B64 not set');
+  }
+});
