@@ -406,7 +406,7 @@ export function InteractionTimeline({
         id: 'signup',
         type: 'signup',
         date: signupDate,
-        title: 'Joined the network',
+        title: 'Joined the Network',
       });
 
       for (const row of signups as EventSignupRow[]) {
