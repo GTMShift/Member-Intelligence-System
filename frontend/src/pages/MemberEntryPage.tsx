@@ -573,8 +573,13 @@ export function MemberEntryPage() {
     setEnrichError(null);
 
     try {
+      const apiBase = import.meta.env.VITE_API_URL;
+      if (!apiBase) {
+        throw new Error('VITE_API_URL is not configured');
+      }
+
       const startResponse = await fetch(
-        `${import.meta.env.VITE_API_URL}/members/${createdMemberId}/enrich`,
+        `${apiBase}/members/${createdMemberId}/enrich`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -583,7 +588,14 @@ export function MemberEntryPage() {
       );
 
       if (!startResponse.ok) {
-        throw new Error('Failed to start enrichment');
+        let details = 'Failed to start enrichment';
+        try {
+          const errBody = await startResponse.json();
+          details = errBody.details || errBody.error || details;
+        } catch {
+          // ignore non-JSON error bodies
+        }
+        throw new Error(details);
       }
 
       const startData = await startResponse.json();
@@ -600,7 +612,7 @@ export function MemberEntryPage() {
         await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
 
         const statusResponse = await fetch(
-          `${import.meta.env.VITE_API_URL}/enrich/status/${enrichmentId}`,
+          `${apiBase}/enrich/status/${enrichmentId}`,
         );
         if (!statusResponse.ok) {
           throw new Error('Failed to fetch enrichment status');
@@ -632,8 +644,12 @@ export function MemberEntryPage() {
       setCreatedMember(memberDetail);
       setEnrichmentResult(finishedResult);
       setShowEnrichPrompt(false);
-    } catch {
-      setEnrichError('Enrichment failed — please try again later from the member profile.');
+    } catch (error) {
+      setEnrichError(
+        error instanceof Error && error.message
+          ? error.message
+          : 'Enrichment failed — please try again later from the member profile.',
+      );
     } finally {
       setEnriching(false);
     }

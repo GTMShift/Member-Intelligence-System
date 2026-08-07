@@ -1,6 +1,10 @@
+import { Navigate } from 'react-router-dom';
+import { useAuth } from '../context/authShared';
 import { supabase } from '../lib/supabaseClient';
 
 export function LoginPage() {
+  const { session, loading, role, needsOnboarding } = useAuth();
+
   const handleGoogleSignIn = async () => {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -12,6 +16,27 @@ export function LoginPage() {
       },
     });
   };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-charcoal px-4">
+        <div
+          className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white"
+          role="status"
+          aria-label="Loading"
+        />
+      </div>
+    );
+  }
+
+  // Already signed in (e.g. OAuth finished while this page was showing) — route
+  // them instead of leaving them on the sign-in button.
+  if (session) {
+    if (role === 'admin') return <Navigate to="/" replace />;
+    return (
+      <Navigate to={needsOnboarding ? '/complete-profile' : '/portal'} replace />
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-charcoal px-4">
