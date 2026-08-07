@@ -40,7 +40,6 @@ interface AppRow extends Omit<SpeakerApplication, 'first_name' | 'last_name' | '
 
 interface ProfileRow {
   member_id: string;
-  company_name: string | null;
   seniority_level: string | null;
   bucket: string | null;
 }
@@ -91,7 +90,10 @@ const FILTER_OPTIONS: { value: ApplicationStatus | 'all'; label: string }[] = [
 
 const SPEAKING_INTEREST_OPTIONS = ['OTR', 'Roundtable', 'Other'];
 const SPEAKING_EXPERIENCE_OPTIONS = ['Often', 'Occasionally', 'Rarely', 'Never'];
-const BUCKET_OPTIONS_LIST = Object.entries(BUCKET_LABELS).map(([value, label]) => ({ value, label }));
+const BUCKET_OPTIONS_LIST = [
+  ...Object.entries(BUCKET_LABELS).map(([value, label]) => ({ value, label })),
+  { value: 'unclassified', label: 'Unclassified' },
+];
 
 const PAGE_SIZE = 5;
 
@@ -367,11 +369,11 @@ export function SpeakerApplicationsAdminPage() {
       const memberIds = (apps ?? []).map((a: AppRow) => a.members?.id).filter(Boolean) as string[];
 
       const { data: profiles } = memberIds.length > 0
-        ? await supabase
-            .from('member_profile')
-            .select('member_id, company_name, seniority_level, bucket')
-            .in('member_id', memberIds)
-        : { data: [] as ProfileRow[] };
+      ? await supabase
+          .from('member_profile')
+          .select('member_id, seniority_level, bucket')
+          .in('member_id', memberIds)
+      : { data: [] as ProfileRow[] };
 
       const profileMap = Object.fromEntries(
         (profiles ?? []).map((p: ProfileRow) => [p.member_id, p]),
@@ -382,11 +384,11 @@ export function SpeakerApplicationsAdminPage() {
         first_name: row.members?.first_name ?? '',
         last_name: row.members?.last_name ?? '',
         email: row.members?.email ?? '',
-        company_name: profileMap[row.members?.id ?? '']?.company_name ?? null,
+        company_name: null,
         current_role: profileMap[row.members?.id ?? '']?.seniority_level ?? null,
         bucket: profileMap[row.members?.id ?? '']?.bucket ?? null,
       }));
-
+      
       setApplications(flat);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load applications.');
@@ -450,8 +452,11 @@ export function SpeakerApplicationsAdminPage() {
       experienceFilters.length === 0 || experienceFilters.includes(a.speaking_experience ?? '')
     )
     .filter((a) =>
-      bucketFilters.length === 0 || bucketFilters.includes(a.bucket ?? '')
-    );
+      bucketFilters.length === 0 ||
+      bucketFilters.some((f) =>
+        f === 'unclassified' ? a.bucket === null : a.bucket === f
+      )
+    )
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
