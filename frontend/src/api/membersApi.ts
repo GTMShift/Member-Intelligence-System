@@ -207,6 +207,7 @@ export async function searchMembers(
   const { data, error } = await supabase.rpc('search_members', {
     p_q: params.q ?? null,
     p_icp: params.icp ?? null,
+    p_bucket: params.bucket ?? null,
     p_metro_area_name: params.metro_area_name ?? null,
     p_state: params.state ?? null,
     p_industry: params.industry ?? null,

@@ -171,6 +171,7 @@ export type MemberSortOption =
     page?: number;
     limit?: number;
     icp?: 'YES' | 'NO' | 'TBD' | 'NONE';
+    bucket?: string;
     team_size?: string;
     sort?: MemberSortOption;
     country?: string;

@@ -70,6 +70,7 @@ const SCORED_BUCKETS = ['primary_icp', 'secondary_icp'];
 // scoring function will disagree — reconcile before shipping.
 const SENIORITY_OPTIONS = [
   { value: '', label: 'Select seniority' },
+  { value: 'C-Suite', label: 'C-Suite' },
   { value: 'Global VP', label: 'Global VP' },
   { value: 'SVP', label: 'SVP' },
   { value: 'VP', label: 'VP' },
@@ -333,6 +334,7 @@ function IcpScoringAssistant({
   const [error, setError] = useState<string | null>(null);
   const [suggestion, setSuggestion] = useState<Omit<IcpBucketSuggestion, 'score'> | null>(null);
   const [manualBucket, setManualBucket] = useState('');
+  const [showManualSelector, setShowManualSelector] = useState(false);
 
   const isManualReview = suggestion?.bucket === 'manual_review';
   const alreadyFlagged = currentBucket === 'manual_review';
@@ -341,6 +343,7 @@ function IcpScoringAssistant({
     setIsRunning(true);
     setError(null);
     setManualBucket('');
+    setShowManualSelector(false);
     try {
       const bucketSuggestion = await suggestIcpBucket(memberId);
       setSuggestion(bucketSuggestion);
@@ -352,9 +355,24 @@ function IcpScoringAssistant({
   };
 
   const dismiss = () => {
+    if (isManualReview) {
+      // Already showing the selector in the suggestion card — just clear
+      setSuggestion(null);
+      setManualBucket('');
+      setError(null);
+    } else {
+      // Show manual selector so admin can override the suggestion
+      setShowManualSelector(true);
+      setManualBucket('');
+      setError(null);
+    }
+  };
+
+  const cancelManual = () => {
+    setShowManualSelector(false);
     setSuggestion(null);
-    setError(null);
     setManualBucket('');
+    setError(null);
   };
 
   const flagForReview = async () => {
@@ -362,11 +380,12 @@ function IcpScoringAssistant({
     setIsFlagging(true);
     setError(null);
     try {
-      const input: AdminUpdateMemberInput = {
-        bucket: 'manual_review',
-      };
+      const input: AdminUpdateMemberInput = { bucket: 'manual_review' };
       await updateMemberAsAdmin(memberId, input, user.id);
       await onApplied();
+      setSuggestion(null);
+      setShowManualSelector(false);
+      setManualBucket('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to flag for review.');
     } finally {
@@ -374,9 +393,9 @@ function IcpScoringAssistant({
     }
   };
 
-  const approve = async () => {
-    if (!suggestion || !user?.id) return;
-    const bucketToApply = isManualReview ? manualBucket : suggestion.bucket;
+  const approve = async (bucketOverride?: string) => {
+    if (!user?.id) return;
+    const bucketToApply = bucketOverride ?? (isManualReview ? manualBucket : suggestion?.bucket);
     if (!bucketToApply) {
       setError('Please select a bucket before applying.');
       return;
@@ -396,6 +415,7 @@ function IcpScoringAssistant({
       await onApplied();
       setSuggestion(null);
       setManualBucket('');
+      setShowManualSelector(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to apply suggestion.');
     } finally {
@@ -420,7 +440,7 @@ function IcpScoringAssistant({
             <button
               type="button"
               onClick={flagForReview}
-              disabled={isFlagging || isRunning}
+              disabled={isFlagging || isRunning || isApplying}
               className="shrink-0 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
             >
               {isFlagging ? 'Flagging…' : 'Flag for review'}
@@ -429,7 +449,7 @@ function IcpScoringAssistant({
           <button
             type="button"
             onClick={runScoring}
-            disabled={isRunning || isFlagging}
+            disabled={isRunning || isFlagging || isApplying}
             className="shrink-0 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
           >
             {isRunning ? 'Running…' : 'Run scoring'}
@@ -443,7 +463,8 @@ function IcpScoringAssistant({
         </p>
       )}
 
-      {suggestion && (
+      {/* Scoring suggestion */}
+      {suggestion && !showManualSelector && (
         <div className="mt-3 rounded-md border border-amber-200 bg-white p-3 space-y-3">
           <div>
             <p className="text-sm text-slate-900">
@@ -452,9 +473,7 @@ function IcpScoringAssistant({
                 {BUCKET_LABELS[suggestion.bucket] ?? suggestion.bucket}
               </span>
               {!isManualReview && SCORED_BUCKETS.includes(suggestion.bucket) && (
-                <span className="ml-2 text-xs text-slate-400">
-                  · Fit score calculated on apply
-                </span>
+                <span className="ml-2 text-xs text-slate-400">· Fit score calculated on apply</span>
               )}
             </p>
             {suggestion.reason && (
@@ -462,12 +481,12 @@ function IcpScoringAssistant({
             )}
           </div>
 
+          {/* Manual review: LinkedIn + bucket selector */}
           {isManualReview && (
             <div className="rounded-md border border-orange/20 bg-orange/5 p-3 space-y-3">
               <p className="text-xs font-semibold text-orange-dark uppercase tracking-wide">
                 Manual review required
               </p>
-
               {linkedinUrl ? (
                 <a
                   href={linkedinUrl}
@@ -483,7 +502,6 @@ function IcpScoringAssistant({
               ) : (
                 <p className="text-xs text-slate-400">No LinkedIn URL on file.</p>
               )}
-
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-slate-600">
                   Select correct bucket <span className="text-red-500">*</span>
@@ -495,9 +513,7 @@ function IcpScoringAssistant({
                 >
                   <option value="">Select a bucket…</option>
                   {BUCKET_OPTIONS.filter((o) => o.value && o.value !== 'manual_review').map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
                 </select>
               </div>
@@ -507,7 +523,7 @@ function IcpScoringAssistant({
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={approve}
+              onClick={() => approve()}
               disabled={isApplying || (isManualReview && !manualBucket)}
               className="rounded-md bg-orange px-3 py-1.5 text-sm font-medium text-white hover:bg-orange-dark disabled:opacity-50"
             >
@@ -520,6 +536,61 @@ function IcpScoringAssistant({
               className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             >
               Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Manual selector — shown after dismissing */}
+      {showManualSelector && (
+        <div className="mt-3 rounded-md border border-slate-200 bg-white p-3 space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Manually classify
+          </p>
+          {linkedinUrl && (
+            <a
+              href={linkedinUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-orange-dark hover:text-orange hover:underline"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+              </svg>
+              View LinkedIn profile
+            </a>
+          )}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-slate-600">
+              Select bucket <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={manualBucket}
+              onChange={(e) => setManualBucket(e.target.value)}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
+            >
+              <option value="">Select a bucket…</option>
+              {BUCKET_OPTIONS.filter((o) => o.value && o.value !== 'manual_review').map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => approve(manualBucket)}
+              disabled={isApplying || !manualBucket}
+              className="rounded-md bg-orange px-3 py-1.5 text-sm font-medium text-white hover:bg-orange-dark disabled:opacity-50"
+            >
+              {isApplying ? 'Applying…' : 'Apply manually'}
+            </button>
+            <button
+              type="button"
+              onClick={cancelManual}
+              disabled={isApplying}
+              className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Cancel
             </button>
           </div>
         </div>
