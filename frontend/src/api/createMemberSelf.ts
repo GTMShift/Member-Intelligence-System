@@ -21,6 +21,7 @@ export interface SelfSignupInput {
   country: string | null;
   tshirt_size: string | null;
   dietary_restrictions: string | null;
+  socials?: { platform: string; username: string; url?: string }[] | null;
   oversees_solutions_engineering_consulting: boolean;
   oversees_customer_success: boolean;
   oversees_demo_engineering: boolean;
@@ -45,10 +46,6 @@ async function findOrCreateCompany(companyName: string | null): Promise<string |
   const name = companyName?.trim();
   if (!name) return null;
 
-  // Uses .limit(1) + array check instead of .maybeSingle(), since .maybeSingle()
-  // throws an error (not just returns null) if more than one company happens to
-  // share a similar name — which would otherwise surface as a confusing failure
-  // partway through signup.
   const { data: matches, error: findErr } = await supabase
     .from('companies')
     .select('id')
@@ -66,27 +63,15 @@ async function findOrCreateCompany(companyName: string | null): Promise<string |
   return created.id;
 }
 
-/**
- * Creates a new member record from a self-service signup and links it to the
- * person's existing profiles row (profileId = the authenticated user's id).
- *
- * Resumable: if a previous attempt partially failed (e.g. member row created
- * but company/profile step failed), calling this again picks up where it left
- * off instead of hitting a duplicate-email error and leaving the person stuck.
- *
- * Deliberately does NOT touch ICP/bucket/tagging fields — those are internal-only
- * and members should never set their own classification.
- */
 export async function createMemberSelf(
   input: SelfSignupInput,
   profileId: string,
 ): Promise<{ id: string }> {
-  // Step 1: find-or-create the member row itself
   const { data: existingMember, error: existingErr } = await supabase
     .from('members')
     .select('id')
     .eq('email', input.email)
-    .maybeSingle(); // safe here — email has a unique constraint, so at most one match
+    .maybeSingle();
   if (existingErr) {
     throw new Error(`Failed to check for existing member: ${existingErr.message}`);
   }
@@ -124,10 +109,8 @@ export async function createMemberSelf(
     memberId = member.id;
   }
 
-  // Step 2: company (safe to retry — findOrCreateCompany is itself idempotent)
   const companyId = await findOrCreateCompany(input.company_name);
 
-  // Step 3: find-or-create the member_profile row
   const { data: existingProfile, error: profileCheckErr } = await supabase
     .from('member_profile')
     .select('id')
@@ -187,7 +170,6 @@ export async function createMemberSelf(
     }
   }
 
-  // Step 4: current employment history (job title lives here, not member_profile)
   if (input.job_title) {
     const { data: existingCurrent } = await supabase
       .from('employment_history')
@@ -223,7 +205,31 @@ export async function createMemberSelf(
     }
   }
 
-  // Step 5: link this member to the person's auth profile
+  if (input.socials && input.socials.length > 0) {
+    const { data: existingSocials } = await supabase
+      .from('member_socials')
+      .select('id')
+      .eq('member_id', memberId);
+
+    if (existingSocials && existingSocials.length > 0) {
+      await supabase.from('member_socials').delete().eq('member_id', memberId);
+    }
+
+    const { error: socialsErr } = await supabase.from('member_socials').insert(
+      input.socials
+        .filter((s) => s.username.trim() !== '')
+        .map((s) => ({
+          member_id: memberId,
+          platform: s.platform,
+          username: s.username,
+          url: s.url ?? null,
+        }))
+    );
+    if (socialsErr) {
+      throw new Error(`Failed to save social media: ${socialsErr.message}`);
+    }
+  }
+
   const { error: linkError } = await supabase
     .from('profiles')
     .update({ member_id: memberId })
@@ -232,8 +238,6 @@ export async function createMemberSelf(
     throw new Error(`Failed to link profile to member: ${linkError.message}`);
   }
 
-  // Only fire the "new signup" notification and duplicate check once, on the
-  // actual first successful completion — not on every retry of a resumed signup.
   if (isNewMember) {
     await createNotification({
       type: 'new_signup',
