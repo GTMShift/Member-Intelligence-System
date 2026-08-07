@@ -918,13 +918,25 @@ export default function AnalyticsDashboard() {
                   ))}
                 </Pie>
                 <Tooltip
-                  contentStyle={{
-                    background: 'white',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: 8,
-                    fontSize: 12,
-                  }}
-                />
+                  wrapperStyle={{ zIndex: 10 }}
+                  content={({ active, payload }) => {
+       if (!active || !payload || !payload.length) return null;
+    const entry = payload[0];
+    const isUnclassified = entry.name === 'Unclassified';
+    return (
+      <div style={{
+        background: 'white',
+        border: '1px solid #e2e8f0',
+        borderRadius: 8,
+        padding: '6px 10px',
+        fontSize: 12,
+        color: isUnclassified ? '#000000' : entry.payload.color,
+      }}>
+        {entry.name}: {entry.value}
+      </div>
+    );
+  }}
+/>∏
               </PieChart>
             </ResponsiveContainer>
             <div style={{
@@ -934,6 +946,7 @@ export default function AnalyticsDashboard() {
               transform: 'translate(-50%, -50%)',
               textAlign: 'center',
               pointerEvents: 'none',
+              zIndex: 0,
             }}>
               <div className="text-2xl font-semibold text-slate-900">
                 {icpBreakdown.reduce((sum, r) => sum + r.count, 0).toLocaleString()}
