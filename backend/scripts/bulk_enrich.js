@@ -195,26 +195,34 @@ async function applyEnrichment(memberId, contact, currentProfile, currentMember)
     if (error) throw new Error(`Profile update failed: ${error.message}`);
   }
 
-  // Write employment history if we have job title and no current role
+  // Write employment history if we have job title
   if (position?.title && company?.name) {
     const { data: existingJob } = await supabase
       .from('employment_history')
-      .select('id, role')
+      .select('id, role, company')
       .eq('member_id', memberId)
       .eq('is_current', true)
       .maybeSingle();
 
     if (!existingJob) {
+      // No current job record — insert new one
       await supabase.from('employment_history').insert({
         member_id: memberId,
         company: company.name,
         role: position.title,
         is_current: true,
-        source: 'FullEnrich',
+        source: 'Manual',
       });
       applied.push(`job_title (${position.title})`);
+    } else if (!existingJob.role || !existingJob.company) {
+      // Existing record has empty role or company — update it
+      const updates = {};
+      if (!existingJob.role) updates.role = position.title;
+      if (!existingJob.company) updates.company = company.name;
+      await supabase.from('employment_history').update(updates).eq('id', existingJob.id);
+      applied.push(`job_title updated (${position.title})`);
     } else {
-      skipped.push('job_title (already set)');
+      applied.push('job_title (already set)');
     }
   }
 
