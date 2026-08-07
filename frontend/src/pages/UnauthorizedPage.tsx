@@ -1,13 +1,36 @@
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/authShared';
 import { supabase } from '../lib/supabaseClient';
 
 export function UnauthorizedPage() {
   const navigate = useNavigate();
+  const { session, loading, role, needsOnboarding } = useAuth();
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     navigate('/login');
   };
+
+  // If auth finishes after this page was shown (common on first OAuth redirect),
+  // bounce the user to the right place instead of leaving them stuck.
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+        <div
+          className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600"
+          role="status"
+          aria-label="Loading"
+        />
+      </div>
+    );
+  }
+
+  if (session) {
+    if (role === 'admin') return <Navigate to="/" replace />;
+    return (
+      <Navigate to={needsOnboarding ? '/complete-profile' : '/portal'} replace />
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">

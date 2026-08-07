@@ -661,8 +661,12 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
       ? fullName(member.first_name, member.last_name)
       : 'Unknown member';
     try {
+      const apiBase = import.meta.env.VITE_API_URL;
+      if (!apiBase) {
+        throw new Error('VITE_API_URL is not configured');
+      }
       const startResponse = await fetch(
-        `http://localhost:3000/members/${memberId}/enrich`,
+        `${apiBase}/members/${memberId}/enrich`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -670,7 +674,14 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
         },
       );
       if (!startResponse.ok) {
-        throw new Error('Failed to start enrichment');
+        let details = 'Failed to start enrichment';
+        try {
+          const errBody = await startResponse.json();
+          details = errBody.details || errBody.error || details;
+        } catch {
+          // ignore non-JSON error bodies
+        }
+        throw new Error(details);
       }
       const startData = await startResponse.json();
       const enrichmentId = startData.enrichment_id as string | undefined;
@@ -683,7 +694,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
         const statusResponse = await fetch(
-          `http://localhost:3000/enrich/status/${enrichmentId}`,
+          `${apiBase}/enrich/status/${enrichmentId}`,
         );
         if (!statusResponse.ok) {
           throw new Error('Failed to fetch enrichment status');
@@ -720,13 +731,16 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
         member_name: memberName,
       });
       setEnrichmentResult(finishedResult);
-    } catch {
-      const failMessage = 'Enrichment failed — please try again later';
+    } catch (error) {
+      const failMessage =
+        error instanceof Error && error.message
+          ? error.message
+          : 'Enrichment failed — please try again later';
       setEnrichError(failMessage);
       await createNotification({
         type: 'enrichment_failed',
         title: 'Enrichment failed',
-        body: `${memberName}: enrichment could not be completed. Please try again.`,
+        body: `${memberName}: enrichment could not be completed. ${failMessage}`,
         member_id: memberId,
         member_name: memberName,
       });

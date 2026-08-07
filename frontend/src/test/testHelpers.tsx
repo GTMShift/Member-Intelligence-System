@@ -38,6 +38,7 @@ vi.mock('../api/membersApi', async () => {
       metro_area_name: member.profile.metro_area_name,
       state_region: member.profile.state_region,
       icp: member.profile.icp,
+      bucket: member.profile.bucket,
       last_updated: member.last_updated,
     };
   }
@@ -65,6 +66,13 @@ vi.mock('../api/membersApi', async () => {
     return all.filter((member) => {
       if (params.q && !matchesQuery(member, params.q)) return false;
       if (params.icp && member.profile.icp !== params.icp) return false;
+      if (params.bucket) {
+        if (params.bucket === 'NONE') {
+          if (member.profile.bucket != null) return false;
+        } else if (member.profile.bucket !== params.bucket) {
+          return false;
+        }
+      }
       if (params.metro_area_name && member.profile.metro_area_name !== params.metro_area_name) {
         return false;
       }

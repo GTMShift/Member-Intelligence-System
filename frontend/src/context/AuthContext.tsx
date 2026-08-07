@@ -15,6 +15,21 @@ import {
   toUserRole,
 } from './authShared';
 
+/** True while the URL still has OAuth callback tokens/codes that Supabase
+ *  hasn't finished consuming yet — a null getSession() during this window is
+ *  a race, not a real signed-out state. */
+function hasPendingOAuthCallback(): boolean {
+  if (typeof window === 'undefined') return false;
+  const hash = window.location.hash;
+  const search = window.location.search;
+  return (
+    hash.includes('access_token') ||
+    hash.includes('refresh_token') ||
+    search.includes('code=') ||
+    search.includes('error=')
+  );
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<UserRole>('member');
   const [session, setSession] = useState<Session | null>(null);
@@ -25,6 +40,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // auth listener can tell "the user actually changed" apart from "Supabase
   // just silently refreshed the token" (which fires on every tab focus).
   const currentUserIdRef = useRef<string | null>(null);
+  // Serialize syncAuthState so a stale null getSession() can't finish after a
+  // real SIGNED_IN and wipe the session (common on first OAuth redirect).
+  const syncChainRef = useRef<Promise<void>>(Promise.resolve());
 
   const resolveMemberId = useCallback(
     async (profileId: string, email: string | null | undefined): Promise<string | null> => {
@@ -69,7 +87,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    const syncAuthState = async (currentSession: Session | null) => {
+    const syncAuthState = async (
+      currentSession: Session | null,
+      event?: string,
+    ) => {
+      // Ignore a transient null session while OAuth is still finishing — that
+      // was wiping auth on first Vercel login and sending members to Access Denied.
+      if (!currentSession && hasPendingOAuthCallback()) {
+        return;
+      }
+
+      // A stale getSession()/INITIAL_SESSION null must not overwrite a session
+      // we already established from SIGNED_IN (classic first-login race).
+      if (
+        !currentSession &&
+        currentUserIdRef.current &&
+        event !== 'SIGNED_OUT'
+      ) {
+        if (mounted) setLoading(false);
+        return;
+      }
+
       currentUserIdRef.current = currentSession?.user?.id ?? null;
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
@@ -125,16 +163,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 retryError: retryError.message,
               });
               resolvedRole = isAdmin ? 'admin' : 'member';
+            } else {
+              // Insert raced with the auth trigger (or similar) — still treat as
+              // a normal member/admin so routing can proceed.
+              resolvedRole = isAdmin ? 'admin' : 'member';
             }
           }
         }
 
-        if (resolvedRole && mounted) {
+        // Always resolve a role for signed-in users so routing never stalls on
+        // Access Denied because resolvedRole stayed null.
+        if (!resolvedRole) {
+          resolvedRole = isAdmin ? 'admin' : 'member';
+        }
+
+        if (mounted) {
           setRole(resolvedRole);
 
           // Try to resolve a linked member record regardless of admin/member
-          // role — an admin can also be a genuine member with their own
-          // profile (viewable via the Admin/Member toggle's Member view).
+          // role — an admin can also be a genuine member with their own profile.
           const linkedMemberId = await resolveMemberId(
             currentSession.user.id,
             currentSession.user.email,
@@ -151,8 +198,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      void syncAuthState(currentSession);
+    const enqueueSync = (currentSession: Session | null, event?: string) => {
+      syncChainRef.current = syncChainRef.current
+        .then(() => syncAuthState(currentSession, event))
+        .catch((error) => {
+          console.error('Auth sync failed:', error);
+          if (mounted) setLoading(false);
+        });
+      return syncChainRef.current;
+    };
+
+    // Prefer onAuthStateChange (emits INITIAL_SESSION) as the source of truth.
+    // Still call getSession for older clients, but serialize both through the queue.
+    void supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      void enqueueSync(currentSession, 'GET_SESSION');
     });
 
     const {
@@ -166,13 +225,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // unmounts whatever page is showing via ProtectedRoute's spinner,
       // wiping in-progress form state or dismissed-notification state.
       // Only do the full resync for an actual sign-in/sign-out/user change.
-      if (isSameUser && event !== 'SIGNED_OUT') {
+      if (isSameUser && event === 'TOKEN_REFRESHED') {
         setSession(currentSession);
         return;
       }
 
-      setLoading(true);
-      void syncAuthState(currentSession);
+      // Don't bounce UI into a loading spinner for a null event that we'll
+      // ignore because we already have a signed-in user.
+      const willIgnoreStaleNull =
+        !currentSession &&
+        !!currentUserIdRef.current &&
+        event !== 'SIGNED_OUT';
+
+      if (event !== 'TOKEN_REFRESHED' && !willIgnoreStaleNull) {
+        setLoading(true);
+      }
+      void enqueueSync(currentSession, event);
     });
 
     return () => {
