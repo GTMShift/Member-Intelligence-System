@@ -1,7 +1,8 @@
+
 import { supabase } from '../lib/supabaseClient';
 import { createNotification } from './notificationsApi';
 import { checkAndFlagDuplicate } from './duplicateFlagsApi';
-
+ 
 export interface SelfSignupInput {
   first_name: string;
   last_name: string;
@@ -41,11 +42,11 @@ export interface SelfSignupInput {
   region_apac: boolean;
   region_latin_america: boolean;
 }
-
+ 
 async function findOrCreateCompany(companyName: string | null): Promise<string | null> {
   const name = companyName?.trim();
   if (!name) return null;
-
+ 
   const { data: matches, error: findErr } = await supabase
     .from('companies')
     .select('id')
@@ -53,7 +54,7 @@ async function findOrCreateCompany(companyName: string | null): Promise<string |
     .limit(1);
   if (findErr) throw new Error(`Company lookup failed: ${findErr.message}`);
   if (matches && matches.length > 0) return matches[0].id;
-
+ 
   const { data: created, error: createErr } = await supabase
     .from('companies')
     .insert({ name })
@@ -62,11 +63,12 @@ async function findOrCreateCompany(companyName: string | null): Promise<string |
   if (createErr) throw new Error(`Failed to create company: ${createErr.message}`);
   return created.id;
 }
-
+ 
 export async function createMemberSelf(
   input: SelfSignupInput,
   profileId: string,
 ): Promise<{ id: string }> {
+  // Step 1: find-or-create the member row
   const { data: existingMember, error: existingErr } = await supabase
     .from('members')
     .select('id')
@@ -75,10 +77,10 @@ export async function createMemberSelf(
   if (existingErr) {
     throw new Error(`Failed to check for existing member: ${existingErr.message}`);
   }
-
+ 
   let memberId: string;
   const isNewMember = !existingMember;
-
+ 
   if (existingMember) {
     memberId = existingMember.id;
     const { error: updateErr } = await supabase
@@ -108,9 +110,11 @@ export async function createMemberSelf(
     }
     memberId = member.id;
   }
-
+ 
+  // Step 2: company
   const companyId = await findOrCreateCompany(input.company_name);
-
+ 
+  // Step 3: member_profile
   const { data: existingProfile, error: profileCheckErr } = await supabase
     .from('member_profile')
     .select('id')
@@ -119,7 +123,7 @@ export async function createMemberSelf(
   if (profileCheckErr) {
     throw new Error(`Failed to check for existing profile: ${profileCheckErr.message}`);
   }
-
+ 
   const profileFields = {
     seniority_level: input.seniority_level,
     team_size: input.team_size,
@@ -152,7 +156,7 @@ export async function createMemberSelf(
     company_id: companyId,
     signup_source: 'Website',
   };
-
+ 
   if (existingProfile) {
     const { error: profileUpdateErr } = await supabase
       .from('member_profile')
@@ -169,7 +173,8 @@ export async function createMemberSelf(
       throw new Error(`Failed to create member profile: ${profileInsertErr.message}`);
     }
   }
-
+ 
+  // Step 4: employment history
   if (input.job_title) {
     const { data: existingCurrent } = await supabase
       .from('employment_history')
@@ -177,7 +182,7 @@ export async function createMemberSelf(
       .eq('member_id', memberId)
       .eq('is_current', true)
       .maybeSingle();
-
+ 
     if (existingCurrent) {
       const { error: employmentUpdateErr } = await supabase
         .from('employment_history')
@@ -204,17 +209,27 @@ export async function createMemberSelf(
       }
     }
   }
-
+ 
+  // Step 5: link auth profile to member BEFORE socials so RLS check passes
+  const { error: linkError } = await supabase
+    .from('profiles')
+    .update({ member_id: memberId })
+    .eq('id', profileId);
+  if (linkError) {
+    throw new Error(`Failed to link profile to member: ${linkError.message}`);
+  }
+ 
+  // Step 6: socials — profile link must be set first for RLS to allow insert
   if (input.socials && input.socials.length > 0) {
     const { data: existingSocials } = await supabase
       .from('member_socials')
       .select('id')
       .eq('member_id', memberId);
-
+ 
     if (existingSocials && existingSocials.length > 0) {
       await supabase.from('member_socials').delete().eq('member_id', memberId);
     }
-
+ 
     const { error: socialsErr } = await supabase.from('member_socials').insert(
       input.socials
         .filter((s) => s.username.trim() !== '')
@@ -229,15 +244,8 @@ export async function createMemberSelf(
       throw new Error(`Failed to save social media: ${socialsErr.message}`);
     }
   }
-
-  const { error: linkError } = await supabase
-    .from('profiles')
-    .update({ member_id: memberId })
-    .eq('id', profileId);
-  if (linkError) {
-    throw new Error(`Failed to link profile to member: ${linkError.message}`);
-  }
-
+ 
+  // Step 7: notifications and duplicate check
   if (isNewMember) {
     await createNotification({
       type: 'new_signup',
@@ -246,7 +254,7 @@ export async function createMemberSelf(
       member_id: memberId,
       member_name: `${input.first_name} ${input.last_name}`,
     });
-
+ 
     await checkAndFlagDuplicate(memberId, {
       first_name: input.first_name,
       last_name: input.last_name,
@@ -256,6 +264,7 @@ export async function createMemberSelf(
       current_role: input.job_title,
     });
   }
-
+ 
   return { id: memberId };
 }
+ 
