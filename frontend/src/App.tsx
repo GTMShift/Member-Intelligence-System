@@ -260,15 +260,16 @@ function MemberDirectoryLayout({
       setSearchParams({});
     }
   };
+
   const [showWelcome, setShowWelcome] = useState(false);
   const [portalMember, setPortalMember] = useState<MemberDetail | null>(null);
 
   const incomingMemberId = (location.state as DashboardLocationState | null)?.selectedMemberId;
-  const [appliedIncomingId, setAppliedIncomingId] = useState<string | undefined>(undefined);
-  if (incomingMemberId && incomingMemberId !== appliedIncomingId) {
-    setAppliedIncomingId(incomingMemberId);
-    setSelectedMemberId(incomingMemberId);
-  }
+  useEffect(() => {
+    if (incomingMemberId && incomingMemberId !== selectedMemberId) {
+      setSelectedMemberId(incomingMemberId);
+    }
+  }, [incomingMemberId, selectedMemberId, setSelectedMemberId]);
 
   if ((!portalView || !selectedMemberId) && portalMember !== null) {
     setPortalMember(null);
