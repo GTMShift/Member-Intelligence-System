@@ -55,8 +55,14 @@ function eventAttendanceRawPoints(count90d: number): number {
   return 40;
 }
 
-function interactionRawPoints(interactions: { interaction_type: string }[]): number {
-  const pts = interactions.reduce((sum, i) => sum + pointsForInteractionType(i.interaction_type), 0);
+function interactionRawPoints(interactions: { interaction_type: string; direction: string | null }[]): number {
+  const pts = interactions.reduce((sum, i) => {
+    const isMeetingType = i.interaction_type === 'meeting' || i.interaction_type === 'coffee_chat';
+    if (isMeetingType || i.direction === 'inbound') {
+      return sum + pointsForInteractionType(i.interaction_type);
+    }
+    return sum;
+  }, 0);
   return Math.min(pts, 30);
 }
 
@@ -117,9 +123,9 @@ export function ScoreBreakdownCard({ memberId }: ScoreBreakdownCardProps) {
         }).length;
         const { data: interactions, error: interactionsError } = await supabase
           .from('interactions')
-          .select('interaction_type, occurred_at')
+          .select('interaction_type, direction, occurred_at')
           .eq('member_id', memberId)
-          .eq('direction', 'inbound')
+
           .gte('occurred_at', cutoffIso);
         if (interactionsError) throw interactionsError;
 
