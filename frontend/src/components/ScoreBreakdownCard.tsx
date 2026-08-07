@@ -111,10 +111,10 @@ export function ScoreBreakdownCard({ memberId }: ScoreBreakdownCardProps) {
         if (signupsError) throw signupsError;
 
         const events90d = (signups ?? []).filter((s) => {
-          const eventDate = s.events?.[0]?.event_date;
+          const events = s.events as { event_date: string }[] | { event_date: string } | null;
+          const eventDate = Array.isArray(events) ? events[0]?.event_date : events?.event_date;
           return eventDate && eventDate >= cutoffIso;
         }).length;
-
         const { data: interactions, error: interactionsError } = await supabase
           .from('interactions')
           .select('interaction_type, occurred_at')
