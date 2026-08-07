@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { MemberProfileCard } from './components/MemberProfileCard';
 import { MemberSearchPanel } from './components/MemberSearchPanel';
 import { DuplicateFlagAlerts } from './components/DuplicateFlagAlerts';
@@ -251,7 +251,15 @@ function MemberDirectoryLayout({
 }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedMemberId = searchParams.get('member') ?? null;
+  const setSelectedMemberId = (id: string | null) => {
+    if (id) {
+      setSearchParams({ member: id });
+    } else {
+      setSearchParams({});
+    }
+  };
   const [showWelcome, setShowWelcome] = useState(false);
   const [portalMember, setPortalMember] = useState<MemberDetail | null>(null);
 
@@ -280,9 +288,16 @@ function MemberDirectoryLayout({
   // same pattern already used for incomingMemberId in this file.
   useEffect(() => {
     if (justCreatedFlag) {
-      navigate(location.pathname, { replace: true, state: {} });
+      const memberId = searchParams.get('member') ?? incomingMemberId;
+      navigate(
+        {
+          pathname: location.pathname,
+          search: memberId ? `?member=${encodeURIComponent(memberId)}` : '',
+        },
+        { replace: true, state: {} },
+      );
     }
-  }, [justCreatedFlag, location.pathname, navigate]);
+  }, [justCreatedFlag, incomingMemberId, location.pathname, navigate, searchParams]);
 
   useEffect(() => {
     if (!portalView || !selectedMemberId) {
