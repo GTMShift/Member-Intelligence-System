@@ -353,10 +353,6 @@ export function SpeakerApplicationsAdminPage() {
     if (!isAdmin) navigate('/');
   }, [isAdmin, navigate]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [filter, interestFilters, experienceFilters, bucketFilters]);
-
   const loadApplications = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -434,6 +430,7 @@ export function SpeakerApplicationsAdminPage() {
     setExperienceFilters([]);
     setBucketFilters([]);
     setFilter('all');
+    setPage(1);
   };
 
   const hasActiveFilters = interestFilters.length > 0 || experienceFilters.length > 0 || bucketFilters.length > 0 || filter !== 'all';
@@ -504,7 +501,7 @@ export function SpeakerApplicationsAdminPage() {
               <button
                 key={opt.value}
                 type="button"
-                onClick={() => setFilter(opt.value)}
+                onClick={() => { setFilter(opt.value); setPage(1); }}
                 className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                   filter === opt.value
                     ? 'bg-white text-ink shadow-sm border border-charcoal/15'
@@ -526,19 +523,19 @@ export function SpeakerApplicationsAdminPage() {
             label="Interest"
             options={SPEAKING_INTEREST_OPTIONS.map((o) => ({ value: o, label: o }))}
             selected={interestFilters}
-            onChange={setInterestFilters}
+            onChange={(v) => { setInterestFilters(v); setPage(1); }}
           />
           <MultiSelectDropdown
             label="Experience"
             options={SPEAKING_EXPERIENCE_OPTIONS.map((o) => ({ value: o, label: o }))}
             selected={experienceFilters}
-            onChange={setExperienceFilters}
+            onChange={(v) => { setExperienceFilters(v); setPage(1); }}
           />
           <MultiSelectDropdown
             label="ICP Bucket"
             options={BUCKET_OPTIONS_LIST}
             selected={bucketFilters}
-            onChange={setBucketFilters}
+            onChange={(v) => { setBucketFilters(v); setPage(1); }}
           />
 
           {hasActiveFilters && (
