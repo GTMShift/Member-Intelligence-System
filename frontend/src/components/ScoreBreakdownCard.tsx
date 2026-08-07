@@ -110,8 +110,8 @@ export function ScoreBreakdownCard({ memberId }: ScoreBreakdownCardProps) {
           .eq('rsvp_status', 'attended');
         if (signupsError) throw signupsError;
 
-        const events90d = (signups ?? []).filter((s: any) => {
-          const eventDate = s.events?.event_date;
+        const events90d = (signups ?? []).filter((s) => {
+          const eventDate = s.events?.[0]?.event_date;
           return eventDate && eventDate >= cutoffIso;
         }).length;
 
