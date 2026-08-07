@@ -403,15 +403,17 @@ function IcpScoringAssistant({
     setIsApplying(true);
     setError(null);
     try {
+      // Set bucket first so calculate_fit_score sees the correct bucket
+      await updateMemberAsAdmin(memberId, { bucket: bucketToApply }, user.id);
+  
       const fitScore = SCORED_BUCKETS.includes(bucketToApply)
         ? await calculateFitScore(memberId)
         : null;
-
-      const input: AdminUpdateMemberInput = {
-        bucket: bucketToApply,
-        fit_score: fitScore,
-      };
-      await updateMemberAsAdmin(memberId, input, user.id);
+  
+      if (fitScore !== null) {
+        await updateMemberAsAdmin(memberId, { fit_score: fitScore }, user.id);
+      }
+  
       await onApplied();
       setSuggestion(null);
       setManualBucket('');
