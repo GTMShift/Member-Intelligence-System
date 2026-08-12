@@ -1096,7 +1096,7 @@ export function MemberEntryPage() {
                   onChange={handleChange}
                   required
                   placeholder="Chicago"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-orange focus:outline-none"
                 />
               </div>
 
