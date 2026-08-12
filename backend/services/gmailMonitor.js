@@ -7,6 +7,27 @@ const supabase = require('../supabaseClient');
 const POLL_INTERVAL_MS = 60_000;
 const WEBHOOK_URL = 'http://localhost:3000/webhook/email';
 
+/** Internal team addresses — sent mail to these is skipped (not member outreach). */
+const INTERNAL_EMAILS = [
+  'james@solutionexec.com',
+  'meghan@solutionexec.com',
+  'chris@solutionexec.com',
+];
+
+function isBoomerangOrSelfSent({ subject, sender_email, recipient_email, body }) {
+  return (
+    subject?.toLowerCase().includes('boomerang') ||
+    sender_email?.toLowerCase().includes('boomerang') ||
+    sender_email?.toLowerCase().includes('baydin.com') ||
+    body?.toLowerCase().includes('boomerang') ||
+    body?.toLowerCase().includes('baydin.com') ||
+    body?.toLowerCase().includes('message moved to top of inbox by boomerang') ||
+    (!!sender_email &&
+      !!recipient_email &&
+      sender_email.toLowerCase() === recipient_email.toLowerCase())
+  );
+}
+
 function extractEmailAddress(headerValue) {
   if (!headerValue) return null;
   const match = headerValue.match(/<([^>]+)>/);
@@ -127,9 +148,15 @@ async function processMessage(gmail, messageId) {
   if (
     subject?.toLowerCase().includes('boomerang') ||
     sender_email?.toLowerCase().includes('boomerang') ||
-    body?.toLowerCase().includes('boomerang')
+    sender_email?.toLowerCase().includes('baydin.com') ||
+    body?.toLowerCase().includes('boomerang') ||
+    body?.toLowerCase().includes('baydin.com') ||
+    body?.toLowerCase().includes('message moved to top of inbox by boomerang') ||
+    (!!sender_email &&
+      !!recipient_email &&
+      sender_email.toLowerCase() === recipient_email.toLowerCase())
   ) {
-    console.log(`[gmailMonitor] Skipping Boomerang email: ${subject}`);
+    console.log(`[gmailMonitor] Skipping Boomerang or self-sent email: ${subject}`);
     return;
   }
 
@@ -232,6 +259,146 @@ async function pollUnreadEmails(gmail) {
   }
 }
 
+/**
+ * Process a message from James's Sent folder. Looks up the RECIPIENT in
+ * members (the person James emailed). Skips silently when not a member.
+ */
+async function processSentMessage(gmail, messageId) {
+  const { data: message } = await gmail.users.messages.get({
+    userId: 'me',
+    id: messageId,
+    format: 'full',
+  });
+
+  const headers = message.payload?.headers || [];
+  const senderHeader = getHeader(headers, 'From');
+  const recipientHeader = getHeader(headers, 'To');
+  const subject = getHeader(headers, 'Subject') || '(no subject)';
+  const dateHeader = getHeader(headers, 'Date');
+
+  const sender_email = extractEmailAddress(senderHeader);
+  const recipient_email = extractEmailAddress(recipientHeader);
+  const body = extractBodyText(message.payload);
+  const occurred_at = parseOccurredAt(message, dateHeader);
+
+  if (
+    isBoomerangOrSelfSent({
+      subject,
+      sender_email,
+      recipient_email,
+      body,
+    })
+  ) {
+    console.log(
+      `[gmailMonitor] Skipping Boomerang or self-sent email: ${subject}`,
+    );
+    return;
+  }
+
+  if (!sender_email || !recipient_email) {
+    return;
+  }
+
+  const allInternalEmails = [
+    ...INTERNAL_EMAILS,
+    process.env.MONITOR_EMAIL?.toLowerCase(),
+  ].filter(Boolean);
+
+  if (allInternalEmails.includes(recipient_email)) {
+    console.log(
+      `[gmailMonitor] Skipping internal recipient: ${recipient_email}`,
+    );
+    return;
+  }
+
+  const { data: member } = await supabase
+    .from('members')
+    .select('id')
+    .eq('email', recipient_email)
+    .maybeSingle();
+
+  // James sends lots of non-member email — skip silently, no review flag.
+  if (!member) {
+    return;
+  }
+
+  const summary = await summarizeEmail({
+    subject,
+    sender: senderHeader || sender_email,
+    body: body.slice(0, 8000),
+  });
+
+  await axios.post(WEBHOOK_URL, {
+    sender_email,
+    recipient_email,
+    subject,
+    summary,
+    direction: 'sent',
+    occurred_at,
+    thread_id: message.threadId || null,
+    logged_by: 'Gmail monitor',
+  });
+
+  await supabase
+    .from('processed_emails')
+    .insert({ gmail_message_id: messageId });
+
+  console.log(
+    `[gmailMonitor] Processed sent email ${messageId}: "${subject}" → ${recipient_email}`,
+  );
+}
+
+async function pollSentEmails(gmail) {
+  const monitorEmail = process.env.MONITOR_EMAIL;
+  console.log(
+    `[gmailMonitor] Checking sent mail for ${monitorEmail || '(MONITOR_EMAIL not set)'}…`,
+  );
+
+  const { data } = await gmail.users.messages.list({
+    userId: 'me',
+    labelIds: ['SENT'],
+    q: 'newer_than:1d',
+    maxResults: 25,
+  });
+
+  const messages = data.messages || [];
+  if (messages.length === 0) {
+    console.log('[gmailMonitor] No recent sent emails');
+    return;
+  }
+
+  console.log(`[gmailMonitor] Found ${messages.length} recent sent email(s)`);
+
+  for (const message of messages) {
+    try {
+      const messageId = message.id;
+
+      const { data: alreadyProcessed } = await supabase
+        .from('processed_emails')
+        .select('id')
+        .eq('gmail_message_id', messageId)
+        .maybeSingle();
+
+      if (alreadyProcessed) {
+        continue;
+      }
+
+      await processSentMessage(gmail, messageId);
+    } catch (error) {
+      const details =
+        error.response?.data ||
+        error.error ||
+        error.stack ||
+        error.message ||
+        String(error);
+      console.error(
+        `[gmailMonitor] Failed to process sent message ${message.id}:`,
+        typeof details === 'string' ? details : JSON.stringify(details, null, 2),
+      );
+    }
+  }
+}
+
 async function startMonitoring() {
   if (!process.env.MONITOR_EMAIL) {
     console.error('[gmailMonitor] MONITOR_EMAIL is not set in the environment');
@@ -253,6 +420,7 @@ async function startMonitoring() {
   const run = async () => {
     try {
       await pollUnreadEmails(gmail);
+      await pollSentEmails(gmail);
     } catch (error) {
       console.error('[gmailMonitor] Poll failed:', error.message);
     }
