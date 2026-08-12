@@ -123,6 +123,16 @@ async function processMessage(gmail, messageId) {
   const occurred_at = parseOccurredAt(message, dateHeader);
   const monitorEmail = (process.env.MONITOR_EMAIL || '').trim().toLowerCase();
 
+  // Skip Boomerang notification emails before calling Claude or the webhook
+  if (
+    subject?.toLowerCase().includes('boomerang') ||
+    sender_email?.toLowerCase().includes('boomerang') ||
+    body?.toLowerCase().includes('boomerang')
+  ) {
+    console.log(`[gmailMonitor] Skipping Boomerang email: ${subject}`);
+    return;
+  }
+
   if (!sender_email || !recipient_email) {
     throw new Error('Could not extract sender or recipient email');
   }
