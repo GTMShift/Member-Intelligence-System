@@ -51,7 +51,7 @@ BEGIN
 
     IF NEW.job_title IS NOT NULL AND trim(NEW.job_title) != '' THEN
       INSERT INTO employment_history (member_id, company, role, is_current, source)
-      VALUES (v_member_id, NEW.company, NEW.job_title, true, 'Join Us form');
+      VALUES (v_member_id, NEW.company, NEW.job_title, true, 'Website');
     END IF;
 
     INSERT INTO notifications (type, title, body, member_id, member_name)
