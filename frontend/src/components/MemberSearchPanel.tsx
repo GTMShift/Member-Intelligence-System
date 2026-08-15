@@ -31,6 +31,11 @@ interface MemberSearchPanelProps {
 
 const EMPTY_FILTERS: MemberSearchParams = {};
 
+// Tags that should be merged into a single filter option.
+// Any tag in MERGED_INTO_OTR_BA will be hidden from the dropdown and its
+// results folded into OTR-BA-2026 when OTR-BA-2026 is selected.
+const MERGED_INTO_OTR_BA = new Set(['OTR-SC-2026']);
+
 // ---- Bucket badge -----------------------------------------------------------
 const BUCKET_STYLES: Record<string, { bg: string; text: string; label: string }> = {
   primary_icp: {
@@ -74,6 +79,7 @@ const BUCKET_STYLES: Record<string, { bg: string; text: string; label: string }>
     label: 'Non-ICP',
   },
 };
+
 function IcpBucketBadge({ bucket }: { bucket: string | null | undefined }) {
   if (!bucket) {
     return (
@@ -97,6 +103,49 @@ function IcpBucketBadge({ bucket }: { bucket: string | null | undefined }) {
       {style.label}
     </span>
   );
+}
+
+// Runs searchMembers for a tag and all tags merged into it in parallel,
+// then de-duplicates by member id and sums the totals.
+// Fetches the primary tag with normal pagination, and fetches ALL members from
+// secondary/merged tags in a single high-limit call (they are small groups).
+// This means secondary tag members are fully loaded on the first search, so
+// "Load more" only ever needs to paginate the primary tag — no dual-pagination
+// complexity, no getting stuck.
+async function searchWithMergedTags(
+  baseParams: MemberSearchParams,
+  primaryTag: string,
+  mergedTags: Set<string>,
+): Promise<{ results: MemberSearchResult[]; total: number }> {
+  const [primaryResponse, ...secondaryResponses] = await Promise.all([
+    searchMembers({ ...baseParams, tag: primaryTag }),
+    ...[...mergedTags].map((t) =>
+      searchMembers({ ...baseParams, tag: t, page: 1, limit: 1000 }),
+    ),
+  ]);
+
+  const seen = new Set<string>();
+  const results: MemberSearchResult[] = [];
+  for (const member of primaryResponse.results) {
+    if (!seen.has(member.id)) { seen.add(member.id); results.push(member); }
+  }
+  for (const response of secondaryResponses) {
+    for (const member of response.results) {
+      if (!seen.has(member.id)) { seen.add(member.id); results.push(member); }
+    }
+  }
+
+  // If all primary tag members fit on this page, the de-duplicated results
+  // array IS the true total — use it directly so the "Load more" count isn't
+  // inflated by members tagged with both BA and SC (overlap).
+  // If primary has more pages to load, fall back to summing both totals as an
+  // approximation (load more will still work correctly in that case).
+  const allPrimaryLoaded = primaryResponse.results.length >= primaryResponse.total;
+  const total = allPrimaryLoaded
+    ? results.length
+    : primaryResponse.total + secondaryResponses.reduce((sum, r) => sum + r.total, 0);
+
+  return { results, total };
 }
 
 export function MemberSearchPanel({
@@ -153,14 +202,27 @@ export function MemberSearchPanel({
     setLoading(true);
     setError(null);
     try {
-      const response = await searchMembers({
+      const baseParams = {
         q: searchQuery || undefined,
         ...searchFilters,
         page: 1,
         limit: PAGE_SIZE,
-      });
-      setResults(response.results);
-      setTotal(response.total);
+      };
+
+      if (searchFilters.tag === 'OTR-BA-2026') {
+        // Merge OTR-SC-2026 results into OTR-BA-2026
+        const { results: merged, total: mergedTotal } = await searchWithMergedTags(
+          baseParams,
+          'OTR-BA-2026',
+          MERGED_INTO_OTR_BA,
+        );
+        setResults(merged);
+        setTotal(mergedTotal);
+      } else {
+        const response = await searchMembers(baseParams);
+        setResults(response.results);
+        setTotal(response.total);
+      }
       setPage(1);
     } catch {
       setError('Search failed. Please try again.');
@@ -176,14 +238,26 @@ export function MemberSearchPanel({
     setLoadingMore(true);
     try {
       const nextPage = page + 1;
-      const response = await searchMembers({
+      const baseParams = {
         q: query || undefined,
         ...filters,
         page: nextPage,
         limit: PAGE_SIZE,
-      });
-      setResults((prev) => [...prev, ...response.results]);
-      setTotal(response.total);
+      };
+
+      if (filters.tag === 'OTR-BA-2026') {
+        // Secondary tags (OTR-SC-2026) were fully loaded on the initial search.
+        // Only paginate the primary tag here to avoid empty-page issues.
+        const baResponse = await searchMembers({ ...baseParams, tag: 'OTR-BA-2026' });
+        setResults((prev) => {
+          const seen = new Set(prev.map((m) => m.id));
+          return [...prev, ...baResponse.results.filter((m) => !seen.has(m.id))];
+        });
+      } else {
+        const response = await searchMembers(baseParams);
+        setResults((prev) => [...prev, ...response.results]);
+        setTotal(response.total);
+      }
       setPage(nextPage);
     } catch {
       setError('Failed to load more members. Please try again.');
@@ -218,6 +292,11 @@ export function MemberSearchPanel({
     setFilters(EMPTY_FILTERS);
     setQuery('');
   };
+
+  // Hide otr-sc from the tag dropdown — its results are folded into otr-ba
+  const visibleCompanyTags = filterOptions.companyTags.filter(
+    (t) => !MERGED_INTO_OTR_BA.has(t),
+  );
 
   return (
     <div className="flex h-full flex-col bg-charcoal">
@@ -347,7 +426,7 @@ export function MemberSearchPanel({
               label="Tags"
               value={filters.tag ?? ''}
               onChange={(v) => updateFilter('tag', v)}
-              options={filterOptions.companyTags.map((t) => ({ value: t, label: t }))}
+              options={visibleCompanyTags.map((t) => ({ value: t, label: t }))}
             />
           </div>
         )}
