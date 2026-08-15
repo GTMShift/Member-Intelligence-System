@@ -492,7 +492,7 @@ export function CompleteProfilePage() {
                   onChange={handleChange}
                   required
                   placeholder="Jane"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -506,7 +506,7 @@ export function CompleteProfilePage() {
                   onChange={handleChange}
                   required
                   placeholder="Smith"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-orange focus:outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -531,7 +531,7 @@ export function CompleteProfilePage() {
                   placeholder="+12025551234"
                   pattern="^\+[1-9]\d{1,14}$"
                   title="Phone number must be in E.164 format e.g. +12025551234"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-orange focus:outline-none"
                 />
                 <span className="text-xs text-slate-400">Format: +12025551234</span>
               </div>
@@ -546,7 +546,7 @@ export function CompleteProfilePage() {
                   onChange={handleChange}
                   required
                   placeholder="https://linkedin.com/in/yourname"
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-orange focus:outline-none"
                 />
               </div>
             </div>
@@ -567,7 +567,7 @@ export function CompleteProfilePage() {
                     onChange={handleChange}
                     required
                     placeholder="Acme Corp"
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-orange focus:outline-none"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -582,7 +582,7 @@ export function CompleteProfilePage() {
                     required
                     min={0}
                     placeholder="e.g. 25"
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-orange focus:outline-none"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -596,7 +596,7 @@ export function CompleteProfilePage() {
                     onChange={handleChange}
                     required
                     placeholder="Director of Solutions Engineering"
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-orange focus:outline-none"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -608,7 +608,7 @@ export function CompleteProfilePage() {
                     value={form.seniority_level}
                     onChange={handleChange}
                     required
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
+                    className={`rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange focus:outline-none ${form.seniority_level === '' ? 'text-slate-400' : 'text-slate-900'}`}
                   >
                     {SENIORITY_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -625,7 +625,7 @@ export function CompleteProfilePage() {
                     value={form.current_job_start_date}
                     onChange={handleChange}
                     required
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
+                    className={`rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange focus:outline-none ${form.current_job_start_date === '' ? 'text-slate-400' : 'text-slate-900'}`}
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -637,7 +637,7 @@ export function CompleteProfilePage() {
                     value={form.management_layers}
                     onChange={handleChange}
                     required
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
+                    className={`rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange focus:outline-none ${form.management_layers === '' ? 'text-slate-400' : 'text-slate-900'}`}
                   >
                     {MANAGEMENT_LAYER_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -673,7 +673,7 @@ export function CompleteProfilePage() {
                     value={form.oversees_other_text}
                     onChange={handleChange}
                     placeholder="Describe the team..."
-                    className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
+                    className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-orange focus:outline-none"
                   />
                 )}
               </div>
@@ -717,7 +717,7 @@ export function CompleteProfilePage() {
                     onChange={handleChange}
                     required
                     placeholder="123 Main St"
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-orange focus:outline-none"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -731,7 +731,7 @@ export function CompleteProfilePage() {
                     onChange={handleChange}
                     required
                     placeholder="Chicago"
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-orange focus:outline-none"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -825,7 +825,7 @@ export function CompleteProfilePage() {
                     value={form.tshirt_size}
                     onChange={handleChange}
                     required
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-orange focus:outline-none"
+                    className={`rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange focus:outline-none ${form.tshirt_size === '' ? 'text-slate-400' : 'text-slate-900'}`}
                   >
                     <option value="">Select size</option>
                     {TSHIRT_SIZES.map((size) => (
@@ -842,7 +842,7 @@ export function CompleteProfilePage() {
                     value={form.dietary_restrictions}
                     onChange={handleChange}
                     placeholder="e.g. Vegetarian, Gluten free"
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-orange focus:outline-none"
                   />
                 </div>
               </div>
@@ -865,14 +865,14 @@ export function CompleteProfilePage() {
                       value={social.username}
                       onChange={(e) => updateSocial(index, 'username', e.target.value)}
                       placeholder="Username"
-                      className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
+                      className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-orange focus:outline-none"
                     />
                     <input
                       type="url"
                       value={social.url ?? ''}
                       onChange={(e) => updateSocial(index, 'url', e.target.value)}
                       placeholder="URL (optional)"
-                      className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-600 focus:border-orange focus:outline-none"
+                      className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-orange focus:outline-none"
                     />
                     <button
                       type="button"
