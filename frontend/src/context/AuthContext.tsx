@@ -1,60 +1,33 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
   useState,
   type ReactNode,
 } from 'react';
-import type { Session, User } from '@supabase/supabase-js';
+import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
 import type { UserRole } from '../types/api';
+import {
+  ADMIN_EMAILS,
+  AuthContext,
+  toUserRole,
+} from './authShared';
 
-const ADMIN_EMAILS = [
-  'vedanutheti@gmail.com',
-  'bdb6@illinois.edu',
-  'chloeat2@illinois.edu',
-  'chris@solutionexec.com',
-  'james@solutionexec.com',
-  'jtran63@illinois.edu',
-  'meghan@solutionexec.com',
-  'vivaanb2@illinois.edu',
-  'wchen236@illinois.edu',
-  'aadik3@illinois.edu',
-  'aaravg2@illinois.edu',
-  'iwatson3@illinois.edu',
-  'wblum2@illinois.edu',
-  'apm18@illinois.edu',
-  'gmonago2@illinois.edu',
-  'itapere2@illinois.edu',
-  'arai23@illinois.edu',
-];
-
-interface AuthContextValue {
-  role: UserRole;
-  isAdmin: boolean;
-  session: Session | null;
-  user: User | null;
-  loading: boolean;
-  /** The linked members.id for this person, if any. Null means: authenticated,
-   *  but not yet connected to a member record (needs onboarding). */
-  memberId: string | null;
-  /** True once auth/profile resolution has finished AND this is a member-role
-   *  user with no linked member record yet — i.e. they should be sent to the
-   *  "complete your profile" flow. */
-  needsOnboarding: boolean;
-  signOut: () => Promise<void>;
-  /** Call after the onboarding form successfully links a new member, so the
-   *  rest of the app immediately reflects the new memberId without a reload. */
-  refreshMemberId: () => Promise<void>;
-}
-
-export const AuthContext = createContext<AuthContextValue | null>(null);
-
-function toUserRole(role: string): UserRole {
-  return role === 'admin' ? 'admin' : 'member';
+/** True while the URL still has OAuth callback tokens/codes that Supabase
+ *  hasn't finished consuming yet ??? a null getSession() during this window is
+ *  a race, not a real signed-out state. */
+function hasPendingOAuthCallback(): boolean {
+  if (typeof window === 'undefined') return false;
+  const hash = window.location.hash;
+  const search = window.location.search;
+  return (
+    hash.includes('access_token') ||
+    hash.includes('refresh_token') ||
+    search.includes('code=') ||
+    search.includes('error=')
+  );
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -67,10 +40,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // auth listener can tell "the user actually changed" apart from "Supabase
   // just silently refreshed the token" (which fires on every tab focus).
   const currentUserIdRef = useRef<string | null>(null);
+  // Serialize syncAuthState so a stale null getSession() can't finish after a
+  // real SIGNED_IN and wipe the session (common on first OAuth redirect).
+  const syncChainRef = useRef<Promise<void>>(Promise.resolve());
 
   const resolveMemberId = useCallback(
     async (profileId: string, email: string | null | undefined): Promise<string | null> => {
-      // Already linked — nothing to do.
+      // Already linked ??? nothing to do.
       const { data: profile } = await supabase
         .from('profiles')
         .select('member_id')
@@ -78,20 +54,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .maybeSingle();
       if (profile?.member_id) return profile.member_id;
 
-      // Not linked yet — try auto-matching by email against an existing member.
+      // Not linked yet ??? try auto-matching by email against an existing member.
       if (!email) return null;
-      const { data: matchedMember } = await supabase
+      const normalizedEmail = email.trim();
+      const { data: matchedMember, error: matchError } = await supabase
         .from('members')
         .select('id')
-        .ilike('email', email.trim())
+        .ilike('email', normalizedEmail)
         .maybeSingle();
 
+      if (matchError) {
+        console.error('Failed to match member by email:', matchError.message);
+        return null;
+      }
+
       if (matchedMember?.id) {
-        await supabase.from('profiles').update({ member_id: matchedMember.id }).eq('id', profileId);
+        const { error: linkError } = await supabase
+          .from('profiles')
+          .update({ member_id: matchedMember.id })
+          .eq('id', profileId);
+        if (linkError) {
+          console.error('Failed to link profile to member:', linkError.message);
+        }
         return matchedMember.id;
       }
 
-      return null; // genuinely no match — this person needs onboarding
+      return null; // genuinely no match ??? this person needs onboarding
     },
     [],
   );
@@ -99,7 +87,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    const syncAuthState = async (currentSession: Session | null) => {
+    const syncAuthState = async (
+      currentSession: Session | null,
+      event?: string,
+    ) => {
+      // Ignore a transient null session while OAuth is still finishing ??? that
+      // was wiping auth on first Vercel login and sending members to Access Denied.
+      if (!currentSession && hasPendingOAuthCallback()) {
+        return;
+      }
+
+      // A stale getSession()/INITIAL_SESSION null must not overwrite a session
+      // we already established from SIGNED_IN (classic first-login race).
+      if (
+        !currentSession &&
+        currentUserIdRef.current &&
+        event !== 'SIGNED_OUT'
+      ) {
+        if (mounted) setLoading(false);
+        return;
+      }
+
       currentUserIdRef.current = currentSession?.user?.id ?? null;
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
@@ -114,8 +122,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .eq('id', currentSession.user.id)
           .maybeSingle();
 
-        if (existingProfile?.role) {
-          resolvedRole = toUserRole(existingProfile.role);
+        if (existingProfile) {
+          // Profile row exists (often created by the auth trigger). Prefer its
+          // role; fall back to ADMIN_EMAILS if role is somehow missing.
+          resolvedRole = existingProfile.role
+            ? toUserRole(existingProfile.role)
+            : isAdmin
+              ? 'admin'
+              : 'member';
         } else {
           const insertResult = await supabase
             .from('profiles')
@@ -140,26 +154,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (retryProfile?.role) {
               resolvedRole = toUserRole(retryProfile.role);
             } else if (fetchError && insertResult.error && retryError) {
-              await supabase.auth.signOut();
-              if (mounted) {
-                setSession(null);
-                setUser(null);
-                setRole('member');
-                setMemberId(null);
-                setLoading(false);
-                window.location.href = '/unauthorized';
-              }
-              return;
+              // Don't hard-bounce to Access Denied on a transient profile race ???
+              // fall back to email-based role so members can still reach portal /
+              // complete-profile.
+              console.error('Profile sync failed; using email-based role fallback', {
+                fetchError: fetchError.message,
+                insertError: insertResult.error.message,
+                retryError: retryError.message,
+              });
+              resolvedRole = isAdmin ? 'admin' : 'member';
+            } else {
+              // Insert raced with the auth trigger (or similar) ??? still treat as
+              // a normal member/admin so routing can proceed.
+              resolvedRole = isAdmin ? 'admin' : 'member';
             }
           }
         }
 
-        if (resolvedRole && mounted) {
+        // Always resolve a role for signed-in users so routing never stalls on
+        // Access Denied because resolvedRole stayed null.
+        if (!resolvedRole) {
+          resolvedRole = isAdmin ? 'admin' : 'member';
+        }
+
+        if (mounted) {
           setRole(resolvedRole);
 
           // Try to resolve a linked member record regardless of admin/member
-          // role — an admin can also be a genuine member with their own
-          // profile (viewable via the Admin/Member toggle's Member view).
+          // role ??? an admin can also be a genuine member with their own profile.
           const linkedMemberId = await resolveMemberId(
             currentSession.user.id,
             currentSession.user.email,
@@ -176,8 +198,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      void syncAuthState(currentSession);
+    const enqueueSync = (currentSession: Session | null, event?: string) => {
+      syncChainRef.current = syncChainRef.current
+        .then(() => syncAuthState(currentSession, event))
+        .catch((error) => {
+          console.error('Auth sync failed:', error);
+          if (mounted) setLoading(false);
+        });
+      return syncChainRef.current;
+    };
+
+    // Prefer onAuthStateChange (emits INITIAL_SESSION) as the source of truth.
+    // Still call getSession for older clients, but serialize both through the queue.
+    void supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      void enqueueSync(currentSession, 'GET_SESSION');
     });
 
     const {
@@ -187,17 +221,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const isSameUser = incomingUserId === currentUserIdRef.current;
 
       // A routine token refresh for the SAME user (e.g. triggered by the tab
-      // regaining focus) shouldn't flip `loading` back to true — that
+      // regaining focus) shouldn't flip `loading` back to true ??? that
       // unmounts whatever page is showing via ProtectedRoute's spinner,
       // wiping in-progress form state or dismissed-notification state.
       // Only do the full resync for an actual sign-in/sign-out/user change.
-      if (isSameUser && event !== 'SIGNED_OUT') {
+      if (isSameUser && event === 'TOKEN_REFRESHED') {
         setSession(currentSession);
         return;
       }
 
-      setLoading(true);
-      void syncAuthState(currentSession);
+      // Don't bounce UI into a loading spinner for a null event that we'll
+      // ignore because we already have a signed-in user.
+      const willIgnoreStaleNull =
+        !currentSession &&
+        !!currentUserIdRef.current &&
+        event !== 'SIGNED_OUT';
+
+      if (event !== 'TOKEN_REFRESHED' && !willIgnoreStaleNull) {
+        setLoading(true);
+      }
+      void enqueueSync(currentSession, event);
     });
 
     return () => {
@@ -238,12 +281,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth(): AuthContextValue {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
-  return context;
 }
