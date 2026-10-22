@@ -38,7 +38,11 @@ export interface AuthContextValue {
 export const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function toUserRole(role: string): UserRole {
-  return role === 'admin' ? 'admin' : 'member';
+  if (role === 'admin' || role === 'member' || role === 'applicant') {
+    return role;
+  }
+
+  return 'applicant';
 }
 
 export function useAuth(): AuthContextValue {

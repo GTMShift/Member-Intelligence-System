@@ -129,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             ? toUserRole(existingProfile.role)
             : isAdmin
               ? 'admin'
-              : 'member';
+              : 'applicant';
         } else {
           const insertResult = await supabase
             .from('profiles')
@@ -138,7 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               email: currentSession.user.email,
               full_name: currentSession.user.user_metadata?.full_name,
               avatar_url: currentSession.user.user_metadata?.avatar_url,
-              role: isAdmin ? 'admin' : 'member',
+              role: isAdmin ? 'admin' : 'applicant',
             })
             .select('role')
             .single();

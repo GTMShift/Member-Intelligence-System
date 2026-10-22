@@ -11,6 +11,7 @@ const eventsRouter = require('./routes/events');
 const substackRouter = require('./routes/substackImport');
 const formResponsesRouter = require('./routes/formResponses');
 const emailWebhookRouter = require('./routes/emailWebhook');
+const joinUsApplicationsRouter = require('./routes/joinUsApplications');
 
 const allowedOrigins = new Set([
   'http://localhost:5173',
@@ -45,6 +46,7 @@ app.use('/events', eventsRouter);
 app.use('/substack', substackRouter);
 app.use('/form-responses', formResponsesRouter);
 app.use('/webhook/email', emailWebhookRouter);
+app.use('/join-us-applications', joinUsApplicationsRouter);
 
 const PORT = 3000;
 app.listen(PORT, () => {
