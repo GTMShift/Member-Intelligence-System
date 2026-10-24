@@ -59,6 +59,90 @@ begin
   return v_member_id;
 end;
 $$;
+
+-- The hosted project also has the frontend's named-argument overload. Keep
+-- that RPC contract intact, but move its original body behind a guarded
+-- SECURITY DEFINER wrapper. The checked-in migration history does not contain
+-- this overload, so this block is conditional for clean local replays.
+do $$
+declare
+  v_identity_arguments text;
+begin
+  select pg_get_function_identity_arguments(p.oid)
+    into v_identity_arguments
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public'
+     and p.proname = 'create_member_full'
+     and p.pronargs = 42
+     and p.proargnames[23] = 'p_oversees_other'
+     and p.proargnames[24] = 'p_oversees_other_text';
+
+  if v_identity_arguments is not null then
+    execute format('alter function public.create_member_full(%s) rename to create_member_full_impl', v_identity_arguments);
+    execute format('revoke all on function public.create_member_full_impl(%s) from public, anon, authenticated, service_role', v_identity_arguments);
+  end if;
+end $$;
+
+do $$
+begin
+  if to_regprocedure('public.create_member_full_impl(text,text,text,text,text,integer,text,text,text,date,text,text,boolean,boolean,boolean,boolean,boolean,boolean,boolean,boolean,boolean,boolean,boolean,text,boolean,boolean,boolean,boolean,boolean,boolean,text,text,text,text,text,tshirt_size,text,jsonb,icp_bucket,integer,text,uuid)') is not null then
+    execute $ddl$
+      create function public.create_member_full(
+        p_first_name text, p_last_name text, p_email text, p_linkedin_url text,
+        p_phone text default null, p_team_size integer default null,
+        p_company_name text default null, p_current_role text default null,
+        p_seniority_level text default null, p_current_start_date date default null,
+        p_management_layers text default null, p_event_interest text default null,
+        p_oversees_customer_success boolean default false,
+        p_oversees_demo_engineering boolean default false,
+        p_oversees_enablement boolean default false,
+        p_oversees_forward_deployed_engineering boolean default false,
+        p_oversees_implementation_onboarding boolean default false,
+        p_oversees_partnerships_channel_se boolean default false,
+        p_oversees_professional_services boolean default false,
+        p_oversees_solutions_architecture boolean default false,
+        p_oversees_solutions_engineering_consulting boolean default false,
+        p_oversees_value_engineering boolean default false,
+        p_oversees_other boolean default false, p_oversees_other_text text default null,
+        p_region_north_america boolean default false,
+        p_region_regional_usa boolean default false, p_region_global boolean default false,
+        p_region_emea boolean default false, p_region_apac boolean default false,
+        p_region_latin_america boolean default false, p_address text default null,
+        p_city text default null, p_state_region text default null,
+        p_zip_code text default null, p_country text default null,
+        p_tshirt_size tshirt_size default null, p_dietary_restrictions text default null,
+        p_socials jsonb default null, p_bucket icp_bucket default null,
+        p_fit_score integer default null, p_tag_note text default null,
+        p_tagged_by uuid default null
+      ) returns uuid language plpgsql security definer
+      set search_path = pg_catalog, public, auth
+      as $function$
+      begin
+        if auth.role() is distinct from 'service_role'
+          and not public.is_current_user_admin() then
+          raise exception 'Administrator access required';
+        end if;
+        return public.create_member_full_impl(
+          p_first_name, p_last_name, p_email, p_linkedin_url, p_phone,
+          p_team_size, p_company_name, p_current_role, p_seniority_level,
+          p_current_start_date, p_management_layers, p_event_interest,
+          p_oversees_customer_success, p_oversees_demo_engineering,
+          p_oversees_enablement, p_oversees_forward_deployed_engineering,
+          p_oversees_implementation_onboarding, p_oversees_partnerships_channel_se,
+          p_oversees_professional_services, p_oversees_solutions_architecture,
+          p_oversees_solutions_engineering_consulting, p_oversees_value_engineering,
+          p_oversees_other, p_oversees_other_text, p_region_north_america,
+          p_region_regional_usa, p_region_global, p_region_emea, p_region_apac,
+          p_region_latin_america, p_address, p_city, p_state_region, p_zip_code,
+          p_country, p_tshirt_size, p_dietary_restrictions, p_socials, p_bucket,
+          p_fit_score, p_tag_note, p_tagged_by
+        );
+      end;
+      $function$
+    $ddl$;
+  end if;
+end $$;
 revoke all on function public.link_my_member_profile(uuid) from public, anon;
 grant execute on function public.link_my_member_profile(uuid) to authenticated;
 
@@ -783,16 +867,21 @@ begin
     raise exception 'Expected guarded SECURITY DEFINER create_member_full signature was not found';
   end if;
 
-  for f in select p.proname, p.prosrc, p.oid::regprocedure as signature
+  for f in select p.proname, p.prosrc, p.oid, p.pronargs, p.proargnames,
+                  p.oid::regprocedure as signature
     from pg_proc p join pg_namespace n on n.oid=p.pronamespace
     where n.nspname='public' and p.proname in ('create_member_full','delete_member_safely','preview_member_deletion')
   loop
     execute format('revoke execute on function %s from public, anon, authenticated', f.signature);
     if f.proname = 'create_member_full' then
-      -- Keep every other overload service-role-only. The exact reviewed
-      -- SECURITY DEFINER signature above is the only one exposed to admins.
+      -- Keep other overloads service-role-only, except for the guarded local
+      -- signature and the guarded hosted frontend wrapper handled below.
       execute format('grant execute on function %s to service_role', f.signature);
-      if f.signature::oid = v_guarded_oid then
+      if f.oid = v_guarded_oid
+         or (f.pronargs = 42
+             and f.proargnames[23] = 'p_oversees_other'
+             and f.proargnames[24] = 'p_oversees_other_text'
+             and f.prosrc like '%Administrator access required%') then
         execute format('grant execute on function %s to authenticated', f.signature);
       end if;
     else
