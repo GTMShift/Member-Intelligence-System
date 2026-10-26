@@ -11,6 +11,7 @@ const eventsRouter = require('./routes/events');
 const substackRouter = require('./routes/substackImport');
 const formResponsesRouter = require('./routes/formResponses');
 const emailWebhookRouter = require('./routes/emailWebhook');
+const { authenticate, requireAdmin, requireWebhookSecret } = require('./middleware/authorization');
 
 const allowedOrigins = new Set([
   'http://localhost:5173',
@@ -36,25 +37,29 @@ app.use(cors({
 }));
 app.use(express.json());
 
-app.use('/members/:id/enrich', enrichmentRouter);
-app.use('/enrich/status', enrichmentStatusRouter);
-app.use('/members', membersRouter);
-app.use('/companies', companiesRouter);
-app.use('/members/:id/employment', employmentRouter);
+app.use('/members/:id/enrich', authenticate, requireAdmin, enrichmentRouter);
+app.use('/enrich/status', authenticate, requireAdmin, enrichmentStatusRouter);
+app.use('/members', authenticate, requireAdmin, membersRouter);
+app.use('/companies', authenticate, requireAdmin, companiesRouter);
+app.use('/members/:id/employment', authenticate, requireAdmin, employmentRouter);
 app.use('/events', eventsRouter);
-app.use('/substack', substackRouter);
+app.use('/substack', authenticate, requireAdmin, substackRouter);
 app.use('/form-responses', formResponsesRouter);
-app.use('/webhook/email', emailWebhookRouter);
+app.use('/webhook/email', requireWebhookSecret, emailWebhookRouter);
 
 const PORT = 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 
-  if (process.env.GMAIL_CREDENTIALS_B64 && process.env.GMAIL_TOKEN_B64) {
+  if (
+    process.env.GMAIL_CREDENTIALS_B64 &&
+    process.env.GMAIL_TOKEN_B64 &&
+    process.env.EMAIL_WEBHOOK_SECRET
+  ) {
     const { startMonitoring } = require('./services/gmailMonitor');
     startMonitoring();
     console.log('Gmail monitor started');
   } else {
-    console.log('Gmail monitor not started — GMAIL_CREDENTIALS_B64 or GMAIL_TOKEN_B64 not set');
+    console.log('Gmail monitor not started — Gmail credentials or EMAIL_WEBHOOK_SECRET not set');
   }
 });

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/authShared';
-import { createMemberSelf, type SelfSignupInput } from '../api/createMemberSelf';
+import { fetchMyMemberAccessRequest, submitMyMemberAccessRequest, type MemberAccessRequestStatus } from '../api/memberAccessRequestsApi';
 
 const FORM_STORAGE_KEY = 'complete_profile_draft';
 
@@ -245,6 +244,13 @@ function Typeahead({ label, value, options, onChange, onValidChange, placeholder
   const [valid, setValid] = useState(!!value);
   const filtered = options.filter((o) => o.toLowerCase().includes(query.toLowerCase()));
 
+  useEffect(() => {
+    if (value) {
+      setQuery(value);
+      setValid(true);
+    }
+  }, [value]);
+
   return (
     <div className="flex flex-col gap-1.5 relative">
       <label className="text-xs font-medium text-slate-600">
@@ -288,8 +294,8 @@ function Typeahead({ label, value, options, onChange, onValidChange, placeholder
 }
 
 export function CompleteProfilePage() {
-  const navigate = useNavigate();
-  const { user, refreshMemberId } = useAuth();
+  const { user } = useAuth();
+  const [draftWasSaved] = useState(() => Boolean(localStorage.getItem(FORM_STORAGE_KEY)));
 
   const [form, setForm] = useState<FormState>(() => {
     try {
@@ -302,6 +308,8 @@ export function CompleteProfilePage() {
 
   const [socials, setSocials] = useState<SocialEntry[]>([]);
   const [loading, setLoading] = useState(false);
+  const [requestStatus, setRequestStatus] = useState<MemberAccessRequestStatus | null>(null);
+  const [requestStatusLoading, setRequestStatusLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [zipError, setZipError] = useState<string | null>(null);
   const [selectedCountry, setSelectedCountry] = useState('');
@@ -312,6 +320,87 @@ export function CompleteProfilePage() {
   useEffect(() => {
     localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(form));
   }, [form]);
+
+  useEffect(() => {
+    let active = true;
+    fetchMyMemberAccessRequest()
+      .then((request) => {
+        if (!active || !request) return;
+        setRequestStatus(request.status);
+        if (draftWasSaved) return;
+
+        const data = request.submitted_data;
+        setForm((current) => ({
+          ...current,
+          first_name: String(data.first_name ?? ''),
+          last_name: String(data.last_name ?? ''),
+          linkedin_url: String(data.linkedin_url ?? ''),
+          phone: String(data.phone ?? ''),
+          job_title: String(data.job_title ?? ''),
+          current_job_start_date: String(data.current_job_start_date ?? ''),
+          seniority_level: String(data.seniority_level ?? ''),
+          company_name: String(data.company_name ?? ''),
+          team_size: data.team_size == null ? '' : String(data.team_size),
+          management_layers: String(data.management_layers ?? ''),
+          address: String(data.address ?? ''),
+          city: String(data.city ?? ''),
+          zip_code: String(data.zip_code ?? ''),
+          tshirt_size: String(data.tshirt_size ?? ''),
+          dietary_restrictions: String(data.dietary_restrictions ?? ''),
+          oversees_solutions_engineering_consulting: Boolean(data.oversees_solutions_engineering_consulting),
+          oversees_customer_success: Boolean(data.oversees_customer_success),
+          oversees_demo_engineering: Boolean(data.oversees_demo_engineering),
+          oversees_solutions_architecture: Boolean(data.oversees_solutions_architecture),
+          oversees_partnerships_channel_se: Boolean(data.oversees_partnerships_channel_se),
+          oversees_value_engineering: Boolean(data.oversees_value_engineering),
+          oversees_forward_deployed_engineering: Boolean(data.oversees_forward_deployed_engineering),
+          oversees_enablement: Boolean(data.oversees_enablement),
+          oversees_professional_services: Boolean(data.oversees_professional_services),
+          oversees_implementation_onboarding: Boolean(data.oversees_implementation_onboarding),
+          oversees_other: Boolean(data.oversees_other),
+          oversees_other_text: String(data.oversees_other_text ?? ''),
+          region_north_america: Boolean(data.region_north_america),
+          region_regional_usa: Boolean(data.region_regional_usa),
+          region_global: Boolean(data.region_global),
+          region_emea: Boolean(data.region_emea),
+          region_apac: Boolean(data.region_apac),
+          region_latin_america: Boolean(data.region_latin_america),
+        }));
+        const savedCountry = String(data.country ?? '');
+        if (COUNTRIES.includes(savedCountry)) {
+          setSelectedCountry(savedCountry);
+        } else if (savedCountry) {
+          setSelectedCountry('Other');
+          setCountryOtherText(savedCountry);
+        }
+        const savedRegion = String(data.state_region ?? '');
+        const regionChoices = savedCountry && savedCountry !== 'Other'
+          ? [...(REGIONS_BY_COUNTRY[savedCountry] ?? []), 'Other']
+          : [];
+        if (savedRegion && regionChoices.includes(savedRegion)) {
+          setSelectedRegion(savedRegion);
+        } else if (savedRegion) {
+          setSelectedRegion('Other');
+          setRegionOtherText(savedRegion);
+        }
+        if (Array.isArray(data.socials)) {
+          setSocials(data.socials.map((entry) => {
+            const item = entry as Record<string, unknown>;
+            const platform = SOCIAL_PLATFORMS.includes(item.platform as typeof SOCIAL_PLATFORMS[number])
+              ? item.platform as typeof SOCIAL_PLATFORMS[number]
+              : 'Twitter/X';
+            return { platform, username: String(item.username ?? ''), url: String(item.url ?? '') };
+          }));
+        }
+      })
+      .catch((err: unknown) => {
+        if (active) setError(err instanceof Error ? err.message : 'Could not load request status.');
+      })
+      .finally(() => {
+        if (active) setRequestStatusLoading(false);
+      });
+    return () => { active = false; };
+  }, [draftWasSaved]);
 
   const regionOptions = selectedCountry && selectedCountry !== 'Other'
     ? [...(REGIONS_BY_COUNTRY[selectedCountry] ?? []), 'Other']
@@ -402,10 +491,9 @@ export function CompleteProfilePage() {
     setError(null);
 
     try {
-      const input: SelfSignupInput = {
+      const input = {
         first_name: form.first_name.trim().replace(/\b\w/g, (c) => c.toUpperCase()),
         last_name: form.last_name.trim().replace(/\b\w/g, (c) => c.toUpperCase()),
-        email: user.email,
         linkedin_url: normalizeLinkedInUrl(form.linkedin_url),
         phone: form.phone.trim() || null,
         job_title: form.job_title.trim() || null,
@@ -442,10 +530,9 @@ export function CompleteProfilePage() {
         region_latin_america: form.region_latin_america,
       };
 
-      await createMemberSelf(input, user.id);
+      await submitMyMemberAccessRequest(input);
+      setRequestStatus('pending');
       localStorage.removeItem(FORM_STORAGE_KEY);
-      await refreshMemberId();
-      navigate('/portal', { state: { justCreated: true } });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
@@ -460,15 +547,25 @@ export function CompleteProfilePage() {
           <h1 className="text-lg font-semibold text-white">
             SolutionExec Member Intelligence Platform
           </h1>
-          <p className="text-sm text-white/60">Complete your profile</p>
+          <p className="text-sm text-white/60">Request member access</p>
         </div>
       </header>
 
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 sm:px-6">
         <p className="mb-6 text-sm text-slate-600">
           We couldn't find an existing member record for <strong>{user?.email}</strong>.
-          Fill in a few details to get set up.
+          Share your details below so an administrator can review your request. This form does not create or link a member record.
         </p>
+
+        {!requestStatusLoading && requestStatus && (
+          <div className="mb-6 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3">
+            <p className="text-sm font-medium text-sky-900">
+              {requestStatus === 'pending' && 'Your request is saved and waiting for administrator review.'}
+              {requestStatus === 'reviewed' && 'An administrator reviewed your request. Member access is still granted separately.'}
+              {requestStatus === 'declined' && 'Your previous request was declined. You can submit updated details for another review.'}
+            </p>
+          </div>
+        )}
 
         {error && (
           <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
@@ -900,7 +997,7 @@ export function CompleteProfilePage() {
               disabled={loading}
               className="rounded-md bg-orange px-6 py-2 text-sm font-medium text-white hover:bg-orange-dark disabled:opacity-50"
             >
-              {loading ? 'Saving…' : 'Complete profile'}
+              {loading ? 'Submitting…' : requestStatus === 'pending' ? 'Update request' : 'Submit for review'}
             </button>
           </div>
         </form>

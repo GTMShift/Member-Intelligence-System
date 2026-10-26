@@ -261,6 +261,99 @@ export async function searchMembers(
 }
 
 export async function getMember(id: string, role: UserRole): Promise<MemberDetail | null> {
+  if (role === 'member') {
+    // Member RLS intentionally denies direct member_profile access. Use the
+    // fixed self-profile projection and let RLS scope each related query.
+    const [memberResult, profileResult, employmentResult, memberDataResult, authResult] = await Promise.all([
+      supabase
+        .from('members')
+        .select('id, first_name, last_name, email, linkedin_url, phone, created_at, last_updated')
+        .eq('id', id)
+        .maybeSingle(),
+      supabase.rpc('get_my_member_profile'),
+      supabase
+        .from('employment_history')
+        .select('id, company, role, start_date, end_date, is_current, source')
+        .eq('member_id', id),
+      supabase
+        .from('member_data')
+        .select('id, tier, category, data, logged_by, created_at')
+        .eq('member_id', id)
+        .eq('tier', 'user_editable'),
+      supabase.auth.getUser(),
+    ]);
+
+    if (memberResult.error) throw new Error(`Failed to fetch member ${id}: ${memberResult.error.message}`);
+    if (profileResult.error) throw new Error(`Failed to fetch member profile: ${profileResult.error.message}`);
+    if (employmentResult.error) throw new Error(`Failed to fetch employment history: ${employmentResult.error.message}`);
+    if (memberDataResult.error) throw new Error(`Failed to fetch member data: ${memberDataResult.error.message}`);
+    const row = memberResult.data;
+    if (!row) return null;
+
+    const safeProfile = profileResult.data as Record<string, unknown> | null;
+    // A caller-supplied member id must never cause the safe RPC's own profile
+    // to be paired with another member's base record.
+    if (safeProfile?.member_id && safeProfile.member_id !== id) return null;
+
+    const profileId = authResult.data.user?.id;
+    let avatarUrl: string | null = null;
+    if (profileId) {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('avatar_url')
+        .eq('id', profileId)
+        .maybeSingle();
+      if (error) throw new Error(`Failed to fetch profile avatar: ${error.message}`);
+      avatarUrl = data?.avatar_url ?? null;
+    }
+
+    const employment = (employmentResult.data ?? []) as EmploymentHistoryEntry[];
+    const currentEntry = employment.find((entry) => entry.is_current);
+    const previousEntries = employment
+      .filter((entry) => !entry.is_current)
+      .sort((a, b) => (b.start_date ?? '').localeCompare(a.start_date ?? ''));
+    const getText = (key: string) =>
+      typeof safeProfile?.[key] === 'string' ? safeProfile[key] as string : null;
+    const getNumber = (key: string) =>
+      typeof safeProfile?.[key] === 'number' ? safeProfile[key] as number : null;
+
+    industryByMemberId.set(id, getText('company_industry'));
+    const member: MemberDetail = {
+      ...row,
+      profile: {
+        current_job_start_date: currentEntry?.start_date ?? getText('current_job_start_date'),
+        seniority_level: getText('seniority_level'),
+        company_id: getText('company_id'),
+        company_name: getText('company_name'),
+        avatar_url: avatarUrl,
+        country: getText('country'),
+        state_region: getText('state_region'),
+        city: getText('city'),
+        metro_area_name: null,
+        company_size: getText('company_size'),
+        company_tags: [],
+        work_email_enriched: null,
+        prev_company_1: previousEntries[0]?.company ?? null,
+        prev_role_1: previousEntries[0]?.role ?? null,
+        prev_company_2: previousEntries[1]?.company ?? null,
+        prev_role_2: previousEntries[1]?.role ?? null,
+        prev_company_3: previousEntries[2]?.company ?? null,
+        prev_role_3: previousEntries[2]?.role ?? null,
+        icp: null,
+        signup_source: null,
+        updated_at: getText('updated_at') ?? row.last_updated,
+        team_size: getNumber('team_size'),
+        bucket: null,
+        fit_score: null,
+        tag_note: null,
+      },
+      member_data: (memberDataResult.data ?? []) as MemberDataEntry[],
+      interactions: [],
+      employment_history: employment,
+    };
+    return applyRoleFilter(member, role);
+  }
+
   const { data, error } = await supabase.from('members').select(MEMBER_SELECT).eq('id', id).maybeSingle();
   if (error) throw new Error(`Failed to fetch member ${id}: ${error.message}`);
   if (!data) return null;

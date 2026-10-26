@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getMember } from '../api/membersApi';
+import { backendFetch } from '../api/backendFetch';
 import { updateMemberAsAdmin, type AdminUpdateMemberInput } from '../api/adminUpdateMember';
 import { calculateFitScore, suggestIcpBucket, type IcpBucketSuggestion } from '../api/icpScoring';
 import { createNotification } from '../api/notificationsApi';
@@ -667,7 +668,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
       if (!apiBase) {
         throw new Error('VITE_API_URL is not configured');
       }
-      const startResponse = await fetch(
+      const startResponse = await backendFetch(
         `${apiBase}/members/${memberId}/enrich`,
         {
           method: 'POST',
@@ -695,7 +696,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
       let finishedResult: EnrichmentResult | null = null;
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
-        const statusResponse = await fetch(
+        const statusResponse = await backendFetch(
           `${apiBase}/enrich/status/${enrichmentId}`,
         );
         if (!statusResponse.ok) {
@@ -776,7 +777,8 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
   const adminOnlyEntries = member.member_data.filter((e) => e.tier === 'admin_only');
   const currentRole =
     member.employment_history.find((entry) => entry.is_current)?.role ?? null;
-  const canEnrich = isAdmin || user?.email === member.email;
+  // Enrichment uses privileged backend/vendor access, so only trusted admins can trigger it.
+  const canEnrich = isAdmin;
 
   const startEditing = () => {
     setSaveError(null);

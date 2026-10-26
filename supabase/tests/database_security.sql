@@ -38,7 +38,7 @@ insert into public.member_data (member_id, tier, category, data) values
   ('00000000-0000-0000-0000-000000000201', 'user_editable', 'about', '{"text":"member-owned"}'),
   ('00000000-0000-0000-0000-000000000201', 'admin_only', 'intelligence', '{"text":"private"}');
 
-select plan(33);
+select plan(45);
 
 set local role anon;
 select set_config('request.jwt.claim.sub', '', true);
@@ -46,6 +46,8 @@ select set_config('request.jwt.claim.role', 'anon', true);
 
 select is((select count(id) from public.members), 0::bigint, 'anonymous callers cannot read members');
 select ok(not has_function_privilege('anon', 'public.link_my_member_profile(uuid)', 'execute'), 'anonymous callers cannot link profiles');
+select ok(not has_function_privilege('anon', 'public.submit_my_member_access_request(jsonb)', 'execute'), 'anonymous callers cannot submit member access requests');
+select ok(not has_function_privilege('anon', 'public.review_member_access_request(uuid,text,text)', 'execute'), 'anonymous callers cannot review member access requests');
 select ok(not has_function_privilege('anon', 'public.delete_member_safely(uuid)', 'execute'), 'anonymous callers cannot delete members');
 select is(
   (select count(*) from pg_proc p
@@ -156,6 +158,10 @@ select throws_ok(
   'select * from public.search_members(null, null, null, null, null, null, null, null, null, ''last_name_asc'', 1, 50, null)',
   'P0001', null, 'member cannot call the admin member-search RPC'
 );
+select throws_ok(
+  $$select public.submit_my_member_access_request('{"first_name":"Member","last_name":"One"}'::jsonb)$$,
+  'P0001', null, 'a linked member cannot create a new access request'
+);
 select is(
   (select count(*) from pg_proc p
     join pg_namespace n on n.oid = p.pronamespace
@@ -180,10 +186,39 @@ select is(
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000104', true);
 select is(public.link_my_member_profile(null), null::uuid, 'unlinked sign-in does not link by matching or creating a contact');
 select is((select count(id) from public.members), 0::bigint, 'unlinked sign-in cannot enter the member data set');
+select lives_ok(
+  $$select public.submit_my_member_access_request('{"first_name":"New","last_name":"Person","city":"Chicago"}'::jsonb)$$,
+  'an unlinked signed-in member can save a pending access request'
+);
+select throws_ok(
+  $$select public.submit_my_member_access_request('{"first_name":"New","last_name":"Person","role":"admin"}'::jsonb)$$,
+  'P0001', null, 'request payload rejects unapproved fields such as a role'
+);
+select is(
+  (select count(*) from public.member_access_requests where auth_user_id = '00000000-0000-0000-0000-000000000104'),
+  1::bigint, 'the requester can read their own submitted request'
+);
+select is((select count(id) from public.members), 0::bigint, 'submitting an access request does not create a member record');
+
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000101', true);
+select is(
+  (select count(*) from public.member_access_requests where auth_user_id = '00000000-0000-0000-0000-000000000104'),
+  0::bigint, 'members cannot read another account’s access request'
+);
+select throws_ok(
+  $$select public.review_member_access_request((select id from public.member_access_requests where auth_user_id = '00000000-0000-0000-0000-000000000104'), 'reviewed', null)$$,
+  'P0001', null, 'members cannot review access requests'
+);
 
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000103', true);
 select is((select count(id) from public.members), 3::bigint, 'admin can read the management directory');
 select is((select count(id) from public.member_data where tier = 'admin_only'), 1::bigint, 'admin can read admin-only member data');
+select is((select count(*) from public.member_access_requests), 1::bigint, 'admin can read pending access requests');
+select lives_ok(
+  $$select public.review_member_access_request((select id from public.member_access_requests limit 1), 'reviewed', 'Verified for next setup step')$$,
+  'admin can mark a request reviewed'
+);
+select is((select status from public.member_access_requests limit 1), 'reviewed', 'admin review status is persisted');
 select is(
   (select bucket from public.member_profile where member_id = '00000000-0000-0000-0000-000000000201'),
   'manual_review', 'member profile write RPC ignores internal classification fields'

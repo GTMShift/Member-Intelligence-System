@@ -2,20 +2,6 @@ import { createContext, useContext } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import type { UserRole } from '../types/api';
 
-export const ADMIN_EMAILS = [
-  'vedanutheti@gmail.com',
-  'bdb6@illinois.edu',
-  'chloeat2@illinois.edu',
-  'chris@solutionexec.com',
-  'james@solutionexec.com',
-  'jtran63@illinois.edu',
-  'meghan@solutionexec.com',
-  'vivaanb2@illinois.edu',
-  'wchen236@illinois.edu',
-  'seteam@solutionexec.com',
-  'atlas@solutionexec.com',
-];
-
 export interface AuthContextValue {
   role: UserRole;
   isAdmin: boolean;
