@@ -4,6 +4,47 @@ const requireAdmin = require('../middleware/requireAdmin');
 
 const router = express.Router();
 
+router.get('/', requireAdmin, async (req, res) => {
+  const { status } = req.query;
+  const allowedStatuses = ['pending', 'approved', 'rejected'];
+
+  if (status && !allowedStatuses.includes(status)) {
+    return res.status(400).json({
+      error: 'Status must be pending, approved, or rejected',
+    });
+  }
+
+  let query = supabase
+    .from('join_us_applications')
+    .select(`
+      id,
+      first_name,
+      last_name,
+      email_address,
+      linkedin,
+      phone_number,
+      company,
+      job_title,
+      status,
+      created_at,
+      reviewed_by,
+      reviewed_at
+    `)
+    .order('created_at', { ascending: false });
+
+  if (status) {
+    query = query.eq('status', status);
+  }
+
+  const { data: applications, error } = await query;
+
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+
+  return res.json({ applications });
+});
+
 router.post('/:applicationId/approve', requireAdmin, async (req, res) => {
   const { applicationId } = req.params;
 
@@ -33,8 +74,14 @@ router.post('/:applicationId/approve', requireAdmin, async (req, res) => {
     .single();
 
   if (approveError) {
-    return res.status(500).json({ error: approveError.message });
-  }
+    if (approveError.message.includes('Ambiguous member match')) {
+      return res.status(409).json({
+        error: 'Approval needs admin review because the email and LinkedIn match different members.',
+      });
+    }
+
+  return res.status(500).json({ error: approveError.message });
+}
 
   return res.json({ application: approvedApplication });
 });

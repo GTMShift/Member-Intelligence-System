@@ -43,6 +43,99 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Safely create or link a member only when approval has one clear match.
+CREATE OR REPLACE FUNCTION link_approved_join_us_to_member()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_email_member_id uuid;
+  v_linkedin_member_id uuid;
+  v_member_id uuid;
+  v_company_id uuid;
+BEGIN
+  -- Check both identifiers independently before linking anything.
+  SELECT id INTO v_email_member_id
+  FROM members
+  WHERE lower(email) = lower(NEW.email_address)
+  LIMIT 1;
+
+  IF NEW.linkedin IS NOT NULL AND trim(NEW.linkedin) <> '' THEN
+    SELECT id INTO v_linkedin_member_id
+    FROM members
+    WHERE lower(linkedin_url) = lower(trim(NEW.linkedin))
+    LIMIT 1;
+  END IF;
+
+  -- Never merge two different existing members automatically.
+  IF v_email_member_id IS NOT NULL
+    AND v_linkedin_member_id IS NOT NULL
+    AND v_email_member_id <> v_linkedin_member_id THEN
+    RAISE EXCEPTION
+      'Ambiguous member match: email and LinkedIn belong to different members';
+  END IF;
+
+  v_member_id = COALESCE(v_email_member_id, v_linkedin_member_id);
+
+  -- No existing match means approval creates the new member.
+  IF v_member_id IS NULL THEN
+    INSERT INTO members (first_name, last_name, email, linkedin_url, phone)
+    VALUES (
+      NEW.first_name,
+      NEW.last_name,
+      NEW.email_address,
+      NEW.linkedin,
+      NEW.phone_number
+    )
+    RETURNING id INTO v_member_id;
+
+    IF NEW.company IS NOT NULL AND trim(NEW.company) <> '' THEN
+      SELECT id INTO v_company_id
+      FROM companies
+      WHERE lower(name) = lower(trim(NEW.company))
+      LIMIT 1;
+
+      IF v_company_id IS NULL THEN
+        INSERT INTO companies (name)
+        VALUES (trim(NEW.company))
+        RETURNING id INTO v_company_id;
+      END IF;
+    END IF;
+
+    INSERT INTO member_profile (member_id, company_id, signup_source)
+    VALUES (v_member_id, v_company_id, 'Website');
+
+    IF NEW.job_title IS NOT NULL AND trim(NEW.job_title) <> '' THEN
+      INSERT INTO employment_history (
+        member_id,
+        company,
+        role,
+        is_current,
+        source
+      )
+      VALUES (
+        v_member_id,
+        NEW.company,
+        NEW.job_title,
+        true,
+        'Website'
+      );
+    END IF;
+
+    INSERT INTO notifications (type, title, body, member_id, member_name)
+    VALUES (
+      'new_signup',
+      'New member approved',
+      NEW.first_name || ' ' || NEW.last_name ||
+        ' was approved from the Join Us form and added to the directory.',
+      v_member_id,
+      NEW.first_name || ' ' || NEW.last_name
+    );
+  END IF;
+
+  NEW.member_id = v_member_id;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
 -- Create or link a member only when an application is approved.
 CREATE TRIGGER trg_link_approved_join_us_to_member
 BEFORE UPDATE OF status ON join_us_applications
@@ -51,7 +144,7 @@ WHEN (
   OLD.status IS DISTINCT FROM 'approved'
   AND NEW.status = 'approved'
 )
-EXECUTE FUNCTION link_join_us_to_member();
+EXECUTE FUNCTION link_approved_join_us_to_member();
 
 -- If the approved applicant already has a profile, grant member access.
 CREATE OR REPLACE FUNCTION grant_member_access_for_approved_application()
