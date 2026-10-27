@@ -11,6 +11,9 @@ const eventsRouter = require('./routes/events');
 const substackRouter = require('./routes/substackImport');
 const formResponsesRouter = require('./routes/formResponses');
 const emailWebhookRouter = require('./routes/emailWebhook');
+const { requireAuth, requireRole } = require('./middleware/auth');
+
+const adminOnly = [requireAuth, requireRole(['admin'])];
 
 const allowedOrigins = new Set([
   'http://localhost:5173',
@@ -36,13 +39,13 @@ app.use(cors({
 }));
 app.use(express.json());
 
-app.use('/members/:id/enrich', enrichmentRouter);
-app.use('/enrich/status', enrichmentStatusRouter);
-app.use('/members', membersRouter);
-app.use('/companies', companiesRouter);
-app.use('/members/:id/employment', employmentRouter);
+app.use('/members/:id/enrich', ...adminOnly, enrichmentRouter);
+app.use('/enrich/status', ...adminOnly, enrichmentStatusRouter);
+app.use('/members', ...adminOnly, membersRouter);
+app.use('/companies', ...adminOnly, companiesRouter);
+app.use('/members/:id/employment', ...adminOnly, employmentRouter);
 app.use('/events', eventsRouter);
-app.use('/substack', substackRouter);
+app.use('/substack', ...adminOnly, substackRouter);
 app.use('/form-responses', formResponsesRouter);
 app.use('/webhook/email', emailWebhookRouter);
 
