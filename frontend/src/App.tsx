@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { MemberProfileCard } from './components/MemberProfileCard';
 import { MemberSearchPanel } from './components/MemberSearchPanel';
@@ -267,13 +267,13 @@ function MemberDirectoryLayout({
   const selectedMemberId = portalView
     ? authenticatedMemberId
     : searchParams.get('member') ?? null;
-  const setSelectedMemberId = (id: string | null) => {
+  const setSelectedMemberId = useCallback((id: string | null) => {
     if (id) {
       setSearchParams({ member: id });
     } else {
       setSearchParams({});
     }
-  };
+  }, [setSearchParams]);
 
   const [showWelcome, setShowWelcome] = useState(false);
   const [portalMember, setPortalMember] = useState<MemberDetail | null>(null);

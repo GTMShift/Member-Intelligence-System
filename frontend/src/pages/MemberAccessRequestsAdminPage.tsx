@@ -33,7 +33,6 @@ export function MemberAccessRequestsAdminPage() {
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
-    setError(null);
     try {
       setRequests(await fetchMemberAccessRequests());
     } catch (err) {
@@ -43,7 +42,16 @@ export function MemberAccessRequestsAdminPage() {
     }
   }, []);
 
-  useEffect(() => { void reload(); }, [reload]);
+  useEffect(() => {
+    let active = true;
+    fetchMemberAccessRequests()
+      .then((items) => { if (active) setRequests(items); })
+      .catch((err) => {
+        if (active) setError(err instanceof Error ? err.message : 'Could not load access requests.');
+      })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
 
   const markReviewed = async (request: MemberAccessRequest, status: 'reviewed' | 'declined') => {
     setBusyId(request.id);

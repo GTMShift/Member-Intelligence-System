@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/authShared';
 import { fetchMyMemberAccessRequest, submitMyMemberAccessRequest, type MemberAccessRequestStatus } from '../api/memberAccessRequestsApi';
 
@@ -239,17 +239,12 @@ interface TypeaheadProps {
 }
 
 function Typeahead({ label, value, options, onChange, onValidChange, placeholder, required, error }: TypeaheadProps) {
-  const [query, setQuery] = useState(value);
+  const [queryDraft, setQueryDraft] = useState<string | null>(null);
+  const queryDraftRef = useRef<string | null>(null);
   const [open, setOpen] = useState(false);
-  const [valid, setValid] = useState(!!value);
+  const query = queryDraft ?? value;
+  const valid = queryDraft === null && !!value;
   const filtered = options.filter((o) => o.toLowerCase().includes(query.toLowerCase()));
-
-  useEffect(() => {
-    if (value) {
-      setQuery(value);
-      setValid(true);
-    }
-  }, [value]);
 
   return (
     <div className="flex flex-col gap-1.5 relative">
@@ -259,9 +254,23 @@ function Typeahead({ label, value, options, onChange, onValidChange, placeholder
       <input
         type="text"
         value={query}
-        onChange={(e) => { setQuery(e.target.value); setValid(false); setOpen(true); onChange(''); }}
+        onChange={(e) => {
+          queryDraftRef.current = e.target.value;
+          setQueryDraft(e.target.value);
+          setOpen(true);
+          onChange('');
+        }}
         onFocus={() => setOpen(true)}
-        onBlur={() => { setTimeout(() => { setOpen(false); if (!valid) { setQuery(''); onChange(''); } }, 150); }}
+        onBlur={() => {
+          setTimeout(() => {
+            setOpen(false);
+            if (queryDraftRef.current !== null) {
+              queryDraftRef.current = '';
+              setQueryDraft('');
+              onChange('');
+            }
+          }, 150);
+        }}
         placeholder={placeholder}
         autoComplete="off"
         required={required}
@@ -275,7 +284,13 @@ function Typeahead({ label, value, options, onChange, onValidChange, placeholder
             <li key={opt}>
               <button
                 type="button"
-                onMouseDown={() => { setQuery(opt); setValid(true); setOpen(false); onChange(opt); onValidChange(opt); }}
+                onMouseDown={() => {
+                  queryDraftRef.current = null;
+                  setQueryDraft(null);
+                  setOpen(false);
+                  onChange(opt);
+                  onValidChange(opt);
+                }}
                 className="w-full px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-50"
               >
                 {opt}
