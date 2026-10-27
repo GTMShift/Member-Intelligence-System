@@ -14,6 +14,7 @@ import { UnauthorizedPage } from './pages/UnauthorizedPage';
 import { MemberEntryPage } from './pages/MemberEntryPage';
 import { SpeakerApplicationPage } from './pages/SpeakerApplicationPage';
 import { SpeakerApplicationsAdminPage } from './pages/SpeakerApplicationAdminPage';
+import { JoinUsApplicationsAdminPage } from './pages/JoinUsApplicationsAdminPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { SubstackImportPage } from './pages/SubstackImportPage';
 import { CompleteProfilePage } from './pages/CompleteProfilePage';
@@ -112,6 +113,14 @@ function App() {
           element={
             <ProtectedRoute requiredRole="admin">
               <SpeakerApplicationsAdminPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/join-us-applications"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <JoinUsApplicationsAdminPage />
             </ProtectedRoute>
           }
         />
