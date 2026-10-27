@@ -2,11 +2,12 @@ const express = require('express');
 const router = express.Router();
 const supabase = require('../supabaseClient');
 const { isValidEnum } = require('../utils/validate');
+const { authenticate, requireAdmin } = require('../middleware/authorization');
 
 const VALID_RSVP_STATUSES = ['registered', 'attended', 'no_show', 'canceled'];
 
 // CREATE EVENT
-router.post('/', async (req, res) => {
+router.post('/', authenticate, requireAdmin, async (req, res) => {
   const { luma_event_id, event_name, event_date, event_type, capacity, location } = req.body;
 
   if (!event_name || !event_date || !event_type) {
@@ -40,7 +41,7 @@ router.get('/:id', async (req, res) => {
 
   const { data, error } = await supabase
     .from('events')
-    .select()
+    .select('id, luma_event_id, event_name, event_date, event_type, capacity, location')
     .eq('id', id)
     .single();
 
@@ -52,7 +53,7 @@ router.get('/:id', async (req, res) => {
 router.get('/', async (req, res) => {
   const { data, error } = await supabase
     .from('events')
-    .select()
+    .select('id, luma_event_id, event_name, event_date, event_type, capacity, location')
     .order('event_date', { ascending: false });
 
   if (error) return res.status(500).json({ error: error.message });
@@ -60,12 +61,16 @@ router.get('/', async (req, res) => {
 });
 
 // SIGN UP MEMBER FOR EVENT
-router.post('/:id/signup', async (req, res) => {
+router.post('/:id/signup', authenticate, async (req, res) => {
   const { id } = req.params;
-  const { member_id, rsvp_status, signup_date, event_goal, approval_status } = req.body;
+  const { member_id: requestedMemberId, rsvp_status: requestedRsvpStatus, signup_date, event_goal, approval_status } = req.body;
+  const isAdmin = req.auth.profile.role === 'admin';
+  const member_id = isAdmin ? requestedMemberId : req.auth.profile.member_id;
+  const rsvp_status = isAdmin ? requestedRsvpStatus : 'registered';
+  const safeApprovalStatus = isAdmin ? approval_status : 'pending';
 
-  if (!member_id || !rsvp_status) {
-    return res.status(400).json({ error: 'member_id and rsvp_status are required' });
+  if (!member_id || (isAdmin && !rsvp_status)) {
+    return res.status(400).json({ error: 'A linked member profile is required' });
   }
 
   if (!isValidEnum(rsvp_status, VALID_RSVP_STATUSES)) {
@@ -102,7 +107,14 @@ router.post('/:id/signup', async (req, res) => {
 
   const { data, error } = await supabase
     .from('event_signups')
-    .insert({ event_id: id, member_id, rsvp_status, signup_date, event_goal, approval_status })
+    .insert({
+      event_id: id,
+      member_id,
+      rsvp_status,
+      signup_date: isAdmin ? signup_date : new Date().toISOString(),
+      event_goal,
+      approval_status: safeApprovalStatus,
+    })
     .select()
     .single();
 
@@ -111,7 +123,7 @@ router.post('/:id/signup', async (req, res) => {
 });
 
 // GET ALL SIGNUPS FOR AN EVENT
-router.get('/:id/signups', async (req, res) => {
+router.get('/:id/signups', authenticate, requireAdmin, async (req, res) => {
   const { id } = req.params;
 
   // Check event exists
@@ -133,7 +145,7 @@ router.get('/:id/signups', async (req, res) => {
 });
 
 // UPDATE SIGNUP STATUS
-router.put('/:id/signup/:signupId', async (req, res) => {
+router.put('/:id/signup/:signupId', authenticate, requireAdmin, async (req, res) => {
   const { signupId } = req.params;
   const { rsvp_status, event_goal, approval_status } = req.body;
 

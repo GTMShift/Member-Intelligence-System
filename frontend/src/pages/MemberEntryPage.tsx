@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createMember, type CreateMemberInput, type SocialEntry } from '../api/createMember';
+import { backendFetch } from '../api/backendFetch';
 import { getMember } from '../api/membersApi';
 import { useAuth } from '../context/authShared';
 import type { EnrichmentResult, MemberDetail } from '../types/api';
@@ -606,7 +607,7 @@ export function MemberEntryPage() {
         throw new Error('VITE_API_URL is not configured');
       }
 
-      const startResponse = await fetch(
+      const startResponse = await backendFetch(
         `${apiBase}/members/${createdMemberId}/enrich`,
         {
           method: 'POST',
@@ -639,7 +640,7 @@ export function MemberEntryPage() {
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
 
-        const statusResponse = await fetch(
+        const statusResponse = await backendFetch(
           `${apiBase}/enrich/status/${enrichmentId}`,
         );
         if (!statusResponse.ok) {

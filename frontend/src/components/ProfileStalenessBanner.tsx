@@ -5,7 +5,6 @@ const STALE_AFTER_DAYS = 90;
 
 interface ProfileStalenessBannerProps {
   member: MemberDetail;
-  onEnrichClick: () => void;
 }
 
 function isProfileStale(lastUpdated: string): boolean {
@@ -24,10 +23,7 @@ function scrollToMemberFeedback() {
   section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-export function ProfileStalenessBanner({
-  member,
-  onEnrichClick,
-}: ProfileStalenessBannerProps) {
+export function ProfileStalenessBanner({ member }: ProfileStalenessBannerProps) {
   if (!isProfileStale(member.last_updated)) {
     return null;
   }
@@ -45,13 +41,6 @@ export function ProfileStalenessBanner({
             className="rounded-md border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-100"
           >
             Update manually
-          </button>
-          <button
-            type="button"
-            onClick={onEnrichClick}
-            className="rounded-md bg-amber-800 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-900"
-          >
-            Enrich my profile
           </button>
         </div>
       </div>

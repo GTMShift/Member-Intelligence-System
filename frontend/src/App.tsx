@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { MemberProfileCard } from './components/MemberProfileCard';
 import { MemberSearchPanel } from './components/MemberSearchPanel';
@@ -18,6 +18,7 @@ import { NotificationsPage } from './pages/NotificationsPage';
 import { SubstackImportPage } from './pages/SubstackImportPage';
 import { CompleteProfilePage } from './pages/CompleteProfilePage';
 import { MyProfilePage } from './pages/MyProfilePage';
+import { MemberAccessRequestsAdminPage } from './pages/MemberAccessRequestsAdminPage';
 import type { MemberDetail, UserRole } from './types/api';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 
@@ -112,6 +113,14 @@ function App() {
           element={
             <ProtectedRoute requiredRole="admin">
               <SpeakerApplicationsAdminPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/member-access-requests"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <MemberAccessRequestsAdminPage />
             </ProtectedRoute>
           }
         />
@@ -249,22 +258,29 @@ function MemberDirectoryLayout({
   showDuplicateAlerts?: boolean;
   portalView?: boolean;
 }) {
+  const { memberId: authenticatedMemberId } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const selectedMemberId = searchParams.get('member') ?? null;
-  const setSelectedMemberId = (id: string | null) => {
+  // The portal always targets the member linked in the trusted profile row;
+  // never let a URL query parameter select another member's record.
+  const selectedMemberId = portalView
+    ? authenticatedMemberId
+    : searchParams.get('member') ?? null;
+  const setSelectedMemberId = useCallback((id: string | null) => {
     if (id) {
       setSearchParams({ member: id });
     } else {
       setSearchParams({});
     }
-  };
+  }, [setSearchParams]);
 
   const [showWelcome, setShowWelcome] = useState(false);
   const [portalMember, setPortalMember] = useState<MemberDetail | null>(null);
 
-  const incomingMemberId = (location.state as DashboardLocationState | null)?.selectedMemberId;
+  const incomingMemberId = portalView
+    ? undefined
+    : (location.state as DashboardLocationState | null)?.selectedMemberId;
   useEffect(() => {
     if (incomingMemberId && incomingMemberId !== selectedMemberId) {
       setSelectedMemberId(incomingMemberId);
@@ -326,34 +342,18 @@ function MemberDirectoryLayout({
     setSelectedMemberId(memberId);
   };
 
-  const handleEnrich = async () => {
-    if (!selectedMemberId) return;
-
-    const response = await fetch(
-      `${import.meta.env.VITE_API_URL}/members/${selectedMemberId}/enrich`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ run_type: 'manual' }),
-      },
-    );
-    if (response.ok) {
-      alert('Profile enrichment started — your profile will be updated shortly');
-    } else {
-      alert('Enrichment failed — please try again later');
-    }
-  };
-
   const directoryContent = (
     <>
-      <aside className="w-full border-b border-white/10 lg:w-[22rem] lg:shrink-0 lg:border-b-0 lg:border-r xl:w-[26rem]">
-        <div className="h-[28rem] lg:h-full">
-          <MemberSearchPanel
-            selectedMemberId={selectedMemberId}
-            onSelectMember={setSelectedMemberId}
-          />
-        </div>
-      </aside>
+      {!portalView && (
+        <aside className="w-full border-b border-white/10 lg:w-[22rem] lg:shrink-0 lg:border-b-0 lg:border-r xl:w-[26rem]">
+          <div className="h-[28rem] lg:h-full">
+            <MemberSearchPanel
+              selectedMemberId={selectedMemberId}
+              onSelectMember={setSelectedMemberId}
+            />
+          </div>
+        </aside>
+      )}
 
       <section className="min-h-[24rem] flex-1 overflow-hidden bg-surface lg:h-full lg:overflow-y-auto">
       {selectedMemberId ? (
@@ -361,7 +361,6 @@ function MemberDirectoryLayout({
             {portalView && portalMember && (
               <ProfileStalenessBanner
                 member={portalMember}
-                onEnrichClick={handleEnrich}
               />
             )}
             <div className="min-h-0 flex-1">
@@ -372,10 +371,12 @@ function MemberDirectoryLayout({
           <div className="flex h-full items-center justify-center p-8">
             <div className="text-center">
               <p className="text-base font-medium text-ink">
-                Select a member to view their profile
+                {portalView ? 'Your member profile is not linked yet' : 'Select a member to view their profile'}
               </p>
               <p className="mt-1 text-sm text-ink/60">
-                Use search and filters to find members in the directory
+                {portalView
+                  ? 'Complete your profile request, then an administrator can link your account.'
+                  : 'Use search and filters to find members in the directory'}
               </p>
             </div>
           </div>
