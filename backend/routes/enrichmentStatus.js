@@ -17,12 +17,7 @@ router.get('/:enrichment_id', async (req, res) => {
     );
     return res.json(response.data);
   } catch (error) {
-    console.error('FullEnrich status error:', {
-      message: error.message,
-      status: error.response?.status,
-      data: error.response?.data,
-      url: `https://app.fullenrich.com/api/v1/contact/enrich/bulk/${enrichment_id}`
-    });
+    console.error('[enrichmentStatus.provider] failed', error.response?.status || 'unknown');
     return res.status(502).json({ error: 'Failed to fetch enrichment status' });
   }
 });

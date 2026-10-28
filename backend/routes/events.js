@@ -3,6 +3,7 @@ const router = express.Router();
 const supabase = require('../supabaseClient');
 const { isValidEnum } = require('../utils/validate');
 const { requireAuth, requireRole } = require('../middleware/auth');
+const { serverError } = require('../utils/serverError');
 
 const VALID_RSVP_STATUSES = ['registered', 'attended', 'no_show', 'canceled'];
 
@@ -31,7 +32,7 @@ router.post('/', requireAuth, requireRole(['admin']), async (req, res) => {
     .select()
     .single();
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return serverError(res, 'events.create', error);
   res.status(201).json(data);
 });
 
@@ -56,7 +57,7 @@ router.get('/', async (req, res) => {
     .select()
     .order('event_date', { ascending: false });
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return serverError(res, 'events.list', error);
   res.json(data);
 });
 
@@ -119,7 +120,7 @@ router.post('/:id/signup', requireAuth, requireRole(['member', 'admin']), async 
     .select()
     .single();
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return serverError(res, 'events.signup', error);
   res.status(201).json(data);
 });
 
@@ -141,7 +142,7 @@ router.get('/:id/signups', requireAuth, requireRole(['admin']), async (req, res)
     .select()
     .eq('event_id', id);
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return serverError(res, 'events.signups', error);
   res.json(data);
 });
 
@@ -168,7 +169,7 @@ router.put('/:id/signup/:signupId', requireAuth, requireRole(['admin']), async (
     .update({ rsvp_status, event_goal, approval_status })
     .eq('id', signupId);
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return serverError(res, 'events.updateSignup', error);
   res.json({ message: 'Signup updated', signup_id: signupId });
 });
 

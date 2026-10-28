@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const supabase = require('../supabaseClient');
+const { serverError } = require('../utils/serverError');
 
 // CREATE COMPANY
 router.post('/', async (req, res) => {
@@ -25,7 +26,7 @@ router.post('/', async (req, res) => {
     .select()
     .single();
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return serverError(res, 'companies.create', error);
   res.status(201).json(data);
 });
 
@@ -62,7 +63,7 @@ router.put('/:id', async (req, res) => {
     .update({ name, linkedin_url, domain, size, industry, sub_industry, overview, company_type, revenue, tags })
     .eq('id', id);
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return serverError(res, 'companies.update', error);
   res.json({ message: 'Company updated', company_id: id });
 });
 

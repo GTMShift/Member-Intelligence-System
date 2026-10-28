@@ -197,7 +197,7 @@ async function processMessage(gmail, messageId) {
     occurred_at,
     thread_id: message.threadId || null,
     logged_by: 'Gmail monitor',
-  });
+  }, { headers: { 'x-webhook-secret': process.env.EMAIL_WEBHOOK_SECRET } });
 
   await supabase
     .from('processed_emails')
@@ -337,7 +337,7 @@ async function processSentMessage(gmail, messageId) {
     occurred_at,
     thread_id: message.threadId || null,
     logged_by: 'Gmail monitor',
-  });
+  }, { headers: { 'x-webhook-secret': process.env.EMAIL_WEBHOOK_SECRET } });
 
   await supabase
     .from('processed_emails')

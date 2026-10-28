@@ -6,6 +6,7 @@ import { useAuth } from '../context/authShared';
 import type { EnrichmentResult, MemberDetail } from '../types/api';
 import { EnrichmentReviewPanel } from '../components/EnrichmentReviewPanel';
 import { normalizeFullEnrichRecord } from '../utils/enrichment';
+import { authenticatedFetch } from '../lib/authenticatedFetch';
 
 const BUCKET_OPTIONS = [
   { value: '', label: 'Select a category' },
@@ -606,7 +607,7 @@ export function MemberEntryPage() {
         throw new Error('VITE_API_URL is not configured');
       }
 
-      const startResponse = await fetch(
+      const startResponse = await authenticatedFetch(
         `${apiBase}/members/${createdMemberId}/enrich`,
         {
           method: 'POST',
@@ -639,7 +640,7 @@ export function MemberEntryPage() {
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
 
-        const statusResponse = await fetch(
+        const statusResponse = await authenticatedFetch(
           `${apiBase}/enrich/status/${enrichmentId}`,
         );
         if (!statusResponse.ok) {

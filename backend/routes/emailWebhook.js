@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const supabase = require('../supabaseClient');
+const { serverError } = require('../utils/serverError');
 
 // EMAIL WEBHOOK — log Gmail interactions against members
 router.post('/', async (req, res) => {
@@ -12,27 +13,15 @@ router.post('/', async (req, res) => {
     direction,
     occurred_at,
     thread_id,
-    logged_by
   } = req.body;
 
-  console.log('[emailWebhook] Incoming request', {
-    sender_email,
-    recipient_email,
-    subject,
-    direction,
-    occurred_at,
-    thread_id
-  });
-
   if (!sender_email || !recipient_email || !occurred_at) {
-    console.log('[emailWebhook] Missing required fields');
     return res.status(400).json({
       error: 'sender_email, recipient_email, and occurred_at are required'
     });
   }
 
   const lookupEmail = direction === 'sent' ? recipient_email : sender_email;
-  console.log('[emailWebhook] Looking up member by email:', lookupEmail);
 
   // DB check constraint allows inbound/outbound (not sent/received)
   const dbDirection =
@@ -45,21 +34,15 @@ router.post('/', async (req, res) => {
     .maybeSingle();
 
   if (memberError) {
-    console.log('[emailWebhook] Member lookup failed:', memberError.message);
-    return res.status(500).json({ error: memberError.message });
+    return serverError(res, 'emailWebhook.memberLookup', memberError);
   }
 
   if (!member) {
     console.log('[emailWebhook] No matching member — ignoring', lookupEmail);
-    return res.status(200).json({
-      status: 'ignored',
-      message: 'No matching member found — email ignored',
-      unmatched_email: lookupEmail
-    });
+    return res.status(200).json({ status: 'ignored', message: 'No matching member found' });
   }
 
   const memberName = `${member.first_name} ${member.last_name}`.trim();
-  console.log('[emailWebhook] Member found:', member.id, memberName);
 
   const interactionSummary = summary || subject || 'Email interaction';
   const { error: interactionError } = await supabase
@@ -69,7 +52,7 @@ router.post('/', async (req, res) => {
       interaction_type: 'email',
       summary: interactionSummary,
       occurred_at,
-      logged_by: logged_by || 'Claude email plugin',
+      logged_by: 'Gmail monitor',
       direction: dbDirection,
       metadata: {
         subject,
@@ -81,8 +64,7 @@ router.post('/', async (req, res) => {
     });
 
   if (interactionError) {
-    console.log('[emailWebhook] Failed to insert interaction:', interactionError.message);
-    return res.status(500).json({ error: interactionError.message });
+    return serverError(res, 'emailWebhook.insertInteraction', interactionError);
   }
 
   await supabase
@@ -104,15 +86,10 @@ router.post('/', async (req, res) => {
     });
 
   if (notificationError) {
-    console.log('[emailWebhook] Failed to insert notification:', notificationError.message);
+    console.error('[emailWebhook.insertNotification] failed', notificationError.code || 'unknown');
   }
 
-  console.log('[emailWebhook] Interaction logged for member:', member.id);
-  return res.status(201).json({
-    status: 'logged',
-    member_id: member.id,
-    member_name: memberName
-  });
+  return res.status(201).json({ status: 'logged' });
 });
 
 module.exports = router;

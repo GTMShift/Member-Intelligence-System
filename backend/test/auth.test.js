@@ -1,9 +1,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createAuthMiddleware } = require('../middleware/auth');
+const { requireWebhookSecret } = require('../middleware/webhookAuth');
+const { createRateLimiter } = require('../middleware/rateLimit');
 
 function res() {
-  return { code: 200, status(code) { this.code = code; return this; }, json() { return this; } };
+  return { code: 200, status(code) { this.code = code; return this; }, set() { return this; }, json() { return this; } };
 }
 
 test('requires a valid bearer token verified by Supabase Auth', async () => {
@@ -39,4 +41,30 @@ test('loads admin role and member link from the server-side profile', async () =
   await auth.requireRole(['admin'])(req, result, () => { continued = true; });
   assert.equal(continued, true);
   assert.deepEqual(req.profile, { role: 'admin', member_id: null });
+});
+
+test('webhook secret fails closed and accepts only the configured secret', () => {
+  const previous = process.env.EMAIL_WEBHOOK_SECRET;
+  const result = res();
+  let continued = false;
+  delete process.env.EMAIL_WEBHOOK_SECRET;
+  requireWebhookSecret({ get: () => '' }, result, () => { continued = true; });
+  assert.equal(result.code, 503);
+  process.env.EMAIL_WEBHOOK_SECRET = 'test-secret';
+  requireWebhookSecret({ get: () => 'wrong' }, result, () => { continued = true; });
+  assert.equal(result.code, 401);
+  requireWebhookSecret({ get: () => 'test-secret' }, result, () => { continued = true; });
+  assert.equal(continued, true);
+  if (previous === undefined) delete process.env.EMAIL_WEBHOOK_SECRET;
+  else process.env.EMAIL_WEBHOOK_SECRET = previous;
+});
+
+test('rate limiter blocks requests after the configured limit', () => {
+  const limit = createRateLimiter({ windowMs: 60_000, maxRequests: 1 });
+  const first = res();
+  limit({ ip: 'test-client', socket: {} }, first, () => {});
+  const second = res();
+  limit({ ip: 'test-client', socket: {} }, second, () => {});
+  assert.equal(first.code, 200);
+  assert.equal(second.code, 429);
 });

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const supabase = require('../supabaseClient');
 const { isValidEmail, isValidDate, isValidLinkedIn } = require('../utils/validate');
+const { serverError } = require('../utils/serverError');
 
 // CREATE MEMBER
 router.post('/', async (req, res) => {
@@ -220,7 +221,7 @@ router.delete('/:id', async (req, res) => {
     .delete()
     .eq('id', id);
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return serverError(res, 'members.delete', error);
 
   res.json({ message: 'Member deleted', member_id: id });
 });

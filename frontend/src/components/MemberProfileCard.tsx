@@ -11,6 +11,7 @@ import { formatEnrichmentStartDate, normalizeFullEnrichRecord } from '../utils/e
 import { EnrichmentReviewPanel } from './EnrichmentReviewPanel';
 import { InteractionTimeline } from './InteractionTimeline';
 import { ScoreBreakdownCard } from './ScoreBreakdownCard';
+import { authenticatedFetch } from '../lib/authenticatedFetch';
 
 function summarizeEnrichmentResult(result: EnrichmentResult): string {
   const contact = result.contact;
@@ -667,7 +668,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
       if (!apiBase) {
         throw new Error('VITE_API_URL is not configured');
       }
-      const startResponse = await fetch(
+      const startResponse = await authenticatedFetch(
         `${apiBase}/members/${memberId}/enrich`,
         {
           method: 'POST',
@@ -695,7 +696,7 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
       let finishedResult: EnrichmentResult | null = null;
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
-        const statusResponse = await fetch(
+        const statusResponse = await authenticatedFetch(
           `${apiBase}/enrich/status/${enrichmentId}`,
         );
         if (!statusResponse.ok) {
