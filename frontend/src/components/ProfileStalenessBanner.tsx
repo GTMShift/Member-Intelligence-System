@@ -24,10 +24,7 @@ function scrollToMemberFeedback() {
   section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-export function ProfileStalenessBanner({
-  member,
-  onEnrichClick,
-}: ProfileStalenessBannerProps) {
+export function ProfileStalenessBanner({ member, onEnrichClick }: ProfileStalenessBannerProps) {
   if (!isProfileStale(member.last_updated)) {
     return null;
   }

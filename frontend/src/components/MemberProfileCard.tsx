@@ -777,7 +777,8 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
   const adminOnlyEntries = member.member_data.filter((e) => e.tier === 'admin_only');
   const currentRole =
     member.employment_history.find((entry) => entry.is_current)?.role ?? null;
-  const canEnrich = isAdmin || user?.email === member.email;
+  // Enrichment uses privileged backend/vendor access, so only trusted admins can trigger it.
+  const canEnrich = isAdmin;
 
   const startEditing = () => {
     setSaveError(null);

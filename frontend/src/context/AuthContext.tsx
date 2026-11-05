@@ -10,7 +10,6 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
 import type { UserRole } from '../types/api';
 import {
-  ADMIN_EMAILS,
   AuthContext,
   toUserRole,
 } from './authShared';
@@ -44,45 +43,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // real SIGNED_IN and wipe the session (common on first OAuth redirect).
   const syncChainRef = useRef<Promise<void>>(Promise.resolve());
 
-  const resolveMemberId = useCallback(
-    async (profileId: string, email: string | null | undefined): Promise<string | null> => {
-      // Already linked — nothing to do.
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('member_id')
-        .eq('id', profileId)
-        .maybeSingle();
-      if (profile?.member_id) return profile.member_id;
-
-      // Not linked yet — try auto-matching by email against an existing member.
-      if (!email) return null;
-      const normalizedEmail = email.trim();
-      const { data: matchedMember, error: matchError } = await supabase
-        .from('members')
-        .select('id')
-        .ilike('email', normalizedEmail)
-        .maybeSingle();
-
-      if (matchError) {
-        console.error('Failed to match member by email:', matchError.message);
-        return null;
-      }
-
-      if (matchedMember?.id) {
-        const { error: linkError } = await supabase
-          .from('profiles')
-          .update({ member_id: matchedMember.id })
-          .eq('id', profileId);
-        if (linkError) {
-          console.error('Failed to link profile to member:', linkError.message);
-        }
-        return matchedMember.id;
-      }
-
-      return null; // genuinely no match — this person needs onboarding
-    },
-    [],
-  );
+  const resolveMemberId = useCallback(async (profileId: string): Promise<string | null> => {
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('member_id')
+      .eq('id', profileId)
+      .maybeSingle();
+    if (error) {
+      console.error('Failed to load trusted member link:', error.message);
+      return null;
+    }
+    return profile?.member_id ?? null;
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -113,79 +85,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(currentSession?.user ?? null);
 
       if (currentSession?.user) {
-        const isAdmin = ADMIN_EMAILS.includes(currentSession.user.email ?? '');
-        let resolvedRole: UserRole | null = null;
-
-        const { data: existingProfile, error: fetchError } = await supabase
+        let { data: existingProfile, error: fetchError } = await supabase
           .from('profiles')
-          .select('role')
+          .select('role, member_id')
           .eq('id', currentSession.user.id)
           .maybeSingle();
 
-        if (existingProfile) {
-          // Profile row exists (often created by the auth trigger). Prefer its
-          // role; fall back to ADMIN_EMAILS if role is somehow missing.
-          resolvedRole = existingProfile.role
-            ? toUserRole(existingProfile.role)
-            : isAdmin
-              ? 'admin'
-              : 'member';
-        } else {
-          const insertResult = await supabase
+        // The auth trigger creates member profiles. Retry briefly for trigger
+        // timing; the browser never creates a profile or assigns its role.
+        if (!existingProfile) {
+          const retry = await supabase
             .from('profiles')
-            .insert({
-              id: currentSession.user.id,
-              email: currentSession.user.email,
-              full_name: currentSession.user.user_metadata?.full_name,
-              avatar_url: currentSession.user.user_metadata?.avatar_url,
-              role: isAdmin ? 'admin' : 'member',
-            })
-            .select('role')
-            .single();
-
-          if (insertResult.data?.role) {
-            resolvedRole = toUserRole(insertResult.data.role);
-          } else if (insertResult.error) {
-            const { data: retryProfile, error: retryError } = await supabase
-              .from('profiles')
-              .select('role')
-              .eq('id', currentSession.user.id)
-              .maybeSingle();
-            if (retryProfile?.role) {
-              resolvedRole = toUserRole(retryProfile.role);
-            } else if (fetchError && insertResult.error && retryError) {
-              // Don't hard-bounce to Access Denied on a transient profile race —
-              // fall back to email-based role so members can still reach portal /
-              // complete-profile.
-              console.error('Profile sync failed; using email-based role fallback', {
-                fetchError: fetchError.message,
-                insertError: insertResult.error.message,
-                retryError: retryError.message,
-              });
-              resolvedRole = isAdmin ? 'admin' : 'member';
-            } else {
-              // Insert raced with the auth trigger (or similar) — still treat as
-              // a normal member/admin so routing can proceed.
-              resolvedRole = isAdmin ? 'admin' : 'member';
-            }
-          }
+            .select('role, member_id')
+            .eq('id', currentSession.user.id)
+            .maybeSingle();
+          existingProfile = retry.data;
+          fetchError = retry.error;
         }
 
-        // Always resolve a role for signed-in users so routing never stalls on
-        // Access Denied because resolvedRole stayed null.
-        if (!resolvedRole) {
-          resolvedRole = isAdmin ? 'admin' : 'member';
+        if (fetchError) {
+          console.error('Profile role lookup failed:', fetchError.message);
         }
+        // A missing profile is treated as a non-admin session in the UI. The
+        // backend independently requires a trusted profiles row for access.
+        const resolvedRole: UserRole = existingProfile?.role
+          ? toUserRole(existingProfile.role)
+          : 'member';
 
         if (mounted) {
           setRole(resolvedRole);
-
-          // Try to resolve a linked member record regardless of admin/member
-          // role — an admin can also be a genuine member with their own profile.
-          const linkedMemberId = await resolveMemberId(
-            currentSession.user.id,
-            currentSession.user.email,
-          );
+          const linkedMemberId = await resolveMemberId(currentSession.user.id);
           if (mounted) setMemberId(linkedMemberId);
         }
       } else if (mounted) {

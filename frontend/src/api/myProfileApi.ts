@@ -35,27 +35,11 @@ export interface UpdateMyProfileInput {
 }
 
 async function findOrCreateCompany(companyName: string | null): Promise<string | null> {
-    const name = companyName?.trim();
-    if (!name) return null;
-  
-    // Uses .limit(1) + array check instead of .maybeSingle(), since .maybeSingle()
-    // throws an error (not just returns null) if more than one company happens to
-    // share a similar name — which would otherwise surface as a confusing failure.
-    const { data: matches, error: findErr } = await supabase
-      .from('companies')
-      .select('id')
-      .ilike('name', name)
-      .limit(1);
-    if (findErr) throw new Error(`Company lookup failed: ${findErr.message}`);
-    if (matches && matches.length > 0) return matches[0].id;
-
-  const { data: created, error: createErr } = await supabase
-    .from('companies')
-    .insert({ name })
-    .select('id')
-    .single();
-  if (createErr) throw new Error(`Failed to create company: ${createErr.message}`);
-  return created.id;
+  const name = companyName?.trim();
+  if (!name) return null;
+  const { data, error } = await supabase.rpc('find_or_create_company', { p_name: name });
+  if (error) throw new Error(`Company lookup failed: ${error.message}`);
+  return data;
 }
 
 export async function fetchMyProfile(memberId: string, profileId: string): Promise<MyProfileData> {
@@ -66,11 +50,8 @@ export async function fetchMyProfile(memberId: string, profileId: string): Promi
     .single();
   if (memberErr) throw new Error(`Failed to load member: ${memberErr.message}`);
 
-  const { data: profile } = await supabase
-    .from('member_profile')
-    .select('seniority_level, country, state_region, city, company_id, companies(name)')
-    .eq('member_id', memberId)
-    .maybeSingle();
+  const { data: profile, error: profileErr } = await supabase.rpc('get_my_member_profile');
+  if (profileErr) throw new Error(`Failed to load member profile: ${profileErr.message}`);
 
   const { data: currentEmployment } = await supabase
     .from('employment_history')
@@ -85,9 +66,6 @@ export async function fetchMyProfile(memberId: string, profileId: string): Promi
     .eq('id', profileId)
     .maybeSingle();
 
-  const companyRaw = profile?.companies;
-  const company = Array.isArray(companyRaw) ? companyRaw[0] : companyRaw;
-
   return {
     first_name: member.first_name ?? '',
     last_name: member.last_name ?? '',
@@ -97,7 +75,7 @@ export async function fetchMyProfile(memberId: string, profileId: string): Promi
     job_title: currentEmployment?.role ?? null,
     current_job_start_date: currentEmployment?.start_date ?? null,
     seniority_level: profile?.seniority_level ?? null,
-    company_name: company?.name ?? null,
+    company_name: profile?.company_name ?? null,
     country: profile?.country ?? null,
     state_region: profile?.state_region ?? null,
     city: profile?.city ?? null,
@@ -122,17 +100,15 @@ export async function updateMyProfile(
 
   const companyId = await findOrCreateCompany(input.company_name);
 
-  const { error: profileErr } = await supabase
-    .from('member_profile')
-    .update({
+  const { error: profileErr } = await supabase.rpc('save_my_member_profile', {
+    p_values: {
       seniority_level: input.seniority_level,
       country: input.country,
       state_region: input.state_region,
       city: input.city,
       company_id: companyId,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('member_id', memberId);
+    },
+  });
   if (profileErr) throw new Error(`Failed to update member profile: ${profileErr.message}`);
 
   // Update (or create) the current employment_history row
