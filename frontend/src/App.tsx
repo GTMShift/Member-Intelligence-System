@@ -8,6 +8,7 @@ import { ProfileStalenessBanner } from './components/ProfileStalenessBanner';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AuthContext, useAuth } from './context/authShared';
 import { getMember } from './api/membersApi';
+import { authenticatedFetch } from './lib/authenticatedFetch';
 import { CompanyDetailPage } from './pages/CompanyDetailPage';
 import { LoginPage } from './pages/LoginPage';
 import { UnauthorizedPage } from './pages/UnauthorizedPage';
@@ -342,6 +343,23 @@ function MemberDirectoryLayout({
     setSelectedMemberId(memberId);
   };
 
+  const handleEnrich = async () => {
+    if (!selectedMemberId) return;
+
+    const response = await authenticatedFetch(
+      `${import.meta.env.VITE_API_URL}/members/${selectedMemberId}/enrich`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ run_type: 'manual' }),
+      },
+    );
+    if (response.ok) {
+      alert('Profile enrichment started — your profile will be updated shortly');
+    } else {
+      alert('Enrichment failed — please try again later');
+    }
+  };
   const directoryContent = (
     <>
       {!portalView && (
@@ -361,6 +379,7 @@ function MemberDirectoryLayout({
             {portalView && portalMember && (
               <ProfileStalenessBanner
                 member={portalMember}
+                onEnrichClick={handleEnrich}
               />
             )}
             <div className="min-h-0 flex-1">

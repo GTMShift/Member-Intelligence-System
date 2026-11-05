@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createMember, type CreateMemberInput, type SocialEntry } from '../api/createMember';
-import { backendFetch } from '../api/backendFetch';
 import { getMember } from '../api/membersApi';
 import { useAuth } from '../context/authShared';
 import type { EnrichmentResult, MemberDetail } from '../types/api';
 import { EnrichmentReviewPanel } from '../components/EnrichmentReviewPanel';
 import { normalizeFullEnrichRecord } from '../utils/enrichment';
+import { authenticatedFetch } from '../lib/authenticatedFetch';
 
 const BUCKET_OPTIONS = [
   { value: '', label: 'Select a category' },
@@ -607,7 +607,7 @@ export function MemberEntryPage() {
         throw new Error('VITE_API_URL is not configured');
       }
 
-      const startResponse = await backendFetch(
+      const startResponse = await authenticatedFetch(
         `${apiBase}/members/${createdMemberId}/enrich`,
         {
           method: 'POST',
@@ -640,7 +640,7 @@ export function MemberEntryPage() {
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
 
-        const statusResponse = await backendFetch(
+        const statusResponse = await authenticatedFetch(
           `${apiBase}/enrich/status/${enrichmentId}`,
         );
         if (!statusResponse.ok) {

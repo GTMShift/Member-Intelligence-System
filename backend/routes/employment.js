@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router({ mergeParams: true });
 const supabase = require('../supabaseClient');
 const { isValidDate, isValidEnum } = require('../utils/validate');
+const { serverError } = require('../utils/serverError');
 
 const VALID_SOURCES = ['Apollo', 'Manual', 'Import'];
 
@@ -48,7 +49,7 @@ router.post('/', async (req, res) => {
     .select()
     .single();
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return serverError(res, 'employment.create', error);
   res.status(201).json(data);
 });
 
@@ -71,7 +72,7 @@ router.get('/', async (req, res) => {
     .eq('member_id', id)
     .order('start_date', { ascending: false });
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return serverError(res, 'employment.list', error);
   res.json(data);
 });
 
@@ -106,7 +107,7 @@ router.put('/:jobId', async (req, res) => {
     .update({ company, role, start_date, end_date, is_current, source })
     .eq('id', jobId);
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return serverError(res, 'employment.update', error);
   res.json({ message: 'Job updated', job_id: jobId });
 });
 

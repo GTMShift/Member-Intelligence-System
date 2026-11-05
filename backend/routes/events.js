@@ -2,12 +2,13 @@ const express = require('express');
 const router = express.Router();
 const supabase = require('../supabaseClient');
 const { isValidEnum } = require('../utils/validate');
-const { authenticate, requireAdmin } = require('../middleware/authorization');
+const { requireAuth, requireRole } = require('../middleware/auth');
+const { serverError } = require('../utils/serverError');
 
 const VALID_RSVP_STATUSES = ['registered', 'attended', 'no_show', 'canceled'];
 
 // CREATE EVENT
-router.post('/', authenticate, requireAdmin, async (req, res) => {
+router.post('/', requireAuth, requireRole(['admin']), async (req, res) => {
   const { luma_event_id, event_name, event_date, event_type, capacity, location } = req.body;
 
   if (!event_name || !event_date || !event_type) {
@@ -31,7 +32,7 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
     .select()
     .single();
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return serverError(res, 'events.create', error);
   res.status(201).json(data);
 });
 
@@ -41,7 +42,7 @@ router.get('/:id', async (req, res) => {
 
   const { data, error } = await supabase
     .from('events')
-    .select('id, luma_event_id, event_name, event_date, event_type, capacity, location')
+    .select()
     .eq('id', id)
     .single();
 
@@ -53,24 +54,27 @@ router.get('/:id', async (req, res) => {
 router.get('/', async (req, res) => {
   const { data, error } = await supabase
     .from('events')
-    .select('id, luma_event_id, event_name, event_date, event_type, capacity, location')
+    .select()
     .order('event_date', { ascending: false });
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return serverError(res, 'events.list', error);
   res.json(data);
 });
 
 // SIGN UP MEMBER FOR EVENT
-router.post('/:id/signup', authenticate, async (req, res) => {
+router.post('/:id/signup', requireAuth, requireRole(['member', 'admin']), async (req, res) => {
   const { id } = req.params;
-  const { member_id: requestedMemberId, rsvp_status: requestedRsvpStatus, signup_date, event_goal, approval_status } = req.body;
-  const isAdmin = req.auth.profile.role === 'admin';
-  const member_id = isAdmin ? requestedMemberId : req.auth.profile.member_id;
-  const rsvp_status = isAdmin ? requestedRsvpStatus : 'registered';
-  const safeApprovalStatus = isAdmin ? approval_status : 'pending';
+  const { event_goal } = req.body;
+  const member_id = req.profile.role === 'admin' ? req.body.member_id : req.profile.member_id;
+  const rsvp_status = req.profile.role === 'admin' ? req.body.rsvp_status : 'registered';
+  const signup_date = req.profile.role === 'admin' ? req.body.signup_date : new Date().toISOString();
 
-  if (!member_id || (isAdmin && !rsvp_status)) {
-    return res.status(400).json({ error: 'A linked member profile is required' });
+  if (req.profile.role === 'member' && !member_id) {
+    return res.status(403).json({ error: 'Member account is not linked to a member record' });
+  }
+
+  if (!member_id || !rsvp_status) {
+    return res.status(400).json({ error: 'member_id and rsvp_status are required' });
   }
 
   if (!isValidEnum(rsvp_status, VALID_RSVP_STATUSES)) {
@@ -105,25 +109,23 @@ router.post('/:id/signup', authenticate, async (req, res) => {
 
   if (existingSignup) return res.status(409).json({ error: 'Member is already signed up for this event' });
 
+  const signup = { event_id: id, member_id, rsvp_status, signup_date, event_goal };
+  if (req.profile.role === 'admin' && req.body.approval_status !== undefined) {
+    signup.approval_status = req.body.approval_status;
+  }
+
   const { data, error } = await supabase
     .from('event_signups')
-    .insert({
-      event_id: id,
-      member_id,
-      rsvp_status,
-      signup_date: isAdmin ? signup_date : new Date().toISOString(),
-      event_goal,
-      approval_status: safeApprovalStatus,
-    })
+    .insert(signup)
     .select()
     .single();
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return serverError(res, 'events.signup', error);
   res.status(201).json(data);
 });
 
 // GET ALL SIGNUPS FOR AN EVENT
-router.get('/:id/signups', authenticate, requireAdmin, async (req, res) => {
+router.get('/:id/signups', requireAuth, requireRole(['admin']), async (req, res) => {
   const { id } = req.params;
 
   // Check event exists
@@ -140,12 +142,12 @@ router.get('/:id/signups', authenticate, requireAdmin, async (req, res) => {
     .select()
     .eq('event_id', id);
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return serverError(res, 'events.signups', error);
   res.json(data);
 });
 
 // UPDATE SIGNUP STATUS
-router.put('/:id/signup/:signupId', authenticate, requireAdmin, async (req, res) => {
+router.put('/:id/signup/:signupId', requireAuth, requireRole(['admin']), async (req, res) => {
   const { signupId } = req.params;
   const { rsvp_status, event_goal, approval_status } = req.body;
 
@@ -167,7 +169,7 @@ router.put('/:id/signup/:signupId', authenticate, requireAdmin, async (req, res)
     .update({ rsvp_status, event_goal, approval_status })
     .eq('id', signupId);
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return serverError(res, 'events.updateSignup', error);
   res.json({ message: 'Signup updated', signup_id: signupId });
 });
 

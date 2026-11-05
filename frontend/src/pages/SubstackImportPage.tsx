@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
-import { backendFetch } from '../api/backendFetch';
+import { authenticatedFetch } from '../lib/authenticatedFetch';
 
 interface ImportResult {
   import_run_id: string;
@@ -76,7 +76,7 @@ export function SubstackImportPage() {
     formData.append('file', file);
 
     try {
-      const res = await backendFetch(`${BACKEND_URL}/substack/import`, {
+      const res = await authenticatedFetch(`${BACKEND_URL}/substack/import`, {
         method: 'POST',
         body: formData,
       });
