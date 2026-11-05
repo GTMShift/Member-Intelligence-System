@@ -54,7 +54,7 @@ router.get('/import-runs', async (req, res) => {
     .select('*')
     .order('created_at', { ascending: false })
     .limit(20);
-  if (error) return res.status(500).json({ error: 'Failed to fetch import runs', details: error.message });
+  if (error) return res.status(500).json({ error: 'Failed to fetch import runs' });
   res.json(data);
 });
 
@@ -79,7 +79,7 @@ router.post('/import', upload.single('file'), async (req, res) => {
     .insert({ filename: req.file.originalname, imported_by: null, total_rows: rows.length })
     .select()
     .single();
-  if (importRunErr) return res.status(500).json({ error: 'Failed to create import run', details: importRunErr.message });
+  if (importRunErr) return res.status(500).json({ error: 'Failed to create import run' });
 
   const parsedRows = rows
     .map((row) => ({
@@ -136,7 +136,7 @@ router.post('/import', upload.single('file'), async (req, res) => {
       .from('substack_subscribers')
       .select('id, email, status')
       .in('email', batch);
-    if (fetchErr) return res.status(500).json({ error: 'Failed to query existing subscribers', details: fetchErr.message });
+    if (fetchErr) return res.status(500).json({ error: 'Failed to query existing subscribers' });
     existingRows.push(...(data || []));
   }
 
@@ -169,7 +169,7 @@ router.post('/import', upload.single('file'), async (req, res) => {
 
   if (toInsert.length > 0) {
     const { error: insertErr } = await supabase.from('substack_subscribers').insert(toInsert);
-    if (insertErr) return res.status(500).json({ error: 'Failed to insert new subscribers', details: insertErr.message });
+    if (insertErr) return res.status(500).json({ error: 'Failed to insert new subscribers' });
   }
 
   // 3. Mark everyone in this import as active + update last_seen_at. Batched, same reason as above.
@@ -178,7 +178,7 @@ router.post('/import', upload.single('file'), async (req, res) => {
       .from('substack_subscribers')
       .update({ last_seen_at: now, status: 'active', unsubscribed_at: null, updated_at: now })
       .in('email', batch);
-    if (touchErr) return res.status(500).json({ error: 'Failed to update seen subscribers', details: touchErr.message });
+    if (touchErr) return res.status(500).json({ error: 'Failed to update seen subscribers' });
   }
 
   // 4. Anyone previously active but missing from this import = unsubscribed.
@@ -189,7 +189,7 @@ router.post('/import', upload.single('file'), async (req, res) => {
     .from('substack_subscribers')
     .select('id, email')
     .eq('status', 'active');
-  if (activeErr) return res.status(500).json({ error: 'Failed to fetch active subscribers', details: activeErr.message });
+  if (activeErr) return res.status(500).json({ error: 'Failed to fetch active subscribers' });
 
   const missingIds = (allActive || [])
     .filter((s) => !incomingEmailSet.has(s.email))
@@ -201,7 +201,7 @@ router.post('/import', upload.single('file'), async (req, res) => {
       .from('substack_subscribers')
       .update({ status: 'unsubscribed', unsubscribed_at: now })
       .in('id', missingIds);
-    if (unsubErr) return res.status(500).json({ error: 'Failed to mark unsubscribed', details: unsubErr.message });
+    if (unsubErr) return res.status(500).json({ error: 'Failed to mark unsubscribed' });
     unsubscribedCount = missingIds.length;
   }
 
@@ -210,7 +210,7 @@ router.post('/import', upload.single('file'), async (req, res) => {
   const { data: membersData, error: membersErr } = await supabase
     .from('members')
     .select('id, email');
-  if (membersErr) return res.status(500).json({ error: 'Failed to fetch members for matching', details: membersErr.message });
+  if (membersErr) return res.status(500).json({ error: 'Failed to fetch members for matching' });
 
   const memberIdByEmail = new Map(
     (membersData || [])
@@ -237,7 +237,7 @@ router.post('/import', upload.single('file'), async (req, res) => {
       .from('substack_subscribers')
       .select('id, email, member_id')
       .in('email', batch);
-    if (allSubsErr) return res.status(500).json({ error: 'Failed to fetch subscriber ids for engagement snapshot', details: allSubsErr.message });
+  if (allSubsErr) return res.status(500).json({ error: 'Failed to fetch subscriber ids for engagement snapshot' });
     allSubscribers.push(...(data || []));
   }
 
@@ -259,7 +259,7 @@ router.post('/import', upload.single('file'), async (req, res) => {
 
   if (engagementRows.length > 0) {
     const { error: engagementErr } = await supabase.from('substack_engagement_snapshots').insert(engagementRows);
-    if (engagementErr) return res.status(500).json({ error: 'Failed to insert engagement snapshot', details: engagementErr.message });
+  if (engagementErr) return res.status(500).json({ error: 'Failed to insert engagement snapshot' });
   }
 
   // 7. Update the import run with final counts
@@ -273,7 +273,7 @@ router.post('/import', upload.single('file'), async (req, res) => {
     })
     .eq('id', importRun.id);
   if (updateRunErr) {
-    return res.status(500).json({ error: 'Failed to update import run counts', details: updateRunErr.message });
+    return res.status(500).json({ error: 'Failed to update import run counts' });
   }
 
   res.json({
