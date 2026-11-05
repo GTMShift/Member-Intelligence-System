@@ -16,7 +16,7 @@ with intended_admin_emails(email) as (
     ('wchen236@illinois.edu'),
     ('seteam@solutionexec.com'),
     ('atlas@solutionexec.com'),
-    ('wblum@illinois.edu')
+    ('wblum2@illinois.edu')
 ), eligible_users as (
   select distinct on (u.id)
     u.id,
