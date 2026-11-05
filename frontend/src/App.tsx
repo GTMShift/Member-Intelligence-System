@@ -8,6 +8,7 @@ import { ProfileStalenessBanner } from './components/ProfileStalenessBanner';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AuthContext, useAuth } from './context/authShared';
 import { getMember } from './api/membersApi';
+import { authenticatedFetch } from './lib/authenticatedFetch';
 import { CompanyDetailPage } from './pages/CompanyDetailPage';
 import { LoginPage } from './pages/LoginPage';
 import { UnauthorizedPage } from './pages/UnauthorizedPage';
@@ -329,7 +330,7 @@ function MemberDirectoryLayout({
   const handleEnrich = async () => {
     if (!selectedMemberId) return;
 
-    const response = await fetch(
+    const response = await authenticatedFetch(
       `${import.meta.env.VITE_API_URL}/members/${selectedMemberId}/enrich`,
       {
         method: 'POST',

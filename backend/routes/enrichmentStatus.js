@@ -1,9 +1,21 @@
 const express = require('express');
 const axios = require('axios');
 const router = express.Router();
+const supabase = require('../supabaseClient');
 
 router.get('/:enrichment_id', async (req, res) => {
   const { enrichment_id } = req.params;
+
+  if (req.profile.role === 'member') {
+    const { data: run, error } = await supabase
+      .from('enrichment_runs')
+      .select('id')
+      .eq('member_id', req.profile.member_id)
+      .contains('fields_updated', { enrichment_id })
+      .maybeSingle();
+
+    if (error || !run) return res.status(404).json({ error: 'Enrichment not found' });
+  }
 
   try {
     const response = await axios.get(

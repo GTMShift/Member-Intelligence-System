@@ -50,8 +50,8 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '1mb' }));
 
-app.use('/members/:id/enrich', ...adminOnly, enrichmentRouter);
-app.use('/enrich/status', ...adminOnly, enrichmentStatusRouter);
+app.use('/members/:id/enrich', requireAuth, requireRole(['admin', 'member']), enrichmentRouter);
+app.use('/enrich/status', requireAuth, requireRole(['admin', 'member']), enrichmentStatusRouter);
 app.use('/members', ...adminOnly, membersRouter);
 app.use('/companies', ...adminOnly, companiesRouter);
 app.use('/members/:id/employment', ...adminOnly, employmentRouter);

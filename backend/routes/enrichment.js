@@ -52,6 +52,10 @@ router.post('/', async (req, res) => {
   const { id } = req.params;
   const run_type = req.body.run_type || 'manual';
 
+  if (req.profile.role === 'member' && req.profile.member_id !== id) {
+    return res.status(403).json({ error: 'Members can only enrich their own profile' });
+  }
+
   if (!process.env.FULLENRICH_API_KEY) {
     return res.status(500).json({ error: 'FULLENRICH_API_KEY is not configured' });
   }
