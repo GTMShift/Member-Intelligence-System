@@ -44,13 +44,17 @@ async function logEnrichmentRun(memberId, runType, status, fieldsUpdated, fields
     });
 
   if (error) {
-    console.error('Failed to log enrichment run:', error.message);
+    console.error('[enrichment.logRun] failed', error?.code || 'unknown');
   }
 }
 
 router.post('/', async (req, res) => {
   const { id } = req.params;
   const run_type = req.body.run_type || 'manual';
+
+  if (req.profile.role === 'member' && req.profile.member_id !== id) {
+    return res.status(403).json({ error: 'Members can only enrich their own profile' });
+  }
 
   if (!process.env.FULLENRICH_API_KEY) {
     return res.status(500).json({ error: 'FULLENRICH_API_KEY is not configured' });
@@ -123,15 +127,8 @@ router.post('/', async (req, res) => {
     );
   } catch (error) {
     await logEnrichmentRun(id, run_type, 'failed', {}, {});
-    const providerMessage =
-      error.response?.data?.message ||
-      error.response?.data?.error ||
-      error.message;
-    console.error('FullEnrich API call failed:', error.response?.data || error.message);
-    return res.status(502).json({
-      error: 'FullEnrich request failed',
-      details: providerMessage,
-    });
+    console.error('[enrichment.provider] failed', error.response?.status || 'unknown');
+    return res.status(502).json({ error: 'FullEnrich request failed' });
   }
 
   const enrichmentId = enrichmentResponse.data?.enrichment_id;

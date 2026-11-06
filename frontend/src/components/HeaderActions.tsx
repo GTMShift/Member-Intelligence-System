@@ -165,6 +165,13 @@ export function HeaderActions() {
               </button>
                 Speaker applications
               </button>
+              <button
+                type="button"
+                onClick={() => go('/admin/member-access-requests')}
+                className={navButtonClass}
+              >
+                Member access requests
+              </button>
               <button type="button" onClick={() => go('/analytics')} className={navButtonClass}>
                 Analytics
               </button>

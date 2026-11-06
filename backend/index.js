@@ -12,51 +12,71 @@ const substackRouter = require('./routes/substackImport');
 const formResponsesRouter = require('./routes/formResponses');
 const emailWebhookRouter = require('./routes/emailWebhook');
 const joinUsApplicationsRouter = require('./routes/joinUsApplications');
+const { requireAuth, requireRole } = require('./middleware/auth');
+const { requireWebhookSecret } = require('./middleware/webhookAuth');
+const { createRateLimiter } = require('./middleware/rateLimit');
+
+const adminOnly = [requireAuth, requireRole(['admin'])];
 
 const allowedOrigins = new Set([
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'http://localhost:3000',
   'https://member-intelligence-system.vercel.app',
+  ...(process.env.NODE_ENV === 'production' ? [] : [
+    'http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000',
+  ]),
 ]);
+
+app.disable('x-powered-by');
+app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS || 0));
+app.use((req, res, next) => {
+  res.set({
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'no-referrer',
+  });
+  next();
+});
 
 app.use(cors({
   origin(origin, callback) {
-    // Allow non-browser tools (no Origin) and any localhost Vite port.
-    if (
-      !origin ||
-      allowedOrigins.has(origin) ||
-      /^http:\/\/localhost:\d+$/.test(origin)
-    ) {
+    // CORS only controls browsers; protected routes still require authentication.
+    if (!origin || allowedOrigins.has(origin)) {
       return callback(null, true);
     }
-    return callback(new Error(`Not allowed by CORS: ${origin}`));
+    const error = new Error('Origin not allowed');
+    error.status = 403;
+    return callback(error);
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-webhook-secret'],
 }));
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 
-app.use('/members/:id/enrich', enrichmentRouter);
-app.use('/enrich/status', enrichmentStatusRouter);
-app.use('/members', membersRouter);
-app.use('/companies', companiesRouter);
-app.use('/members/:id/employment', employmentRouter);
+app.use('/members/:id/enrich', requireAuth, requireRole(['admin', 'member']), enrichmentRouter);
+app.use('/enrich/status', requireAuth, requireRole(['admin', 'member']), enrichmentStatusRouter);
+app.use('/members', ...adminOnly, membersRouter);
+app.use('/companies', ...adminOnly, companiesRouter);
+app.use('/members/:id/employment', ...adminOnly, employmentRouter);
 app.use('/events', eventsRouter);
-app.use('/substack', substackRouter);
-app.use('/form-responses', formResponsesRouter);
-app.use('/webhook/email', emailWebhookRouter);
-app.use('/join-us-applications', joinUsApplicationsRouter);
+app.use('/substack', ...adminOnly, substackRouter);
+app.use('/form-responses', createRateLimiter({ windowMs: 60_000, maxRequests: 20 }), formResponsesRouter);
+app.use('/webhook/email', requireWebhookSecret, emailWebhookRouter);
+app.use('/join-us-applications', ...adminOnly, joinUsApplicationsRouter);
 
-const PORT = 3000;
+app.use((error, req, res, next) => {
+  if (res.headersSent) return next(error);
+  console.error('[request] failed', error?.status || 500);
+  res.status(error?.status || 500).json({ error: error?.status === 403 ? 'Origin not allowed' : 'Internal server error' });
+});
+
+const PORT = Number(process.env.PORT || 3000);
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 
-  if (process.env.GMAIL_CREDENTIALS_B64 && process.env.GMAIL_TOKEN_B64) {
+  if (process.env.GMAIL_CREDENTIALS_B64 && process.env.GMAIL_TOKEN_B64 && process.env.EMAIL_WEBHOOK_SECRET) {
     const { startMonitoring } = require('./services/gmailMonitor');
     startMonitoring();
     console.log('Gmail monitor started');
   } else {
-    console.log('Gmail monitor not started — GMAIL_CREDENTIALS_B64 or GMAIL_TOKEN_B64 not set');
+    console.log('Gmail monitor not started — Gmail credentials, token, or EMAIL_WEBHOOK_SECRET not set');
   }
 });
