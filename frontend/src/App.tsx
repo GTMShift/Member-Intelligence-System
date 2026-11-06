@@ -60,7 +60,7 @@ function RoleBasedRedirect() {
       <Navigate to={needsOnboarding ? '/complete-profile' : '/portal'} replace />
     );
   }
-  return <Navigate to="/login" replace />;
+  return <Navigate to="/unauthorized" replace />;
 }
 
 function App() {
@@ -123,6 +123,10 @@ function App() {
           element={
             <ProtectedRoute requiredRole="admin">
               <JoinUsApplicationsAdminPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/admin/member-access-requests"
           element={
             <ProtectedRoute requiredRole="admin">
