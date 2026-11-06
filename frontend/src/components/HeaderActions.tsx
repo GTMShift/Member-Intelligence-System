@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { fetchUnreadNotificationCount } from '../api/notificationsApi';
@@ -7,8 +8,8 @@ export function HeaderActions() {
   const { user, signOut, role, memberId } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  // Open only while pathname matches the path when opened — closes on navigate
-  // without a setState-in-effect.
+
+  // Open only while pathname matches the path when opened.
   const [menuOpenForPath, setMenuOpenForPath] = useState<string | null>(null);
   const menuOpen = menuOpenForPath === location.pathname;
   const [unreadCount, setUnreadCount] = useState(0);
@@ -156,14 +157,14 @@ export function HeaderActions() {
                 onClick={() => go('/admin/speaker-applications')}
                 className={navButtonClass}
               >
+                Speaker applications
+              </button>
               <button
                 type="button"
                 onClick={() => go('/admin/join-us-applications')}
                 className={navButtonClass}
               >
                 Join Us applications
-              </button>
-                Speaker applications
               </button>
               <button
                 type="button"
