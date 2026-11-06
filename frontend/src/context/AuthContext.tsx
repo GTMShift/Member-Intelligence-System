@@ -30,7 +30,7 @@ function hasPendingOAuthCallback(): boolean {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [role, setRole] = useState<UserRole>('member');
+  const [role, setRole] = useState<UserRole>('applicant');
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<Session['user'] | null>(null);
   const [memberId, setMemberId] = useState<string | null>(null);
@@ -110,7 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // backend independently requires a trusted profiles row for access.
         const resolvedRole: UserRole = existingProfile?.role
           ? toUserRole(existingProfile.role)
-          : 'member';
+          : 'applicant';
 
         if (mounted) {
           setRole(resolvedRole);
@@ -118,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (mounted) setMemberId(linkedMemberId);
         }
       } else if (mounted) {
-        setRole('member');
+        setRole('applicant');
         setMemberId(null);
       }
 
@@ -182,7 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
     setSession(null);
     setUser(null);
-    setRole('member');
+    setRole('applicant');
     setMemberId(null);
   }, []);
 
