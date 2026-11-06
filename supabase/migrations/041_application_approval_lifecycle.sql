@@ -155,7 +155,7 @@ BEGIN
     role = 'member',
     member_id = NEW.member_id,
     updated_at = now()
-  WHERE lower(email) = lower(NEW.email_address);
+  WHERE lower(email) = lower(NEW.email_address) AND role = 'applicant';
 
   RETURN NEW;
 END;
