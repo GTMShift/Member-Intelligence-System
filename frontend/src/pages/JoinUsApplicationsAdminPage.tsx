@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/authShared';
 import {
@@ -27,38 +27,44 @@ const STATUS_STYLES: Record<JoinUsApplicationStatus, string> = {
 export function JoinUsApplicationsAdminPage() {
   const navigate = useNavigate();
   const { session } = useAuth();
+  const accessToken = session?.access_token;
   const [applications, setApplications] = useState<JoinUsApplication[]>([]);
   const [filter, setFilter] = useState<FilterStatus>('pending');
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const loadApplications = useCallback(async () => {
-    if (!session?.access_token) {
-      setError('Your session has expired. Please sign in again.');
-      setLoading(false);
-      return;
-    }
+  
+useEffect(() => {
+  if (!accessToken) return;
 
-    setLoading(true);
-    setError(null);
+  let cancelled = false;
 
-    try {
-      const data = await getJoinUsApplications(
-        session.access_token,
-        filter === 'all' ? undefined : filter,
-      );
+  getJoinUsApplications(
+    accessToken,
+    filter === 'all' ? undefined : filter
+  )
+    .then((data) => {
+      if (cancelled) return;
       setApplications(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not load applications');
-    } finally {
+      setError(null);
       setLoading(false);
-    }
-  }, [filter, session?.access_token]);
+    })
+    .catch((err: unknown) => {
+      if (cancelled) return;
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Could not load applications'
+      );
+      setLoading(false);
+    });
 
-  useEffect(() => {
-    void loadApplications();
-  }, [loadApplications]);
+  return () => {
+    cancelled = true;
+  };
+}, [accessToken, filter]);
+
 
   const handleDecision = async (
     application: JoinUsApplication,
@@ -129,7 +135,11 @@ export function JoinUsApplicationsAdminPage() {
 
           <select
             value={filter}
-            onChange={(event) => setFilter(event.target.value as FilterStatus)}
+            onChange={(event) => {
+              setLoading(true);
+              setError(null);
+              setFilter(event.target.value as FilterStatus);
+            }}
             className="rounded-md border border-charcoal/20 bg-white px-3 py-2 text-sm text-charcoal"
           >
             {FILTERS.map((option) => (
