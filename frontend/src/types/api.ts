@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'member';
+export type UserRole = 'admin' | 'member' | 'applicant';
 
 export type IcpStatus = 'YES' | 'NO' | null;
 

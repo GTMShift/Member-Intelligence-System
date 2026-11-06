@@ -11,6 +11,7 @@ const eventsRouter = require('./routes/events');
 const substackRouter = require('./routes/substackImport');
 const formResponsesRouter = require('./routes/formResponses');
 const emailWebhookRouter = require('./routes/emailWebhook');
+const joinUsApplicationsRouter = require('./routes/joinUsApplications');
 const { requireAuth, requireRole } = require('./middleware/auth');
 const { requireWebhookSecret } = require('./middleware/webhookAuth');
 const { createRateLimiter } = require('./middleware/rateLimit');
@@ -59,6 +60,7 @@ app.use('/events', eventsRouter);
 app.use('/substack', ...adminOnly, substackRouter);
 app.use('/form-responses', createRateLimiter({ windowMs: 60_000, maxRequests: 20 }), formResponsesRouter);
 app.use('/webhook/email', requireWebhookSecret, emailWebhookRouter);
+app.use('/join-us-applications', ...adminOnly, joinUsApplicationsRouter);
 
 app.use((error, req, res, next) => {
   if (res.headersSent) return next(error);

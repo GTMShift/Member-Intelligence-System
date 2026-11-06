@@ -56,6 +56,7 @@ router.post('/', async (req, res) => {
     .insert({
       first_name,
       last_name,
+      status: 'pending',
       email_address: resolvedEmail,
       linkedin: resolvedLinkedIn || null,
       phone_number: resolvedPhone || null,

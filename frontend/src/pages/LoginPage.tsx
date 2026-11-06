@@ -33,6 +33,7 @@ export function LoginPage() {
   // them instead of leaving them on the sign-in button.
   if (session) {
     if (role === 'admin') return <Navigate to="/" replace />;
+    if (role === 'applicant') return <Navigate to="/unauthorized" replace />;
     return (
       <Navigate to={needsOnboarding ? '/complete-profile' : '/portal'} replace />
     );
