@@ -27,6 +27,19 @@ The checked-in project documentation has no trusted member-approval field or dat
 
 The applicant-role constraint/lifecycle change is owned by the approval workstream. Apply and test this migration against the integrated schema, and verify applicants remain non-members even if a stale `member_id` exists.
 
+## Join Us approval lifecycle (041–042)
+
+Migration 041 makes every new sign-in an `applicant` and creates or links a member only when an admin approves a Join Us application. Migration 042 hardens that flow:
+
+- Existing applications that already linked a member before 041 are marked `approved` instead of reappearing as pending.
+- New Join Us rows always start `pending` with no member link or reviewer, whatever the client sends; the anon insert policy is limited to such rows.
+- Only `pending` applications can be approved or rejected, matching the API.
+- Approvals that cannot complete fail with clear messages (no email, no LinkedIn for a brand-new member, or a member record already linked to a different login). The API returns these as 409s.
+- A sign-in after approval never fails because the member record is already linked to another login; that account stays an `applicant`.
+- Unlinked applicants can submit a member access request (039 previously accepted only unlinked `member` accounts, which 041 no longer creates).
+
+Existing directory members are still not linked by email at sign-in. They get access when an admin approves their Join Us application, which links them to their existing member record. `supabase/tests/application_lifecycle.sql` covers this flow.
+
 ## Column-level privacy integration blocker
 
 RLS limits rows, not columns. The migration blocks direct member reads of `member_profile` and defines an explicit safe-field projection through `get_my_member_profile()`. The member profile frontend uses the new RPCs. Admins retain direct table access. Member rows and any other mixed-data tables still require their own column-level review before claiming that every admin-only field across the platform is private. Applicant approval and account linking remain with their owning workstream.
