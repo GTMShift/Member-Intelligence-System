@@ -1,8 +1,39 @@
 const express = require('express');
 const supabase = require('../supabaseClient');
 const requireAdmin = require('../middleware/requireAdmin');
+const { serverError } = require('../utils/serverError');
 
 const router = express.Router();
+
+// Database rules (migrations 041/042) that block an approval for a reason an
+// admin can act on. Anything else is an unexpected failure.
+const DECISION_CONFLICTS = [
+  {
+    match: 'Ambiguous member match',
+    error: 'Approval needs admin review because the email and LinkedIn match different members.',
+  },
+  {
+    match: 'LinkedIn URL is required',
+    error: 'This applicant has no LinkedIn URL, which a new member record needs.',
+  },
+  {
+    match: 'Email address is required',
+    error: 'This application has no email address, so it cannot be approved.',
+  },
+  {
+    match: 'already linked to a different login',
+    error: 'The matching member record is already linked to a different login. Resolve that link before approving.',
+  },
+  {
+    match: 'Only pending applications can be approved or rejected',
+    error: 'This application has already been reviewed.',
+  },
+];
+
+function decisionConflict(error) {
+  const message = error?.message || '';
+  return DECISION_CONFLICTS.find((rule) => message.includes(rule.match)) || null;
+}
 
 router.get('/', requireAdmin, async (req, res) => {
   const { status } = req.query;
@@ -39,14 +70,15 @@ router.get('/', requireAdmin, async (req, res) => {
   const { data: applications, error } = await query;
 
   if (error) {
-    return res.status(500).json({ error: error.message });
+    return serverError(res, 'list join us applications', error);
   }
 
   return res.json({ applications });
 });
 
-router.post('/:applicationId/approve', requireAdmin, async (req, res) => {
+async function decide(req, res, decision) {
   const { applicationId } = req.params;
+  const verb = decision === 'approved' ? 'approved' : 'rejected';
 
   const { data: application, error: fetchError } = await supabase
     .from('join_us_applications')
@@ -55,7 +87,7 @@ router.post('/:applicationId/approve', requireAdmin, async (req, res) => {
     .maybeSingle();
 
   if (fetchError) {
-    return res.status(500).json({ error: fetchError.message });
+    return serverError(res, `load join us application for ${verb}`, fetchError);
   }
 
   if (!application) {
@@ -63,62 +95,35 @@ router.post('/:applicationId/approve', requireAdmin, async (req, res) => {
   }
 
   if (application.status !== 'pending') {
-    return res.status(409).json({ error: 'Only pending applications can be approved' });
+    return res.status(409).json({ error: `Only pending applications can be ${verb}` });
   }
 
-  const { data: approvedApplication, error: approveError } = await supabase
+  // Only update while still pending, so two admins acting at once cannot both
+  // decide the same application.
+  const { data: updated, error: updateError } = await supabase
     .from('join_us_applications')
-    .update({status: 'approved', reviewed_by: req.user.id, reviewed_at: new Date().toISOString(),})
+    .update({ status: decision, reviewed_by: req.user.id, reviewed_at: new Date().toISOString() })
     .eq('id', applicationId)
-    .select('id, status, member_id')
-    .single();
+    .eq('status', 'pending')
+    .select(decision === 'approved' ? 'id, status, member_id' : 'id, status')
+    .maybeSingle();
 
-  if (approveError) {
-    if (approveError.message.includes('Ambiguous member match')) {
-      return res.status(409).json({
-        error: 'Approval needs admin review because the email and LinkedIn match different members.',
-      });
+  if (updateError) {
+    const conflict = decisionConflict(updateError);
+    if (conflict) {
+      return res.status(409).json({ error: conflict.error });
     }
+    return serverError(res, `join us application ${verb}`, updateError);
+  }
 
-  return res.status(500).json({ error: approveError.message });
+  if (!updated) {
+    return res.status(409).json({ error: 'This application has already been reviewed.' });
+  }
+
+  return res.json({ application: updated });
 }
 
-  return res.json({ application: approvedApplication });
-});
-
-router.post('/:applicationId/reject', requireAdmin, async (req, res) => {
-  const { applicationId } = req.params;
-
-  const { data: application, error: fetchError } = await supabase
-    .from('join_us_applications')
-    .select('id, status')
-    .eq('id', applicationId)
-    .maybeSingle();
-
-  if (fetchError) {
-    return res.status(500).json({ error: fetchError.message });
-  }
-
-  if (!application) {
-    return res.status(404).json({ error: 'Application not found' });
-  }
-
-  if (application.status !== 'pending') {
-    return res.status(409).json({ error: 'Only pending applications can be rejected' });
-  }
-
-  const { data: rejectedApplication, error: rejectError } = await supabase
-    .from('join_us_applications')
-    .update({status: 'rejected', reviewed_by: req.user.id, reviewed_at: new Date().toISOString(),})
-    .eq('id', applicationId)
-    .select('id, status')
-    .single();
-
-  if (rejectError) {
-    return res.status(500).json({ error: rejectError.message });
-  }
-
-  return res.json({ application: rejectedApplication });
-});
+router.post('/:applicationId/approve', requireAdmin, (req, res) => decide(req, res, 'approved'));
+router.post('/:applicationId/reject', requireAdmin, (req, res) => decide(req, res, 'rejected'));
 
 module.exports = router;
