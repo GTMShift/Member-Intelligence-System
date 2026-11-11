@@ -17,12 +17,14 @@ insert into public.members (id, first_name, last_name, email, linkedin_url) valu
   ('00000000-0000-0000-0000-000000000202', 'Member', 'Two', 'member-two@example.test', 'https://example.test/member-two'),
   ('00000000-0000-0000-0000-000000000203', 'Admin', 'Account', 'admin@example.test', 'https://example.test/admin');
 
+-- New sign-ins start as applicants (041); these fixtures are approved members.
 update public.profiles
-set member_id = '00000000-0000-0000-0000-000000000201'
+set role = 'member', member_id = '00000000-0000-0000-0000-000000000201'
 where id = '00000000-0000-0000-0000-000000000101';
 
+-- New sign-ins start as applicants (041); these fixtures are approved members.
 update public.profiles
-set member_id = '00000000-0000-0000-0000-000000000202'
+set role = 'member', member_id = '00000000-0000-0000-0000-000000000202'
 where id = '00000000-0000-0000-0000-000000000102';
 
 update public.profiles
