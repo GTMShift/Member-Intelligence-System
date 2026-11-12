@@ -55,7 +55,7 @@ app.use('/members/:id/enrich', requireAuth, requireRole(['admin', 'member']), en
 app.use('/enrich/status', requireAuth, requireRole(['admin', 'member']), enrichmentStatusRouter);
 app.use('/members', ...adminOnly, membersRouter);
 app.use('/companies', ...adminOnly, companiesRouter);
-app.use('/members/:id/employment', ...adminOnly, employmentRouter);
+app.use('/members/:id/employment', requireAuth, employmentRouter);
 app.use('/events', eventsRouter);
 app.use('/substack', ...adminOnly, substackRouter);
 app.use('/form-responses', createRateLimiter({ windowMs: 60_000, maxRequests: 20 }), formResponsesRouter);

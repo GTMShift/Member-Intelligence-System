@@ -309,8 +309,14 @@ function Typeahead({ label, value, options, onChange, onValidChange, placeholder
 }
 
 export function CompleteProfilePage() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const [draftWasSaved] = useState(() => Boolean(localStorage.getItem(FORM_STORAGE_KEY)));
+
+  const handleSwitchAccount = async () => {
+    localStorage.removeItem(FORM_STORAGE_KEY);
+    await signOut();
+    window.location.replace('/login');
+  };
 
   const [form, setForm] = useState<FormState>(() => {
     try {
@@ -559,6 +565,13 @@ export function CompleteProfilePage() {
     <div className="flex min-h-screen flex-col bg-surface">
       <header className="bg-charcoal">
         <div className="mx-auto max-w-2xl px-4 py-4 sm:px-6">
+          <button
+            type="button"
+            onClick={handleSwitchAccount}
+            className="mb-3 text-sm font-medium text-white/80 hover:text-white"
+          >
+            ← Use a different account
+          </button>
           <h1 className="text-lg font-semibold text-white">
             SolutionExec Member Intelligence Platform
           </h1>

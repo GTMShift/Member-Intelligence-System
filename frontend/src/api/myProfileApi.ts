@@ -1,5 +1,7 @@
 // src/api/myProfileApi.ts
+import { authenticatedFetch } from '../lib/authenticatedFetch';
 import { supabase } from '../lib/supabaseClient';
+import type { EmploymentHistoryEntry } from '../types/api';
 import { createNotification } from './notificationsApi';
 
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024; // 5MB
@@ -18,6 +20,7 @@ export interface MyProfileData {
   state_region: string | null;
   city: string | null;
   avatar_url: string | null;
+  employment_history: EmploymentHistoryEntry[];
 }
 
 export interface UpdateMyProfileInput {
@@ -25,21 +28,59 @@ export interface UpdateMyProfileInput {
   last_name: string;
   linkedin_url: string;
   phone: string | null;
-  job_title: string | null;
-  current_job_start_date: string | null;
   seniority_level: string | null;
-  company_name: string | null;
   country: string | null;
   state_region: string | null;
   city: string | null;
 }
 
-async function findOrCreateCompany(companyName: string | null): Promise<string | null> {
-  const name = companyName?.trim();
-  if (!name) return null;
-  const { data, error } = await supabase.rpc('find_or_create_company', { p_name: name });
-  if (error) throw new Error(`Company lookup failed: ${error.message}`);
-  return data;
+export type EmploymentAction = 'change' | 'correct';
+
+export interface SaveEmploymentInput {
+  company: string;
+  role: string;
+  start_date: string | null;
+}
+
+export interface SaveEmploymentResult {
+  current: EmploymentHistoryEntry;
+  history: EmploymentHistoryEntry[];
+}
+
+function getBackendUrl(): string {
+  const apiUrl = import.meta.env.VITE_API_URL;
+  if (!apiUrl) throw new Error('VITE_API_URL is not configured');
+  return apiUrl.replace(/\/$/, '');
+}
+
+async function requestEmployment<T>(
+  memberId: string,
+  path = '',
+  init?: RequestInit,
+): Promise<T> {
+  const response = await authenticatedFetch(
+    `${getBackendUrl()}/members/${encodeURIComponent(memberId)}/employment${path}`,
+    init,
+  );
+  const data = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(data?.error || 'Employment request failed');
+  return data as T;
+}
+
+export function fetchMyEmploymentHistory(memberId: string): Promise<EmploymentHistoryEntry[]> {
+  return requestEmployment<EmploymentHistoryEntry[]>(memberId);
+}
+
+export function saveMyEmployment(
+  memberId: string,
+  action: EmploymentAction,
+  input: SaveEmploymentInput,
+): Promise<SaveEmploymentResult> {
+  return requestEmployment<SaveEmploymentResult>(memberId, `/${action}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
 }
 
 export async function fetchMyProfile(memberId: string, profileId: string): Promise<MyProfileData> {
@@ -53,12 +94,8 @@ export async function fetchMyProfile(memberId: string, profileId: string): Promi
   const { data: profile, error: profileErr } = await supabase.rpc('get_my_member_profile');
   if (profileErr) throw new Error(`Failed to load member profile: ${profileErr.message}`);
 
-  const { data: currentEmployment } = await supabase
-    .from('employment_history')
-    .select('role, start_date')
-    .eq('member_id', memberId)
-    .eq('is_current', true)
-    .maybeSingle();
+  const employmentHistory = await fetchMyEmploymentHistory(memberId);
+  const currentEmployment = employmentHistory.find((employment) => employment.is_current);
 
   const { data: profileRow } = await supabase
     .from('profiles')
@@ -75,7 +112,8 @@ export async function fetchMyProfile(memberId: string, profileId: string): Promi
     job_title: currentEmployment?.role ?? null,
     current_job_start_date: currentEmployment?.start_date ?? null,
     seniority_level: profile?.seniority_level ?? null,
-    company_name: profile?.company_name ?? null,
+    company_name: currentEmployment?.company ?? profile?.company_name ?? null,
+    employment_history: employmentHistory,
     country: profile?.country ?? null,
     state_region: profile?.state_region ?? null,
     city: profile?.city ?? null,
@@ -98,50 +136,16 @@ export async function updateMyProfile(
     .eq('id', memberId);
   if (memberErr) throw new Error(`Failed to update member: ${memberErr.message}`);
 
-  const companyId = await findOrCreateCompany(input.company_name);
-
   const { error: profileErr } = await supabase.rpc('save_my_member_profile', {
     p_values: {
       seniority_level: input.seniority_level,
       country: input.country,
       state_region: input.state_region,
       city: input.city,
-      company_id: companyId,
     },
   });
   if (profileErr) throw new Error(`Failed to update member profile: ${profileErr.message}`);
 
-  // Update (or create) the current employment_history row
-  const { data: existingCurrent } = await supabase
-    .from('employment_history')
-    .select('id')
-    .eq('member_id', memberId)
-    .eq('is_current', true)
-    .maybeSingle();
-
-  if (input.job_title) {
-    if (existingCurrent) {
-      const { error: empErr } = await supabase
-        .from('employment_history')
-        .update({
-          company: input.company_name,
-          role: input.job_title,
-          start_date: input.current_job_start_date,
-        })
-        .eq('id', existingCurrent.id);
-      if (empErr) throw new Error(`Failed to update employment history: ${empErr.message}`);
-    } else {
-      const { error: empErr } = await supabase.from('employment_history').insert({
-        member_id: memberId,
-        company: input.company_name,
-        role: input.job_title,
-        start_date: input.current_job_start_date,
-        is_current: true,
-        source: 'Manual',
-      });
-      if (empErr) throw new Error(`Failed to create employment history: ${empErr.message}`);
-    }
-  }
 
   await createNotification({
     type: 'profile_updated',

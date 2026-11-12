@@ -115,7 +115,11 @@ function toMemberDetail(row: RawMemberRow): MemberDetail {
   const linkedProfile = firstOrSelf(row.linked_profile);
   const company = firstOrSelf(profileRaw?.company);
   const metroArea = firstOrSelf(profileRaw?.metro_area);
-  const employment = row.employment_history ?? [];
+  const employment = [...(row.employment_history ?? [])].sort(
+    (a: EmploymentHistoryEntry, b: EmploymentHistoryEntry) =>
+      Number(b.is_current) - Number(a.is_current) ||
+      (b.start_date ?? '').localeCompare(a.start_date ?? ''),
+  );
 
   const currentEntry = employment.find((e: EmploymentHistoryEntry) => e.is_current);
   const prevEntries = [...employment]
