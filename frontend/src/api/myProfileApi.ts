@@ -120,9 +120,11 @@ export async function saveMyEmployment(
 
   if (action === 'change') {
     const name = memberName?.trim() || 'A member';
+    // Members may only create profile_updated and new_signup notifications (migration 038),
+    // so the job change is sent as a profile update with its own title.
     // createNotification logs and never throws, so the saved job is never reported as a failure.
     await createNotification({
-      type: 'job_change',
+      type: 'profile_updated',
       title: 'Job change reported',
       body: `${name} reported a new job: ${result.current.role} at ${result.current.company}.`,
       member_id: memberId,
