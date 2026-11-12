@@ -51,11 +51,13 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '1mb' }));
 
+// Routes under /members that members may use must be mounted before the
+// admin-only /members router, or its admin check answers 403 first.
 app.use('/members/:id/enrich', requireAuth, requireRole(['admin', 'member']), enrichmentRouter);
 app.use('/enrich/status', requireAuth, requireRole(['admin', 'member']), enrichmentStatusRouter);
+app.use('/members/:id/employment', requireAuth, employmentRouter);
 app.use('/members', ...adminOnly, membersRouter);
 app.use('/companies', ...adminOnly, companiesRouter);
-app.use('/members/:id/employment', requireAuth, employmentRouter);
 app.use('/events', eventsRouter);
 app.use('/substack', ...adminOnly, substackRouter);
 app.use('/form-responses', createRateLimiter({ windowMs: 60_000, maxRequests: 20 }), formResponsesRouter);
@@ -68,15 +70,21 @@ app.use((error, req, res, next) => {
   res.status(error?.status || 500).json({ error: error?.status === 403 ? 'Origin not allowed' : 'Internal server error' });
 });
 
-const PORT = Number(process.env.PORT || 3000);
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+// Tests set BACKEND_NO_LISTEN to import the app with its real route order
+// without starting the server. Normal starts are unchanged.
+if (!process.env.BACKEND_NO_LISTEN) {
+  const PORT = Number(process.env.PORT || 3000);
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
 
-  if (process.env.GMAIL_CREDENTIALS_B64 && process.env.GMAIL_TOKEN_B64 && process.env.EMAIL_WEBHOOK_SECRET) {
-    const { startMonitoring } = require('./services/gmailMonitor');
-    startMonitoring();
-    console.log('Gmail monitor started');
-  } else {
-    console.log('Gmail monitor not started — Gmail credentials, token, or EMAIL_WEBHOOK_SECRET not set');
-  }
-});
+    if (process.env.GMAIL_CREDENTIALS_B64 && process.env.GMAIL_TOKEN_B64 && process.env.EMAIL_WEBHOOK_SECRET) {
+      const { startMonitoring } = require('./services/gmailMonitor');
+      startMonitoring();
+      console.log('Gmail monitor started');
+    } else {
+      console.log('Gmail monitor not started — Gmail credentials, token, or EMAIL_WEBHOOK_SECRET not set');
+    }
+  });
+}
+
+module.exports = app;
