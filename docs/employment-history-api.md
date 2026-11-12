@@ -30,6 +30,17 @@ Accepts any non-empty subset of `company`, `role`, and `start_date`. It updates 
 
 Both write endpoints return `{ "current": <employment row>, "history": [<rows newest first>] }`. They also keep `member_profile.company_id` and `member_profile.current_job_start_date` aligned with the current row.
 
+## Self-service profile page
+
+`/my-profile` (`frontend/src/pages/MyProfilePage.tsx`) shows the member's current job, a career timeline, and two actions:
+
+- **Changed jobs** opens an empty form for the new company, job title and start date (all required). It previews the end date the previous job will get, then calls `/change`. With no current job on file the button reads **Add your current job**.
+- **Correct current information** opens the current job pre-filled and calls `/correct`. Saving with nothing edited is blocked.
+
+The page checks the same rules as the database before sending (real dates, no future start dates, a new job cannot start before the current one, same company and title is pointed to the correction form; see `frontend/src/lib/employmentForm.ts`). Employment is saved separately from **Save changes**, which only saves contact, professional, location and event details. A job change also creates a `job_change` notification for admins.
+
+The employment router is mounted before the admin-only `/members` router in `backend/index.js`. Mounted after it, every member request to these endpoints is answered 403 by the admin check. `backend/test/employmentRoutes.test.js` covers that order and the member/admin/applicant access rules.
+
 ## Integration notes and edge cases
 
 - Use `/change` only when the member reports a job change; use `/correct` for typos or corrected dates/details.
@@ -37,3 +48,4 @@ Both write endpoints return `{ "current": <employment row>, "history": [<rows ne
 - The partial unique index enforces at most one current row per member. The migration stops with a clear error if existing data already has multiple current rows; resolve those before applying it.
 - A new start date earlier than the current role's start date is rejected. Same-day transitions are allowed and close the old role on that date.
 - The self-service form must send either the `change` or `correct` action. Admin and enrichment workflows still need an equivalent action before their writes are history-preserving and transactional with the profile projection.
+- The `employment_history_write_own` policy from migration 038 still lets a member write their own rows directly with the Supabase client, which skips history preservation. Onboarding (`createMemberSelf.ts`) and the admin editor (`adminUpdateMember.ts`) still write directly too. Once they use these endpoints, that policy can be reduced to read-only.
