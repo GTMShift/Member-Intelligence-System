@@ -47,7 +47,7 @@ function validateEmploymentInput(req, res, action) {
   return { company: company || null, role: role || null, startDate };
 }
 
-async function saveEmployment(req, res, action) {
+async function saveEmployment(req, res, action, statusCode = 200) {
   const input = validateEmploymentInput(req, res, action);
   if (!input) return;
 
@@ -63,7 +63,7 @@ async function saveEmployment(req, res, action) {
   if (error?.code === '22023') return res.status(400).json({ error: error.message });
   if (error?.code === '23505') return res.status(409).json({ error: 'Member already has a current position' });
   if (error) return serverError(res, `employment.${action}`, error);
-  return res.json(data);
+  return res.status(statusCode).json(data);
 }
 
 // POST /members/:id/employment/change
@@ -93,6 +93,8 @@ router.post('/', requireAdmin, async (req, res) => {
     return res.status(400).json({ error: 'Invalid end_date format. Use YYYY-MM-DD' });
   }
 
+  if (is_current) return saveEmployment(req, res, 'change', 201);
+
   // Check member exists
   const { data: member } = await supabase
     .from('members')
@@ -102,18 +104,9 @@ router.post('/', requireAdmin, async (req, res) => {
 
   if (!member) return res.status(404).json({ error: 'Member not found' });
 
-  // If this is the new current job, set all other jobs to is_current = false
-  if (is_current) {
-    await supabase
-      .from('employment_history')
-      .update({ is_current: false })
-      .eq('member_id', id)
-      .eq('is_current', true);
-  }
-
   const { data, error } = await supabase
     .from('employment_history')
-    .insert({ member_id: id, company, role, start_date, end_date, is_current: is_current || false, source: source || 'Manual' })
+    .insert({ member_id: id, company, role, start_date, end_date, is_current: false, source: source || 'Manual' })
     .select()
     .single();
 
@@ -166,15 +159,23 @@ router.put('/:jobId', requireAdmin, async (req, res) => {
   // Check job exists
   const { data: existing } = await supabase
     .from('employment_history')
-    .select('id')
+    .select('id, is_current')
     .eq('id', jobId)
     .single();
 
   if (!existing) return res.status(404).json({ error: 'Job not found' });
 
+  if (is_current === true) return saveEmployment(req, res, 'change');
+  if (is_current !== undefined) {
+    return res.status(400).json({ error: 'Use the employment change or correction workflow to change current status' });
+  }
+  if (existing.is_current && (company !== undefined || role !== undefined || start_date !== undefined)) {
+    return saveEmployment(req, res, 'correct');
+  }
+
   const { error } = await supabase
     .from('employment_history')
-    .update({ company, role, start_date, end_date, is_current, source })
+    .update({ company, role, start_date, end_date, source })
     .eq('id', jobId);
 
   if (error) return serverError(res, 'employment.update', error);
