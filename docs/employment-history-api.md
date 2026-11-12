@@ -37,7 +37,7 @@ Both write endpoints return `{ "current": <employment row>, "history": [<rows ne
 - **Changed jobs** opens an empty form for the new company, job title and start date (all required). It previews the end date the previous job will get, then calls `/change`. With no current job on file the button reads **Add your current job**.
 - **Correct current information** opens the current job pre-filled and calls `/correct`. Saving with nothing edited is blocked.
 
-The page checks the same rules as the database before sending (real dates, no future start dates, a new job cannot start before the current one, same company and title is pointed to the correction form; see `frontend/src/lib/employmentForm.ts`). Employment is saved separately from **Save changes**, which only saves contact, professional, location and event details. A job change also creates a `job_change` notification for admins.
+The page checks the same rules as the database before sending (real dates, no future start dates, a new job cannot start before the current one, same company and title is pointed to the correction form; see `frontend/src/lib/employmentForm.ts`). Employment is saved separately from **Save changes**, which only saves contact, professional, location and event details. A job change also notifies admins with a `profile_updated` notification titled "Job change reported" (members may only create `profile_updated` and `new_signup` notifications).
 
 The employment router is mounted before the admin-only `/members` router in `backend/index.js`. Mounted after it, every member request to these endpoints is answered 403 by the admin check. `backend/test/employmentRoutes.test.js` covers that order and the member/admin/applicant access rules.
 
