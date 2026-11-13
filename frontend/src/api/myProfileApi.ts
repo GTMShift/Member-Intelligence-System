@@ -1,5 +1,16 @@
 // src/api/myProfileApi.ts
 import { authenticatedFetch } from '../lib/authenticatedFetch';
+import { sortEmploymentHistory } from '../lib/employmentForm';
+import {
+  REGION_FIELDS,
+  TEAM_FIELDS,
+  emptyRegionFlags,
+  emptyTeamFlags,
+  isTshirtSize,
+  type RegionFlags,
+  type TeamFlags,
+  type TshirtSize,
+} from '../lib/profileOptions';
 import { supabase } from '../lib/supabaseClient';
 import type { EmploymentHistoryEntry } from '../types/api';
 import { createNotification } from './notificationsApi';
@@ -19,10 +30,20 @@ export interface MyProfileData {
   country: string | null;
   state_region: string | null;
   city: string | null;
+  address: string | null;
+  zip_code: string | null;
+  team_size: number | null;
+  management_layers: string | null;
+  teams_overseen: TeamFlags;
+  regions: RegionFlags;
+  tshirt_size: TshirtSize | null;
+  dietary_restrictions: string | null;
   avatar_url: string | null;
   employment_history: EmploymentHistoryEntry[];
 }
 
+// Employment is not part of this input: job changes and corrections go
+// through saveMyEmployment so the career history is preserved.
 export interface UpdateMyProfileInput {
   first_name: string;
   last_name: string;
@@ -32,6 +53,14 @@ export interface UpdateMyProfileInput {
   country: string | null;
   state_region: string | null;
   city: string | null;
+  address: string | null;
+  zip_code: string | null;
+  team_size: number | null;
+  management_layers: string | null;
+  teams_overseen: TeamFlags;
+  regions: RegionFlags;
+  tshirt_size: TshirtSize | null;
+  dietary_restrictions: string | null;
 }
 
 export type EmploymentAction = 'change' | 'correct';
@@ -67,20 +96,59 @@ async function requestEmployment<T>(
   return data as T;
 }
 
-export function fetchMyEmploymentHistory(memberId: string): Promise<EmploymentHistoryEntry[]> {
-  return requestEmployment<EmploymentHistoryEntry[]>(memberId);
+export async function fetchMyEmploymentHistory(memberId: string): Promise<EmploymentHistoryEntry[]> {
+  const history = await requestEmployment<EmploymentHistoryEntry[]>(memberId);
+  return sortEmploymentHistory(history ?? []);
 }
 
-export function saveMyEmployment(
+/**
+ * Saves a job change ("change": the current job moves to history) or a
+ * correction ("correct": the current job is edited in place). Only the member's
+ * own record is accepted by the backend unless the caller is an admin.
+ */
+export async function saveMyEmployment(
   memberId: string,
   action: EmploymentAction,
   input: SaveEmploymentInput,
+  memberName?: string,
 ): Promise<SaveEmploymentResult> {
-  return requestEmployment<SaveEmploymentResult>(memberId, `/${action}`, {
+  const result = await requestEmployment<SaveEmploymentResult>(memberId, `/${action}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
   });
+
+  if (action === 'change') {
+    const name = memberName?.trim() || 'A member';
+    // Members may only create profile_updated and new_signup notifications (migration 038),
+    // so the job change is sent as a profile update with its own title.
+    // createNotification logs and never throws, so the saved job is never reported as a failure.
+    await createNotification({
+      type: 'profile_updated',
+      title: 'Job change reported',
+      body: `${name} reported a new job: ${result.current.role} at ${result.current.company}.`,
+      member_id: memberId,
+      member_name: memberName?.trim() || null,
+    });
+  }
+
+  return { current: result.current, history: sortEmploymentHistory(result.history ?? []) };
+}
+
+function readFlags<K extends string>(
+  source: Record<string, unknown> | null,
+  fields: readonly { key: K }[],
+  empty: Record<K, boolean>,
+): Record<K, boolean> {
+  const flags = { ...empty };
+  for (const { key } of fields) flags[key] = source?.[key] === true;
+  return flags;
+}
+
+function textOrNull(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const text = String(value).trim();
+  return text ? text : null;
 }
 
 export async function fetchMyProfile(memberId: string, profileId: string): Promise<MyProfileData> {
@@ -103,6 +171,10 @@ export async function fetchMyProfile(memberId: string, profileId: string): Promi
     .eq('id', profileId)
     .maybeSingle();
 
+  const details = (profile ?? null) as Record<string, unknown> | null;
+  const teamSize = details?.team_size;
+  const tshirtSize = details?.tshirt_size;
+
   return {
     first_name: member.first_name ?? '',
     last_name: member.last_name ?? '',
@@ -117,6 +189,14 @@ export async function fetchMyProfile(memberId: string, profileId: string): Promi
     country: profile?.country ?? null,
     state_region: profile?.state_region ?? null,
     city: profile?.city ?? null,
+    address: textOrNull(details?.address),
+    zip_code: textOrNull(details?.zip_code),
+    team_size: typeof teamSize === 'number' ? teamSize : null,
+    management_layers: textOrNull(details?.management_layers),
+    teams_overseen: readFlags(details, TEAM_FIELDS, emptyTeamFlags()),
+    regions: readFlags(details, REGION_FIELDS, emptyRegionFlags()),
+    tshirt_size: isTshirtSize(tshirtSize) ? tshirtSize : null,
+    dietary_restrictions: textOrNull(details?.dietary_restrictions),
     avatar_url: profileRow?.avatar_url ?? null,
   };
 }
@@ -136,16 +216,25 @@ export async function updateMyProfile(
     .eq('id', memberId);
   if (memberErr) throw new Error(`Failed to update member: ${memberErr.message}`);
 
+  // save_my_member_profile merges these keys over the saved row, so fields not
+  // sent here (company, tags, event interest) keep their current values.
   const { error: profileErr } = await supabase.rpc('save_my_member_profile', {
     p_values: {
       seniority_level: input.seniority_level,
       country: input.country,
       state_region: input.state_region,
       city: input.city,
+      address: input.address,
+      zip_code: input.zip_code,
+      team_size: input.team_size,
+      management_layers: input.management_layers,
+      tshirt_size: input.tshirt_size,
+      dietary_restrictions: input.dietary_restrictions,
+      ...input.teams_overseen,
+      ...input.regions,
     },
   });
   if (profileErr) throw new Error(`Failed to update member profile: ${profileErr.message}`);
-
 
   await createNotification({
     type: 'profile_updated',
