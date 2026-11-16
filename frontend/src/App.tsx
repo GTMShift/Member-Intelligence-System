@@ -21,6 +21,7 @@ import { SubstackImportPage } from './pages/SubstackImportPage';
 import { CompleteProfilePage } from './pages/CompleteProfilePage';
 import { MyProfilePage } from './pages/MyProfilePage';
 import { MemberAccessRequestsAdminPage } from './pages/MemberAccessRequestsAdminPage';
+import { DuplicateReviewPage } from './pages/DuplicateReviewPage';
 import type { MemberDetail, UserRole } from './types/api';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 
@@ -53,6 +54,7 @@ function RoleBasedRedirect() {
   if (!session) return <Navigate to="/login" replace />;
 
   if (role === 'admin') return <Navigate to="/" replace />;
+  if (role === 'applicant') return <Navigate to="/complete-profile" replace />;
   if (role === 'member') {
     // Existing members go to the portal; brand-new logins with no members row
     // complete their profile first.
@@ -73,7 +75,7 @@ function App() {
         <Route
           path="/complete-profile"
           element={
-            <ProtectedRoute requiredRole="member">
+            <ProtectedRoute requiredRole="member" allowApplicant>
               <CompleteProfilePage />
             </ProtectedRoute>
           }
@@ -131,6 +133,14 @@ function App() {
           element={
             <ProtectedRoute requiredRole="admin">
               <MemberAccessRequestsAdminPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/duplicates"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <DuplicateReviewPage />
             </ProtectedRoute>
           }
         />

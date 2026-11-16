@@ -60,7 +60,8 @@ export async function updateMemberAsAdmin(
         ...(input.linkedin_url !== undefined && { linkedin_url: input.linkedin_url }),
         ...(input.phone !== undefined && { phone: input.phone }),
       })
-      .eq('id', memberId);
+      .eq('id', memberId)
+      .is('merged_into_member_id', null);
     if (memberErr) throw new Error(`Failed to update member: ${memberErr.message}`);
   }
 

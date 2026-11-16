@@ -209,7 +209,8 @@ router.post('/import', upload.single('file'), async (req, res) => {
   // Only sets member_id where it's currently null, so this never overwrites a manual link.
   const { data: membersData, error: membersErr } = await supabase
     .from('members')
-    .select('id, email');
+    .select('id, email')
+    .is('merged_into_member_id', null);
   if (membersErr) return res.status(500).json({ error: 'Failed to fetch members for matching' });
 
   const memberIdByEmail = new Map(

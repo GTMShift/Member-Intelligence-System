@@ -69,11 +69,12 @@ export async function createMemberSelf(
   profileId: string,
 ): Promise<{ id: string }> {
   // Step 1: find-or-create the member row
-  const { data: existingMember, error: existingErr } = await supabase
+  const { data: existingMemberResult, error: existingErr } = await supabase
     .from('members')
-    .select('id')
+    .select('id, merged_into_member_id')
     .eq('email', input.email)
     .maybeSingle();
+  const existingMember = existingMemberResult as unknown as { id: string; merged_into_member_id: string | null } | null;
   if (existingErr) {
     throw new Error(`Failed to check for existing member: ${existingErr.message}`);
   }
@@ -82,7 +83,7 @@ export async function createMemberSelf(
   const isNewMember = !existingMember;
  
   if (existingMember) {
-    memberId = existingMember.id;
+    memberId = existingMember.merged_into_member_id ?? existingMember.id;
     const { error: updateErr } = await supabase
       .from('members')
       .update({
@@ -267,4 +268,3 @@ export async function createMemberSelf(
  
   return { id: memberId };
 }
- 

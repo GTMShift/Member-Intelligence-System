@@ -188,7 +188,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshMemberId = useCallback(async () => {
     if (!user) return;
-    const { data } = await supabase.from('profiles').select('member_id').eq('id', user.id).maybeSingle();
+    const { data } = await supabase.from('profiles').select('role, member_id').eq('id', user.id).maybeSingle();
+    if (data?.role) setRole(toUserRole(data.role));
     setMemberId(data?.member_id ?? null);
   }, [user]);
 

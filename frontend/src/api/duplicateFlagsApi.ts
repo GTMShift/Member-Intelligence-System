@@ -31,6 +31,7 @@ export async function checkAndFlagDuplicate(
     .from('members')
     .select('id, email, linkedin_url, phone')
     .neq('id', newMemberId)
+    .is('merged_into_member_id', null)
     .or(orConditions.join(','));
 
   if (error) {

@@ -31,6 +31,7 @@ router.post('/', async (req, res) => {
     .from('members')
     .select('id, first_name, last_name, email')
     .eq('email', lookupEmail)
+    .is('merged_into_member_id', null)
     .maybeSingle();
 
   if (memberError) {

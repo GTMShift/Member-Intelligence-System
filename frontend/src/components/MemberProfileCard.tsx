@@ -869,12 +869,6 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
   ];
 
   const historyFields: ProfileField[] = [
-    { label: 'Previous company 1', value: profile.prev_company_1 },
-    { label: 'Previous role 1', value: profile.prev_role_1 },
-    { label: 'Previous company 2', value: profile.prev_company_2 },
-    { label: 'Previous role 2', value: profile.prev_role_2 },
-    { label: 'Previous company 3', value: profile.prev_company_3 },
-    { label: 'Previous role 3', value: profile.prev_role_3 },
     { label: 'Signup source', value: profile.signup_source },
   ];
 
@@ -1167,7 +1161,26 @@ export function MemberProfileCard({ memberId }: MemberProfileCardProps) {
             </div>
 
             <div>
-              <h4 className="mb-2 text-sm font-semibold text-slate-700">History & source</h4>
+              <h4 className="mb-2 text-sm font-semibold text-slate-700">Career history</h4>
+              {member.employment_history.length > 0 ? (
+                <ol className="space-y-3 border-l border-slate-200 pl-4">
+                  {member.employment_history.map((job) => (
+                    <li key={job.id} className="relative">
+                      <span className="absolute -left-[1.33rem] top-1.5 h-2 w-2 rounded-full bg-orange" />
+                      <p className="text-sm font-medium text-slate-800">
+                        {job.role || 'Role not listed'} · {job.company}
+                        {job.is_current && <span className="ml-2 text-xs font-medium text-sage">Current</span>}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {job.start_date ?? 'Start date not listed'} – {job.is_current ? 'Present' : job.end_date ?? 'End date not listed'}
+                      </p>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="text-sm text-slate-500">No employment history recorded.</p>
+              )}
+              <h4 className="mb-2 mt-4 text-sm font-semibold text-slate-700">Profile source</h4>
               <FieldGrid fields={historyFields} />
             </div>
           </div>

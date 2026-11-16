@@ -5,9 +5,10 @@ import type { UserRole } from '../types/api';
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requiredRole?: UserRole;
+  allowApplicant?: boolean;
 }
 
-export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
+export function ProtectedRoute({ children, requiredRole, allowApplicant = false }: ProtectedRouteProps) {
   const { session, role, loading, needsOnboarding } = useAuth();
   const location = useLocation();
 
@@ -47,6 +48,9 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
     // Admins stay on the admin dashboard — no portal toggle / dual view.
     if (role === 'admin') {
       return <Navigate to="/" replace />;
+    }
+    if (role === 'applicant') {
+      return allowApplicant ? <>{children}</> : <Navigate to="/complete-profile" replace />;
     }
     if (role !== 'member') {
       return <Navigate to="/unauthorized" replace />;

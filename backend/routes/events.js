@@ -95,6 +95,7 @@ router.post('/:id/signup', requireAuth, requireRole(['member', 'admin']), async 
     .from('members')
     .select('id')
     .eq('id', member_id)
+    .is('merged_into_member_id', null)
     .single();
 
   if (!member) return res.status(404).json({ error: 'Member not found' });

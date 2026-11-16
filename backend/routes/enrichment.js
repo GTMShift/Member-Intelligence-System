@@ -66,6 +66,7 @@ router.post('/', async (req, res) => {
       'id, email, linkedin_url, first_name, last_name, member_profile(company_id, companies(name, domain))',
     )
     .eq('id', id)
+    .is('merged_into_member_id', null)
     .single();
 
   if (memberError || !member) {
@@ -141,7 +142,8 @@ router.post('/', async (req, res) => {
       enriched_at: new Date().toISOString(),
       last_updated: new Date().toISOString(),
     })
-    .eq('id', id);
+    .eq('id', id)
+    .is('merged_into_member_id', null);
 
   return res.json({
     status: 'pending',

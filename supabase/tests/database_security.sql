@@ -10,12 +10,15 @@ insert into auth.users (
   ('00000000-0000-0000-0000-000000000101', 'authenticated', 'authenticated', 'member-one@example.test', now(), '{}', '{}', now(), now()),
   ('00000000-0000-0000-0000-000000000102', 'authenticated', 'authenticated', 'member-two@example.test', now(), '{}', '{}', now(), now()),
   ('00000000-0000-0000-0000-000000000103', 'authenticated', 'authenticated', 'admin@example.test', now(), '{}', '{}', now(), now()),
-  ('00000000-0000-0000-0000-000000000104', 'authenticated', 'authenticated', 'unlinked@example.test', now(), '{}', '{}', now(), now());
+  ('00000000-0000-0000-0000-000000000104', 'authenticated', 'authenticated', 'unlinked@example.test', now(), '{}', '{}', now(), now()),
+  ('00000000-0000-0000-0000-000000000105', 'authenticated', 'authenticated', 'rejected@example.test', now(), '{}', '{}', now(), now()),
+  ('00000000-0000-0000-0000-000000000106', 'authenticated', 'authenticated', 'existing@example.test', now(), '{}', '{}', now(), now());
 
 insert into public.members (id, first_name, last_name, email, linkedin_url) values
   ('00000000-0000-0000-0000-000000000201', 'Member', 'One', 'member-one@example.test', 'https://example.test/member-one'),
   ('00000000-0000-0000-0000-000000000202', 'Member', 'Two', 'member-two@example.test', 'https://example.test/member-two'),
-  ('00000000-0000-0000-0000-000000000203', 'Admin', 'Account', 'admin@example.test', 'https://example.test/admin');
+  ('00000000-0000-0000-0000-000000000203', 'Admin', 'Account', 'admin@example.test', 'https://example.test/admin'),
+  ('00000000-0000-0000-0000-000000000204', 'Existing', 'Member', 'existing@example.test', 'https://example.test/existing');
 
 update public.profiles
 set member_id = '00000000-0000-0000-0000-000000000201'
@@ -38,7 +41,7 @@ insert into public.member_data (member_id, tier, category, data) values
   ('00000000-0000-0000-0000-000000000201', 'user_editable', 'about', '{"text":"member-owned"}'),
   ('00000000-0000-0000-0000-000000000201', 'admin_only', 'intelligence', '{"text":"private"}');
 
-select plan(45);
+select plan(51);
 
 set local role anon;
 select set_config('request.jwt.claim.sub', '', true);
@@ -47,7 +50,7 @@ select set_config('request.jwt.claim.role', 'anon', true);
 select is((select count(id) from public.members), 0::bigint, 'anonymous callers cannot read members');
 select ok(not has_function_privilege('anon', 'public.link_my_member_profile(uuid)', 'execute'), 'anonymous callers cannot link profiles');
 select ok(not has_function_privilege('anon', 'public.submit_my_member_access_request(jsonb)', 'execute'), 'anonymous callers cannot submit member access requests');
-select ok(not has_function_privilege('anon', 'public.review_member_access_request(uuid,text,text)', 'execute'), 'anonymous callers cannot review member access requests');
+select ok(not has_function_privilege('anon', 'public.decide_member_access_request(uuid,text,text)', 'execute'), 'anonymous callers cannot decide member access requests');
 select ok(not has_function_privilege('anon', 'public.delete_member_safely(uuid)', 'execute'), 'anonymous callers cannot delete members');
 select is(
   (select count(*) from pg_proc p
@@ -187,7 +190,7 @@ select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000104
 select is(public.link_my_member_profile(null), null::uuid, 'unlinked sign-in does not link by matching or creating a contact');
 select is((select count(id) from public.members), 0::bigint, 'unlinked sign-in cannot enter the member data set');
 select lives_ok(
-  $$select public.submit_my_member_access_request('{"first_name":"New","last_name":"Person","city":"Chicago"}'::jsonb)$$,
+  $$select public.submit_my_member_access_request('{"first_name":"New","last_name":"Person","linkedin_url":"https://example.test/new-person","phone":"+12025550123","company_name":"New Company","job_title":"Analyst","city":"Chicago"}'::jsonb)$$,
   'an unlinked signed-in member can save a pending access request'
 );
 select throws_ok(
@@ -200,25 +203,61 @@ select is(
 );
 select is((select count(id) from public.members), 0::bigint, 'submitting an access request does not create a member record');
 
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000105', true);
+select lives_ok(
+  $$select public.submit_my_member_access_request('{"first_name":"Reject","last_name":"Me","linkedin_url":"https://example.test/reject-me","phone":"+12025550124","company_name":"Reject Company","job_title":"Analyst"}'::jsonb)$$,
+  'a second applicant can submit a request for the rejection path'
+);
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000106', true);
+select lives_ok(
+  $$select public.submit_my_member_access_request('{"first_name":"Existing","last_name":"Member","linkedin_url":"https://example.test/existing","phone":"+12025550126","company_name":"Existing Co","job_title":"Consultant"}'::jsonb)$$,
+  'an unlinked account matching an existing member can request account linking'
+);
+
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000101', true);
 select is(
   (select count(*) from public.member_access_requests where auth_user_id = '00000000-0000-0000-0000-000000000104'),
   0::bigint, 'members cannot read another account’s access request'
 );
 select throws_ok(
-  $$select public.review_member_access_request((select id from public.member_access_requests where auth_user_id = '00000000-0000-0000-0000-000000000104'), 'reviewed', null)$$,
-  'P0001', null, 'members cannot review access requests'
+  $$select public.decide_member_access_request((select id from public.member_access_requests where auth_user_id = '00000000-0000-0000-0000-000000000104'), 'approved', null)$$,
+  'P0001', null, 'members cannot accept member access requests'
 );
 
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000103', true);
-select is((select count(id) from public.members), 3::bigint, 'admin can read the management directory');
+select is((select count(id) from public.members), 4::bigint, 'admin can read the management directory');
 select is((select count(id) from public.member_data where tier = 'admin_only'), 1::bigint, 'admin can read admin-only member data');
-select is((select count(*) from public.member_access_requests), 1::bigint, 'admin can read pending access requests');
+select is((select count(*) from public.member_access_requests), 3::bigint, 'admin can read pending access requests');
 select lives_ok(
-  $$select public.review_member_access_request((select id from public.member_access_requests limit 1), 'reviewed', 'Verified for next setup step')$$,
-  'admin can mark a request reviewed'
+  $$select public.decide_member_access_request((select id from public.member_access_requests limit 1), 'approved', 'Verified member details')$$,
+  'admin can accept a request and create or link its member'
 );
-select is((select status from public.member_access_requests limit 1), 'reviewed', 'admin review status is persisted');
+select is(
+  (select r.status || ':' || (r.member_id is not null)::text || ':' || p.role
+     from public.member_access_requests r join public.profiles p on p.id = r.auth_user_id
+    where r.auth_user_id = '00000000-0000-0000-0000-000000000104'),
+  'approved:true:member', 'accepting a request records the member and grants its linked account access'
+);
+select lives_ok(
+  $$select public.decide_member_access_request((select id from public.member_access_requests where auth_user_id = '00000000-0000-0000-0000-000000000105'), 'rejected', 'Not a current fit')$$,
+  'admin can reject an access request'
+);
+select is(
+  (select r.status || ':' || (r.member_id is not null)::text || ':' || (p.role in ('applicant', 'member'))::text
+     from public.member_access_requests r join public.profiles p on p.id = r.auth_user_id
+    where r.auth_user_id = '00000000-0000-0000-0000-000000000105'),
+  'rejected:false:true', 'rejecting closes the request without creating or linking a member'
+);
+select lives_ok(
+  $$select public.decide_member_access_request((select id from public.member_access_requests where auth_user_id = '00000000-0000-0000-0000-000000000106'), 'approved', null)$$,
+  'admin can accept a request that matches an existing member record'
+);
+select is(
+  (select r.status || ':' || (r.member_id = '00000000-0000-0000-0000-000000000204')::text || ':' || (p.member_id = r.member_id)::text
+     from public.member_access_requests r join public.profiles p on p.id = r.auth_user_id
+    where r.auth_user_id = '00000000-0000-0000-0000-000000000106'),
+  'approved:true:true', 'existing member is reused and linked without a duplicate member row'
+);
 select is(
   (select bucket from public.member_profile where member_id = '00000000-0000-0000-0000-000000000201'),
   'manual_review', 'member profile write RPC ignores internal classification fields'
@@ -229,7 +268,7 @@ select lives_ok(
 );
 select is(
   (select count(*) from public.search_members(null, null, null, null, null, null, null, null, null, 'last_name_asc', 1, 50, null)),
-  3::bigint,
+  5::bigint,
   'admin search RPC returns directory records'
 );
 

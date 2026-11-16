@@ -115,6 +115,7 @@ router.get('/:id', async (req, res) => {
     .from('members')
     .select()
     .eq('id', id)
+    .is('merged_into_member_id', null)
     .single();
 
   if (memberError) return res.status(404).json({ error: 'Member not found' });
@@ -180,6 +181,7 @@ router.put('/:id', async (req, res) => {
     .from('members')
     .select('id')
     .eq('id', id)
+    .is('merged_into_member_id', null)
     .single();
 
   if (!existing) return res.status(404).json({ error: 'Member not found' });
@@ -212,6 +214,7 @@ router.delete('/:id', async (req, res) => {
     .from('members')
     .select('id')
     .eq('id', id)
+    .is('merged_into_member_id', null)
     .single();
 
   if (!existing) return res.status(404).json({ error: 'Member not found' });
