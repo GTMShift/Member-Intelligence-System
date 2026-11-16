@@ -134,12 +134,43 @@ function createDuplicateReviewRouter(client = require('../supabaseClient')) {
     }
   });
 
+  router.post('/:id/merge', async (req, res) => {
+    const { survivorId, fieldSources } = req.body ?? {};
+    const allowedFields = new Set(['first_name', 'last_name', 'email', 'linkedin_url', 'phone', 'company_name', 'job_title', 'seniority_level', 'city', 'state_region', 'country']);
+    const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value ?? '');
+    if (!isUuid(req.params.id) || !isUuid(survivorId) || !fieldSources || typeof fieldSources !== 'object' || Array.isArray(fieldSources)
+      || Object.keys(fieldSources).some((field) => !allowedFields.has(field) || !['a', 'b'].includes(fieldSources[field]))) {
+      return res.status(400).json({ error: 'Choose a survivor profile and valid field sources' });
+    }
+    try {
+      const { data, error } = await client.rpc('merge_duplicate_members', {
+        p_pair_id: req.params.id,
+        p_survivor_id: survivorId,
+        p_field_sources: fieldSources,
+        p_admin_id: req.user.id,
+      });
+      if (error) {
+        if (error.code === 'P0002') return res.status(404).json({ error: 'This candidate no longer exists' });
+        if (['P0001', '22023', '23505', '23503'].includes(error.code)) {
+          return res.status(409).json({ error: error.code === '23505' || error.code === '23503'
+            ? 'The merge conflicts with an existing linked record. Resolve that conflict and try again.'
+            : (error.message?.startsWith('MERGE_BLOCKED: ') ? error.message.slice(15) : 'This pair cannot be merged in its current state.') });
+        }
+        throw error;
+      }
+      return res.json(data);
+    } catch {
+      return res.status(500).json({ error: 'Could not merge these profiles' });
+    }
+  });
+
   return router;
 }
 
 async function fetchSnapshotsForScan(client) {
   const { data: members, error } = await client.from('members')
-    .select('id, first_name, last_name, email, linkedin_url, phone');
+    .select('id, first_name, last_name, email, linkedin_url, phone')
+    .is('merged_into_member_id', null);
   if (error) throw error;
   const ids = (members ?? []).map((member) => member.id);
   if (!ids.length) return [];

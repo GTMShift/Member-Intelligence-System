@@ -5,16 +5,21 @@
 - `POST /duplicate-review/scan` scans the existing member set and stores proposed pairs. It is server-side and admin-only.
 - `GET /duplicate-review?status=pending|deferred|dismissed` returns up to 100 candidates, their reasons, confidence, profile fields, employment history, and linked-record IDs.
 - `PATCH /duplicate-review/:id/status` lets an admin defer, dismiss, or return a deferred candidate to pending.
+- `POST /duplicate-review/:id/merge` accepts an explicit survivor and the field-source choices from the comparison page. It only accepts pending or deferred pairs.
 - The scanner normalizes email, LinkedIn URL, and phone. Email and LinkedIn are strong signals. Phone is considered only with a similar name; similar names require a shared current/past company or role. Name-only and phone-only pairs are omitted.
 - The confidence value is an explainable heuristic ranking, not a calibrated probability.
 - A unique ordered member pair prevents repeated flags. Re-running a scan leaves a prior pair's review status intact.
-- The comparison page allows per-field choices and shows a preview with all employment-history rows and linked-record counts. It does not write member data or merge records.
+- The comparison page allows per-field choices, selects which profile survives, and requires a browser confirmation before the merge request is sent.
+- The merge runs in one database transaction. It preserves the full employment timeline, keeps the selected current job, combines non-empty profile fields, moves linked records, transfers one existing login link, and rewires other duplicate candidates to the survivor. A second login link on the two records blocks the merge.
+- The source member row remains as an archived record with `merged_into_member_id` pointing to the survivor. This keeps existing history foreign keys valid and preserves original identity data. Active-member searches and scans exclude archived rows.
+- A durable, service-role-only audit stores both original member records, the linked rows from the archived record, the selected fields, the resulting survivor, the reviewer, and affected row counts. Historical snapshot tables retain their original member IDs.
+- A unique-key or foreign-key conflict rolls back the transaction. The API returns a conflict so an administrator can resolve it before retrying. No silent row deletion is used to get around conflicting linked records.
 
 ## API and deployment notes
 
 All routes verify a Supabase bearer token and then read the caller's `profiles.role` on the server. Only admins can access this API. The queue table is RLS-enabled and has direct `anon` and `authenticated` grants revoked; the backend accesses it with the server-only service-role client after the role check.
 
-The schema addition is migration `044_duplicate_review_pairs.sql`, sequenced after migration 043. It is additive and leaves migrations 042 and 043 unchanged. Apply it only after both migration branches are integrated in order. Do not run it on production as part of this prototype without the normal migration review and approval.
+The schema additions are in migration `044_duplicate_review_pairs.sql`, sequenced after the existing profile-management migrations. It creates the review queue, admin-audited merge RPC, and private audit table. Apply it after the preceding migration branches are integrated and review and test it in staging. The merge action changes real member records when an administrator confirms it; do not perform production merges without the normal approval process.
 
 ## Shared-file integration
 
@@ -24,13 +29,12 @@ This branch is based on the migration 43 profile-management branch. It adds a ro
 
 The preview enumerates linked IDs for `member_profile`, `employment_history`, `member_data`, `interactions`, `member_socials`, `event_signups`, `newsletter_engagement`, `enrichment_runs`, `profiles`, `substack_subscribers`, `substack_engagement_snapshots`, `join_us_applications`, `otr_applications`, `notifications`, `duplicate_flags`, `members_history`, `member_profile_history`, and `employment_history_log`. Employment rows are shown from both profiles without dropping or combining entries. Account associations and historical snapshots are highlighted for separate handling.
 
-## Safe transactional merge plan — not implemented
+## Merge safeguards and current limits
 
-1. Require an explicit admin decision and a chosen survivor. Never infer the survivor from match confidence.
-2. In one database transaction, lock both member rows and re-check the pair, status, profile links, and all unique constraints.
-3. Stop if both members are linked to different auth accounts, or if an application/profile/account relationship is ambiguous. Resolve those cases manually first.
-4. Apply the admin's field selections; preserve every employment row and history snapshot. Reassign child rows with table-specific conflict handling (for example, `event_signups` is unique per member/event).
-5. Preserve account associations only when there is a single verified account; do not rewrite audit snapshots to hide the original IDs. Record the reviewer, source/target IDs, selected fields, moved records, and timestamp in a durable merge audit record.
-6. Verify all references and profile invariants before removing the duplicate row. Any failed check rolls the whole transaction back.
+1. An admin must select the survivor; confidence score never selects it automatically.
+2. The database rechecks the admin role, candidate state, profile links, and survivor choice while locking both members. The service-role-only RPC runs as an invoker and the backend supplies the verified admin ID.
+3. The merge is refused when both records have login accounts. Unique and foreign-key violations also roll back the whole transaction; resolve the conflicting record and retry.
+4. Employment rows are retained, the selected current job remains current, profile choices are applied, and linked records move to the survivor. Existing history snapshots keep the original IDs.
+5. The source row is marked archived after its full review data is preserved in the audit record. Other queued pairs are redirected to the survivor and coalesced when the same pair already exists.
 
-No endpoint in this prototype performs those steps, deletes a member, or merges production data.
+The merge is transactional and has no automatic undo button. The source row and complete audit snapshot remain available for a manual restore or a database restore. Use synthetic records in tests and require administrator approval before production use.

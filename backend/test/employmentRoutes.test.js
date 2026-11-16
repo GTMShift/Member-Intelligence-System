@@ -36,6 +36,7 @@ const supabaseMock = {
     const chain = {
       select() { return chain; },
       eq(key, value) { filters[key] = value; return chain; },
+      is() { return chain; },
       order() { return chain; },
       update() { return chain; },
       maybeSingle: async () => {

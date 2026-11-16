@@ -19,6 +19,7 @@ const supabaseMock = {
     const chain = {
       select() { return chain; },
       eq(key, value) { query.filters[key] = value; return chain; },
+      is(key, value) { query.filters[key] = value; return chain; },
       insert(payload) { query.operation = 'insert'; query.payload = payload; return chain; },
       update(payload) { query.operation = 'update'; query.payload = payload; return chain; },
       order() { return Promise.resolve({ data: [], error: null }); },

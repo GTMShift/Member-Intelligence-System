@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { HeaderActions } from '../components/HeaderActions';
 import {
   fetchDuplicateReviewPairs,
+  mergeDuplicateMembers,
   scanDuplicateMembers,
   updateDuplicateReviewStatus,
   type DuplicateReviewMember,
@@ -47,6 +48,7 @@ export function DuplicateReviewPage() {
   const [pairs, setPairs] = useState<DuplicateReviewPair[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [fieldSelections, setFieldSelections] = useState<Record<string, Record<FieldKey, Side>>>({});
+  const [survivorSelections, setSurvivorSelections] = useState<Record<string, Side>>({});
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -122,6 +124,25 @@ export function DuplicateReviewPage() {
     }
   };
 
+  const mergeSelected = async (survivorSide: Side) => {
+    if (!selectedPair) return;
+    const survivor = survivorSide === 'a' ? selectedPair.member_a : selectedPair.member_b;
+    const merged = survivorSide === 'a' ? selectedPair.member_b : selectedPair.member_a;
+    if (!window.confirm(`Keep ${survivor.first_name} ${survivor.last_name} and merge ${merged.first_name} ${merged.last_name} into it? The duplicate will be archived, linked records reassigned, and the decision recorded in the merge audit.`)) return;
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      await mergeDuplicateMembers(selectedPair.id, survivor.id, selectedFields);
+      setMessage(`Merged ${merged.first_name} ${merged.last_name} into ${survivor.first_name} ${survivor.last_name}.`);
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not merge these profiles.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="flex min-h-screen flex-col bg-surface">
       <header className="bg-charcoal">
@@ -138,7 +159,7 @@ export function DuplicateReviewPage() {
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-2xl font-semibold text-ink">Review possible duplicates</h2>
-            <p className="mt-1 text-sm text-ink/60">Compare the evidence and linked records before making any decision. No merge is performed here.</p>
+            <p className="mt-1 text-sm text-ink/60">Compare profiles, choose the record to keep, then confirm a transactional merge.</p>
           </div>
           <button type="button" onClick={() => void scan()} disabled={scanning} className="rounded-lg bg-charcoal px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
             {scanning ? 'Scanning profiles…' : 'Scan profiles'}
@@ -183,6 +204,15 @@ export function DuplicateReviewPage() {
                     <p className="mt-1 text-sm text-slate-600">{confidenceLabel(selectedPair.confidence)} · {Math.round(selectedPair.confidence * 100)}% heuristic score, not a probability</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
+                    {status !== 'dismissed' && <>
+                      <label className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700">
+                        Keep
+                        <select aria-label="Profile to keep" disabled={busy} value={survivorSelections[selectedPair.id] ?? 'a'} onChange={(event) => setSurvivorSelections((current) => ({ ...current, [selectedPair.id]: event.target.value as Side }))} className="bg-transparent font-semibold">
+                          <option value="a">Profile A</option><option value="b">Profile B</option>
+                        </select>
+                      </label>
+                      <button type="button" disabled={busy} onClick={() => void mergeSelected(survivorSelections[selectedPair.id] ?? 'a')} className="rounded-md bg-violet-800 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60">{busy ? 'Working…' : 'Confirm and merge'}</button>
+                    </>}
                     {status === 'pending' ? <>
                       <button type="button" disabled={busy} onClick={() => void updateStatus('deferred')} className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 disabled:opacity-60">Defer</button>
                       <button type="button" disabled={busy} onClick={() => void updateStatus('dismissed')} className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 disabled:opacity-60">Dismiss</button>
@@ -219,7 +249,7 @@ export function DuplicateReviewPage() {
               <div className="grid gap-5 lg:grid-cols-2">
                 <article className="rounded-xl border border-violet-200 bg-violet-50 p-5">
                   <h3 className="font-semibold text-violet-950">Selected-profile preview</h3>
-                  <p className="mt-1 text-xs text-violet-900/70">Field choices below are temporary and do not change either record.</p>
+                  <p className="mt-1 text-xs text-violet-900/70">These choices apply only after you confirm the merge.</p>
                   <dl className="mt-4 grid grid-cols-[8rem_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
                     {FIELDS.map(([field, label]) => <div key={field} className="contents"><dt className="text-violet-900/70">{label}</dt><dd className="break-words font-medium text-violet-950">{preview?.[field]}</dd></div>)}
                   </dl>

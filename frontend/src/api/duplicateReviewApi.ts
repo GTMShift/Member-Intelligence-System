@@ -57,3 +57,11 @@ export function updateDuplicateReviewStatus(id: string, status: 'pending' | 'def
     body: JSON.stringify({ status }),
   });
 }
+
+export function mergeDuplicateMembers(id: string, survivorId: string, fieldSources: Record<string, 'a' | 'b'>) {
+  return request<{ auditId: string; survivorId: string; mergedMemberId: string; movedRecordCounts: Record<string, number> }>(`/duplicate-review/${id}/merge`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ survivorId, fieldSources }),
+  });
+}

@@ -191,6 +191,7 @@ async function fetchAllMemberDetails(): Promise<MemberDetail[]> {
   const { data, error } = await supabase
     .from('members')
     .select(MEMBER_SELECT)
+    .is('merged_into_member_id', null)
     .order('last_name', { ascending: true })
     .order('first_name', { ascending: true })
     .order('id', { ascending: true }); // final tie-breaker for fully stable ordering
@@ -273,6 +274,7 @@ export async function getMember(id: string, role: UserRole): Promise<MemberDetai
         .from('members')
         .select('id, first_name, last_name, email, linkedin_url, phone, created_at, last_updated')
         .eq('id', id)
+        .is('merged_into_member_id', null)
         .maybeSingle(),
       supabase.rpc('get_my_member_profile'),
       supabase
@@ -358,7 +360,7 @@ export async function getMember(id: string, role: UserRole): Promise<MemberDetai
     return applyRoleFilter(member, role);
   }
 
-  const { data, error } = await supabase.from('members').select(MEMBER_SELECT).eq('id', id).maybeSingle();
+  const { data, error } = await supabase.from('members').select(MEMBER_SELECT).eq('id', id).is('merged_into_member_id', null).maybeSingle();
   if (error) throw new Error(`Failed to fetch member ${id}: ${error.message}`);
   if (!data) return null;
 

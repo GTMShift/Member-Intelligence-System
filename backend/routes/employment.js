@@ -98,6 +98,7 @@ router.post('/', requireAdmin, async (req, res) => {
     .from('members')
     .select('id')
     .eq('id', id)
+    .is('merged_into_member_id', null)
     .single();
 
   if (!member) return res.status(404).json({ error: 'Member not found' });
@@ -130,6 +131,7 @@ router.get('/', requireMemberAccess, async (req, res) => {
     .from('members')
     .select('id')
     .eq('id', id)
+    .is('merged_into_member_id', null)
     .single();
 
   if (!member) return res.status(404).json({ error: 'Member not found' });
