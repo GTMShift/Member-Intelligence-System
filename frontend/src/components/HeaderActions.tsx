@@ -173,6 +173,13 @@ export function HeaderActions() {
               >
                 Member access requests
               </button>
+              <button
+                type="button"
+                onClick={() => go('/admin/duplicates')}
+                className={navButtonClass}
+              >
+                Duplicate review
+              </button>
               <button type="button" onClick={() => go('/analytics')} className={navButtonClass}>
                 Analytics
               </button>

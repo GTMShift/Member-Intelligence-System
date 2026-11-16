@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabaseClient';
 
-export type MemberAccessRequestStatus = 'pending' | 'reviewed' | 'declined';
+export type MemberAccessRequestStatus = 'pending' | 'reviewed' | 'approved' | 'rejected';
 
 export interface MemberAccessRequest {
   id: string;
@@ -18,7 +18,7 @@ export async function submitMyMemberAccessRequest(
   const { data, error } = await supabase.rpc('submit_my_member_access_request', {
     p_data: submittedData,
   });
-  if (error) throw new Error(`Could not submit your profile for review: ${error.message}`);
+  if (error) throw new Error(`Could not submit your member access request: ${error.message}`);
   return data;
 }
 
@@ -42,15 +42,15 @@ export async function fetchMemberAccessRequests(): Promise<MemberAccessRequest[]
   return (data ?? []) as MemberAccessRequest[];
 }
 
-export async function reviewMemberAccessRequest(
+export async function decideMemberAccessRequest(
   requestId: string,
-  status: Exclude<MemberAccessRequestStatus, 'pending'>,
+  decision: 'approved' | 'rejected',
   reviewNote: string,
 ): Promise<void> {
-  const { error } = await supabase.rpc('review_member_access_request', {
+  const { error } = await supabase.rpc('decide_member_access_request', {
     p_request_id: requestId,
-    p_status: status,
+    p_decision: decision,
     p_review_note: reviewNote,
   });
-  if (error) throw new Error(`Could not update access request: ${error.message}`);
+  if (error) throw new Error(`Could not ${decision === 'approved' ? 'accept' : 'reject'} access request: ${error.message}`);
 }

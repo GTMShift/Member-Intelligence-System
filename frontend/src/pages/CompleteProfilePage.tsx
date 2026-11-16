@@ -309,7 +309,7 @@ function Typeahead({ label, value, options, onChange, onValidChange, placeholder
 }
 
 export function CompleteProfilePage() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, role, memberId, refreshMemberId } = useAuth();
   const [draftWasSaved] = useState(() => Boolean(localStorage.getItem(FORM_STORAGE_KEY)));
 
   const handleSwitchAccount = async () => {
@@ -341,6 +341,10 @@ export function CompleteProfilePage() {
   useEffect(() => {
     localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(form));
   }, [form]);
+
+  useEffect(() => {
+    if (role === 'member' && memberId) window.location.replace('/portal');
+  }, [role, memberId]);
 
   useEffect(() => {
     let active = true;
@@ -561,6 +565,22 @@ export function CompleteProfilePage() {
     }
   };
 
+  const checkRequestStatus = async () => {
+    setRequestStatusLoading(true);
+    setError(null);
+    try {
+      const request = await fetchMyMemberAccessRequest();
+      if (request) {
+        setRequestStatus(request.status);
+        if (request.status === 'approved') await refreshMemberId();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not check your request status.');
+    } finally {
+      setRequestStatusLoading(false);
+    }
+  };
+
   return (
     <div className="flex min-h-screen flex-col bg-surface">
       <header className="bg-charcoal">
@@ -582,16 +602,22 @@ export function CompleteProfilePage() {
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 sm:px-6">
         <p className="mb-6 text-sm text-slate-600">
           We couldn't find an existing member record for <strong>{user?.email}</strong>.
-          Share your details below so an administrator can review your request. This form does not create or link a member record.
+          Share your details below to request access. An administrator must accept the request before a member record is created or linked.
         </p>
 
-        {!requestStatusLoading && requestStatus && (
+        {requestStatus && (
           <div className="mb-6 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3">
             <p className="text-sm font-medium text-sky-900">
-              {requestStatus === 'pending' && 'Your request is saved and waiting for administrator review.'}
-              {requestStatus === 'reviewed' && 'An administrator reviewed your request. Member access is still granted separately.'}
-              {requestStatus === 'declined' && 'Your previous request was declined. You can submit updated details for another review.'}
+              {requestStatus === 'pending' && 'Your request is waiting for an administrator to accept or reject it.'}
+              {requestStatus === 'reviewed' && 'Your request is ready for an administrator’s final decision.'}
+              {requestStatus === 'approved' && 'Your request was accepted. Refresh your access to open the member portal.'}
+              {requestStatus === 'rejected' && 'Your previous request was rejected. You can update your details and submit again.'}
             </p>
+            {(requestStatus === 'approved' || requestStatus === 'pending' || requestStatus === 'reviewed') && (
+              <button type="button" disabled={requestStatusLoading} onClick={() => void checkRequestStatus()} className="mt-3 rounded-md bg-charcoal px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+                {requestStatusLoading ? 'Checking…' : requestStatus === 'approved' ? 'Continue to member portal' : 'Check request status'}
+              </button>
+            )}
           </div>
         )}
 
@@ -1025,7 +1051,7 @@ export function CompleteProfilePage() {
               disabled={loading}
               className="rounded-md bg-orange px-6 py-2 text-sm font-medium text-white hover:bg-orange-dark disabled:opacity-50"
             >
-              {loading ? 'Submitting…' : requestStatus === 'pending' ? 'Update request' : 'Submit for review'}
+              {loading ? 'Submitting…' : requestStatus === 'pending' || requestStatus === 'reviewed' ? 'Update request' : 'Submit request'}
             </button>
           </div>
         </form>
